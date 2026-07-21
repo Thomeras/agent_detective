@@ -262,7 +262,9 @@ def build_spans(
     resource = Resource(attributes={"service.name": "agent-detective-demo"})
     provider_kwargs = {"resource": resource}
     if deterministic:
-        provider_kwargs["id_generator"] = DeterministicIdGenerator()
+        # Seed ids with the graph id so different scenarios get disjoint
+        # trace/span ids (otherwise ingest drops the second graph's runs).
+        provider_kwargs["id_generator"] = DeterministicIdGenerator(seed=graph_id)
     provider = TracerProvider(**provider_kwargs)
     provider.add_span_processor(SimpleSpanProcessor(exporter))
     tracer = provider.get_tracer("openinference.instrumentation.demo")

@@ -19,8 +19,8 @@
           },
           "spans": [
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000001",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000001",
               "name": "orchestrator.run",
               "kind": 1,
               "startTimeUnixNano": "1751328000000000000",
@@ -86,8 +86,8 @@
               }
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000002",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000002",
               "name": "orchestrator.plan_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328000200000000",
@@ -115,11 +115,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000001"
+              "parentSpanId": "b25a000000000001"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000003",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000003",
               "name": "scraper.run",
               "kind": 1,
               "startTimeUnixNano": "1751328001000000000",
@@ -183,11 +183,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000001"
+              "parentSpanId": "b25a000000000001"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000004",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000004",
               "name": "scraper.extract_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328001500000000",
@@ -215,11 +215,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000003"
+              "parentSpanId": "b25a000000000003"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000005",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000005",
               "name": "translator.run",
               "kind": 1,
               "startTimeUnixNano": "1751328002000000000",
@@ -283,11 +283,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000001"
+              "parentSpanId": "b25a000000000001"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000006",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000006",
               "name": "translator.translate_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328002500000000",
@@ -315,11 +315,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000005"
+              "parentSpanId": "b25a000000000005"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000007",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000007",
               "name": "compliance.run",
               "kind": 1,
               "startTimeUnixNano": "1751328008000000000",
@@ -383,11 +383,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000001"
+              "parentSpanId": "b25a000000000001"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000009",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000009",
               "name": "compliance.fetch_product_data",
               "kind": 1,
               "startTimeUnixNano": "1751328008500000000",
@@ -415,11 +415,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000007"
+              "parentSpanId": "b25a000000000007"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a00000000000000a",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a00000000000a",
               "name": "compliance.fetch_translations",
               "kind": 1,
               "startTimeUnixNano": "1751328009200000000",
@@ -447,11 +447,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000007"
+              "parentSpanId": "b25a000000000007"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a000000000000008",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a000000000008",
               "name": "compliance.check_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328010000000000",
@@ -479,11 +479,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000007"
+              "parentSpanId": "b25a000000000007"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a00000000000000b",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a00000000000b",
               "name": "publisher.run",
               "kind": 1,
               "startTimeUnixNano": "1751328015000000000",
@@ -547,11 +547,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a000000000000001"
+              "parentSpanId": "b25a000000000001"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a00000000000000d",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a00000000000d",
               "name": "publisher.fetch_compliance_report",
               "kind": 1,
               "startTimeUnixNano": "1751328015200000000",
@@ -579,11 +579,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a00000000000000b"
+              "parentSpanId": "b25a00000000000b"
             },
             {
-              "traceId": "00ad0de70a11e5711ce0000000000001",
-              "spanId": "a00000000000000c",
+              "traceId": "9f2a1144b41de5ff05f561fdf6578838",
+              "spanId": "b25a00000000000c",
               "name": "publisher.publish_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328016000000000",
@@ -611,7 +611,7 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "a00000000000000b"
+              "parentSpanId": "b25a00000000000b"
             }
           ]
         }

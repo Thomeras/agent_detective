@@ -10,6 +10,7 @@ strings, span kind as the OTLP integer.
 
 from __future__ import annotations
 
+import hashlib
 import itertools
 import json
 from typing import Any, Sequence
@@ -50,14 +51,26 @@ class CollectingSpanExporter(SpanExporter):
 
 
 class DeterministicIdGenerator(IdGenerator):
-    """Sequential trace/span ids for reproducible fixture payloads."""
+    """Sequential trace/span ids for reproducible fixture payloads.
 
-    def __init__(self, trace_id: int = 0x0AD0DE70A11E5711CE0000000000001) -> None:
-        self._trace_id = trace_id
+    Ids are derived from a per-graph ``seed`` so distinct graphs (e.g. the
+    happy vs faulted scenarios) never share trace/span ids. Ingest maps span
+    ids to globally-unique run ids, so if two graphs reused the same ids the
+    second one ingested would lose its runs to ON CONFLICT DO NOTHING. The
+    derivation is a pure hash, so payloads stay byte-for-byte reproducible.
+    """
+
+    def __init__(self, seed: str = "") -> None:
+        trace_digest = hashlib.sha256(f"trace:{seed}".encode()).digest()
+        # 128-bit, top bit forced on so the id is non-zero and full width.
+        self._trace_id = int.from_bytes(trace_digest[:16], "big") | (1 << 127)
+        span_digest = hashlib.sha256(f"span:{seed}".encode()).digest()
+        # Per-graph 16-bit prefix in the high bits; sequential counter below.
+        self._span_prefix = (int.from_bytes(span_digest[:2], "big") | 0xA000) << 48
         self._span_counter = itertools.count(1)
 
     def generate_span_id(self) -> int:
-        return 0xA000000000000000 | next(self._span_counter)
+        return self._span_prefix | next(self._span_counter)
 
     def generate_trace_id(self) -> int:
         return self._trace_id
