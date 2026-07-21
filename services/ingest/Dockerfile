@@ -14,6 +14,4 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-# TODO(M3): replace this placeholder with the real server:
-#   CMD ["uvicorn", "ingest.main:app", "--host", "0.0.0.0", "--port", "8001"]
-CMD ["python", "-m", "http.server", "8001"]
+CMD ["uvicorn", "ingest.main:app", "--host", "0.0.0.0", "--port", "8001"]

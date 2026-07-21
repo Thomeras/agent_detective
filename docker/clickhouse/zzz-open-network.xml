@@ -1,0 +1,18 @@
+<clickhouse>
+  <!--
+    The clickhouse-server image ships a default-user.xml that restricts the
+    default user to localhost (::1, 127.0.0.1). In compose the ingest/worker
+    services connect over the docker network, so we re-open the default user
+    to all networks with an empty password (single-tenant, self-hosted dev
+    stack). The zzz- filename sorts after default-user.xml so this override
+    wins the users.d merge.
+  -->
+  <users>
+    <default>
+      <password></password>
+      <networks replace="replace">
+        <ip>::/0</ip>
+      </networks>
+    </default>
+  </users>
+</clickhouse>

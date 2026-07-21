@@ -43,6 +43,8 @@ services:
     volumes:
       # Creates the otel_spans table on first boot (see docker/clickhouse/init.sql).
       - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+      # Re-opens the default user to the docker network (see file header).
+      - ./docker/clickhouse/zzz-open-network.xml:/etc/clickhouse-server/users.d/zzz-open-network.xml:ro
     healthcheck:
       test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
       interval: 5s
@@ -134,8 +136,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      # TODO(M3): switch to the real /health endpoint.
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
@@ -176,8 +177,7 @@ services:
       migrate:
         condition: service_completed_successfully
     healthcheck:
-      # TODO(M5): switch to the real /health endpoint.
-      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000')\" || exit 1"]
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000/health')\" || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 6
