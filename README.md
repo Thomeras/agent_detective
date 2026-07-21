@@ -55,20 +55,25 @@ web/               UI placeholder (real UI in milestone M7)
 
 ```bash
 docker compose up --build    # full stack: infra + ingest + worker + api + web
-./demo/run.sh                # happy-path demo run (lands in M6)
-./demo/inject_fault.sh && ./demo/run.sh   # fault injection: incident appears (M6)
+./demo/run.sh                # happy-path demo run: graph appears, no incident
+./demo/inject_fault.sh && ./demo/run.sh   # fault injection: a cut_point incident appears
 ```
 
 Local development (no Docker required):
 
 ```bash
-uv sync                      # install the workspace
-uv run pytest                # run all package tests
+uv sync --all-packages --all-groups   # install the workspace
+./scripts/test.sh                     # run every unit suite (mirrors CI)
 ```
+
+Each suite runs from its own package directory (`scripts/test.sh` handles
+this); the end-to-end acceptance test lives in `tests/e2e` and needs a running
+stack (`uv run pytest tests/e2e`).
 
 ## License
 
-- `packages/otel_mapper`: Apache-2.0
-- Everything else: Business Source License 1.1 (BSL 1.1)
+- `packages/otel_mapper`: Apache-2.0 (see `packages/otel_mapper/LICENSE`)
+- Everything else: Business Source License 1.1 (BSL 1.1) (see `LICENSE`)
 
-LICENSE files land in milestone M8.
+Docs: `docs/architecture.md` (system design), `docs/instrumentation.md`
+(connecting your own agents).
