@@ -1,7 +1,22 @@
 """OTEL span to AgentRun/Edge candidate mapping.
 
-Pure mapping, no I/O. Implemented in milestone M2 (build spec section 6.1).
-License: Apache-2.0.
+Pure mapping, no I/O. Implements build spec section 6.1 (milestone M2).
+License: Apache-2.0. See ``otel_mapper.mapper``'s module docstring for the
+accepted input shapes, run/edge keying, and the correlation-header
+limitation.
 """
 
+from .mapper import flatten_export_request, map_spans
+from .types import AgentRunCandidate, EdgeCandidate, EdgeType, MappingResult
+
 __version__ = "0.1.0"
+
+__all__ = [
+    "AgentRunCandidate",
+    "EdgeCandidate",
+    "EdgeType",
+    "MappingResult",
+    "flatten_export_request",
+    "map_spans",
+    "__version__",
+]

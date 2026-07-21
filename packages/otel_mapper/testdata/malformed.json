@@ -1,0 +1,67 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "telemetry.sdk.name", "value": {"stringValue": "opentelemetry"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "hand-rolled.exporter"},
+          "spans": [
+            {
+              "traceId": "eeee0000000000000000000000000005",
+              "spanId": "0000000000000a01",
+              "name": "unnamed.root",
+              "kind": 1,
+              "startTimeUnixNano": "1752000000000000000",
+              "endTimeUnixNano": "1752000009000000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}},
+                {"value": {"stringValue": "orphan-value-without-key"}},
+                {"key": "mystery", "value": {"unknownValueType": 1}}
+              ],
+              "status": {"code": "STATUS_CODE_OK"}
+            },
+            {
+              "traceId": "eeee0000000000000000000000000005",
+              "spanId": "0000000000000a02",
+              "parentSpanId": "0000000000000a01",
+              "name": "unnamed.child",
+              "kind": 1,
+              "startTimeUnixNano": "not-a-number",
+              "endTimeUnixNano": "1752000008000000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}}
+              ],
+              "status": {"code": "STATUS_CODE_ERROR", "message": "boom"}
+            },
+            {
+              "traceId": "eeee0000000000000000000000000005",
+              "spanId": "0000000000000a03",
+              "parentSpanId": "0000000000000a02",
+              "name": "unnamed.child.llm",
+              "kind": 1,
+              "startTimeUnixNano": "1752000001000000000",
+              "endTimeUnixNano": "1752000002000000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "LLM"}},
+                {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "not-an-int"}}
+              ],
+              "status": {"code": "STATUS_CODE_OK"}
+            },
+            {
+              "traceId": "eeee0000000000000000000000000005",
+              "name": "span-without-id",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}}
+              ]
+            },
+            "this is not a span at all"
+          ]
+        }
+      ]
+    }
+  ]
+}

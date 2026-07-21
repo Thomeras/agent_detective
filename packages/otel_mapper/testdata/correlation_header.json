@@ -1,0 +1,61 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "researcher-service"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.httpx", "version": "0.50b0"},
+          "spans": [
+            {
+              "traceId": "cccc0000000000000000000000000001",
+              "spanId": "00000000000000e1",
+              "name": "researcher.run",
+              "kind": 1,
+              "startTimeUnixNano": "1752000000000000000",
+              "endTimeUnixNano": "1752000005000000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "researcher"}},
+                {"key": "http.request.header.x-execution-graph-id",
+                 "value": {"arrayValue": {"values": [{"stringValue": "g-corr-1"}]}}}
+              ],
+              "status": {"code": "STATUS_CODE_OK"}
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "resource": {
+        "attributes": [
+          {"key": "service.name", "value": {"stringValue": "writer-service"}}
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {"name": "opentelemetry.instrumentation.httpx", "version": "0.50b0"},
+          "spans": [
+            {
+              "traceId": "dddd0000000000000000000000000002",
+              "spanId": "00000000000000e2",
+              "name": "writer.run",
+              "kind": 1,
+              "startTimeUnixNano": "1752000006000000000",
+              "endTimeUnixNano": "1752000010000000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}},
+                {"key": "gen_ai.agent.name", "value": {"stringValue": "writer"}},
+                {"key": "x-execution-graph-id", "value": {"stringValue": "g-corr-1"}}
+              ],
+              "status": {"code": "STATUS_CODE_OK"}
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
