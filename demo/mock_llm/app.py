@@ -92,7 +92,7 @@ def _messages_text(messages: list[dict[str, Any]]) -> str:
 
 
 def _classify(text: str) -> str:
-    """Route a prompt to 'per_node_judge', 'terminal_judge', or 'agent'."""
+    """Route a prompt to 'per_node_judge', 'terminal_judge', 'claims' or 'agent'."""
     lowered = text.lower()
     if "task_score" in lowered or "input_flawed" in lowered:
         return "per_node_judge"
@@ -101,7 +101,28 @@ def _classify(text: str) -> str:
         '"score"' in lowered or "score" in lowered
     ):
         return "terminal_judge"
+    if '"claims"' in lowered or ("claims" in lowered and "suspect output" in lowered):
+        return "claims"
     return "agent"
+
+
+def _claims_response(text: str) -> dict[str, Any]:
+    """Extract the concrete claims (fabricated prices) from the suspect output.
+
+    Returned claims are searched verbatim against downstream outputs by the
+    worker, so returning the price strings is exactly what surfaces the
+    hallucination propagating from the scraper to the published product.
+    """
+    claims: list[str] = []
+    seen: set[str] = set()
+    for match in _PRICE_RE.findall(text):
+        value = match.strip()
+        if value and value not in seen:
+            seen.add(value)
+            claims.append(value)
+    if not claims:
+        claims = ["no concrete fabricated claims detected"]
+    return {"claims": claims[:5]}
 
 
 def _per_node_verdict(text: str) -> dict[str, Any]:
@@ -186,6 +207,8 @@ async def chat_completions(request: Request) -> JSONResponse:
         content = json.dumps(_per_node_verdict(text))
     elif kind == "terminal_judge":
         content = json.dumps(_terminal_verdict(text))
+    elif kind == "claims":
+        content = json.dumps(_claims_response(text))
     else:
         content = _agent_completion(text)
 
