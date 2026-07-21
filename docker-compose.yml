@@ -28,9 +28,12 @@ x-app-env: &app-env
   PAYLOAD_INLINE_MAX_KB: "${PAYLOAD_INLINE_MAX_KB:-64}"
   COST_BUDGET_DEFAULT_USD: "${COST_BUDGET_DEFAULT_USD:-}"
   A2A_DETECTION: "${A2A_DETECTION:-false}"
-  JUDGE_BASE_URL: "${JUDGE_BASE_URL:-http://localhost:11434/v1}"
+  # Defaults to the bundled mock LLM so `docker compose up` + the demo work
+  # with no external model. Point at Ollama / an OpenAI-compat endpoint to
+  # use a real judge.
+  JUDGE_BASE_URL: "${JUDGE_BASE_URL:-http://mock-llm:8080/v1}"
   JUDGE_API_KEY: "${JUDGE_API_KEY:-}"
-  JUDGE_MODEL: "${JUDGE_MODEL:-llama3.1:8b}"
+  JUDGE_MODEL: "${JUDGE_MODEL:-mock}"
   JUDGE_TIMEOUT_S: "${JUDGE_TIMEOUT_S:-30}"
   JUDGE_CONCURRENCY: "${JUDGE_CONCURRENCY:-4}"
   SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
@@ -141,6 +144,18 @@ services:
       timeout: 5s
       retries: 6
 
+  # Bundled OpenAI-compatible mock LLM (judge + demo pipeline). No API keys.
+  mock-llm:
+    build:
+      context: ./demo/mock_llm
+    ports:
+      - "${MOCK_LLM_PORT:-8080}:8080"
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\" || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
   worker:
     build:
       context: .
@@ -152,6 +167,8 @@ services:
       redis:
         condition: service_healthy
       minio:
+        condition: service_healthy
+      mock-llm:
         condition: service_healthy
       migrate:
         condition: service_completed_successfully
