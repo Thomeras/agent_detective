@@ -1,0 +1,101 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  unit:
+    name: Unit tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Sync workspace (all packages, all groups)
+        run: uv sync --all-packages --all-groups --frozen
+
+      # Each package's test suite runs from its own directory. Service test
+      # modules import shared helpers as `from conftest import ...`, which
+      # resolves unambiguously only when pytest's rootdir is the package dir
+      # (all service source roots are on sys.path via the workspace .pth).
+      - name: blame_engine (coverage >= 90%)
+        working-directory: packages/blame_engine
+        run: >
+          uv run --package blame-engine pytest tests
+          --cov=blame_engine --cov-report=term-missing --cov-fail-under=90
+
+      - name: otel_mapper
+        working-directory: packages/otel_mapper
+        run: uv run --package otel-mapper pytest tests
+
+      - name: ingest
+        working-directory: services/ingest
+        run: uv run --package ingest pytest tests
+
+      - name: api
+        working-directory: services/api
+        run: uv run --package api pytest tests
+
+      - name: worker
+        working-directory: services/worker
+        run: uv run --package worker pytest tests
+
+  e2e:
+    name: End-to-end acceptance
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build and start the stack
+        # depends_on pulls in postgres, clickhouse, redis, minio, migrate and
+        # createbuckets automatically. web is not needed for the acceptance test.
+        run: docker compose up -d --build api ingest worker mock-llm
+
+      - name: Wait for services to become healthy
+        run: |
+          set -e
+          for url in \
+            http://localhost:8001/health \
+            http://localhost:8000/health \
+            http://localhost:8080/health; do
+            echo "waiting for $url"
+            for i in $(seq 1 60); do
+              if curl -fsS "$url" >/dev/null 2>&1; then
+                echo "  up"
+                break
+              fi
+              if [ "$i" = "60" ]; then
+                echo "  timed out waiting for $url"
+                docker compose ps
+                docker compose logs
+                exit 1
+              fi
+              sleep 3
+            done
+          done
+
+      - name: Run E2E acceptance test
+        run: uv run pytest tests/e2e -v
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose logs
+
+      - name: Tear down
+        if: always()
+        run: docker compose down -v
