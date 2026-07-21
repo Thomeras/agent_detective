@@ -1,0 +1,201 @@
+# Agent Detective full-stack compose file (build spec sections 1, 5, 7).
+# `docker compose up --build` brings up the whole stack; no .env required.
+
+name: agent-detective
+
+# Shared application environment. Inter-service URLs point at compose
+# service names; tuning knobs fall back to spec defaults and can be
+# overridden from .env.
+x-app-env: &app-env
+  DATABASE_URL: postgresql+asyncpg://postgres:postgres@postgres:5432/agent_detective
+  CLICKHOUSE_URL: http://clickhouse:8123
+  REDIS_URL: redis://redis:6379/0
+  MINIO_ENDPOINT: minio:9000
+  MINIO_ACCESS_KEY: minioadmin
+  MINIO_SECRET_KEY: minioadmin
+  MINIO_BUCKET: agent-detective-payloads
+  MINIO_SECURE: "false"
+  BLAME_THRESHOLD: "${BLAME_THRESHOLD:-0.5}"
+  GAP_THRESHOLD: "${GAP_THRESHOLD:-0.25}"
+  MIN_DROP: "${MIN_DROP:-0.10}"
+  SCORE_W_SCHEMA: "${SCORE_W_SCHEMA:-0.35}"
+  SCORE_W_JUDGE: "${SCORE_W_JUDGE:-0.40}"
+  SCORE_W_HEURISTICS: "${SCORE_W_HEURISTICS:-0.15}"
+  SCORE_MIN_WEIGHT: "${SCORE_MIN_WEIGHT:-0.5}"
+  TIER2_SAMPLE_PCT: "${TIER2_SAMPLE_PCT:-0}"
+  MAX_LOOP_ITERATIONS: "${MAX_LOOP_ITERATIONS:-10}"
+  GRAPH_QUIESCENCE_SECONDS: "${GRAPH_QUIESCENCE_SECONDS:-30}"
+  PAYLOAD_INLINE_MAX_KB: "${PAYLOAD_INLINE_MAX_KB:-64}"
+  COST_BUDGET_DEFAULT_USD: "${COST_BUDGET_DEFAULT_USD:-}"
+  A2A_DETECTION: "${A2A_DETECTION:-false}"
+  JUDGE_BASE_URL: "${JUDGE_BASE_URL:-http://localhost:11434/v1}"
+  JUDGE_API_KEY: "${JUDGE_API_KEY:-}"
+  JUDGE_MODEL: "${JUDGE_MODEL:-llama3.1:8b}"
+  JUDGE_TIMEOUT_S: "${JUDGE_TIMEOUT_S:-30}"
+  JUDGE_CONCURRENCY: "${JUDGE_CONCURRENCY:-4}"
+  SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
+
+services:
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8
+    ports:
+      - "8123:8123"
+    volumes:
+      # Creates the otel_spans table on first boot (see docker/clickhouse/init.sql).
+      - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD", "clickhouse-client", "--query", "SELECT 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: agent_detective
+    ports:
+      - "5432:5432"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d agent_detective"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  # One-shot: applies the Alembic schema from db/, then exits.
+  migrate:
+    build:
+      context: .
+      dockerfile: db/Dockerfile
+    environment:
+      DATABASE_URL: postgresql+psycopg2://postgres:postgres@postgres:5432/agent_detective
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    ports:
+      - "9000:9000"   # S3 API
+      - "9001:9001"   # console
+    volumes:
+      - miniodata:/data
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 12
+
+  # One-shot: creates the payload bucket, then exits.
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set local http://minio:9000 minioadmin minioadmin
+      && mc mb --ignore-existing local/agent-detective-payloads
+      "
+    restart: "no"
+
+  ingest:
+    build:
+      context: .
+      dockerfile: services/ingest/Dockerfile
+    environment: *app-env
+    ports:
+      - "${INGEST_PORT:-8001}:8001"
+    depends_on:
+      clickhouse:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # TODO(M3): switch to the real /health endpoint.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8001')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  worker:
+    build:
+      context: .
+      dockerfile: services/worker/Dockerfile
+    environment: *app-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # TODO(M4): replace with a real liveness probe for the consumers.
+      test: ["CMD-SHELL", "grep -aq python /proc/1/cmdline || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  api:
+    build:
+      context: .
+      dockerfile: services/api/Dockerfile
+    environment: *app-env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      # TODO(M5): switch to the real /health endpoint.
+      test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8000')\" || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "${WEB_PORT:-5173}:80"
+    depends_on:
+      - api
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://localhost/"]
+      interval: 10s
+      timeout: 5s
+      retries: 6
+
+volumes:
+  pgdata:
+  miniodata:

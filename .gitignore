@@ -1,7 +1,22 @@
-node_modules/
-.venv/
+# Python
 __pycache__/
-*.pyc
-.DS_Store
+*.py[cod]
+*.egg-info/
+.venv/
+build/
 dist/
+
+# Node (web UI, milestone M7)
+node_modules/
+web/dist/
+
+# Tooling / test artifacts
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and OS noise
 .env
+.DS_Store
+
+# NOTE: uv.lock is intentionally committed for reproducible builds.

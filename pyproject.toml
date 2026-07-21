@@ -1,0 +1,36 @@
+[project]
+name = "agent-detective"
+version = "0.1.0"
+description = "OTEL-native observability with blame analysis for multi-agent systems"
+requires-python = ">=3.12"
+dependencies = [
+    "blame-engine",
+    "otel-mapper",
+    "ingest",
+    "worker",
+    "api",
+]
+
+# Virtual workspace root: no build-system, so the root itself is never packaged.
+[tool.uv.workspace]
+members = ["packages/*", "services/*"]
+
+[tool.uv.sources]
+blame-engine = { workspace = true }
+otel-mapper = { workspace = true }
+ingest = { workspace = true }
+worker = { workspace = true }
+api = { workspace = true }
+
+# importlib mode avoids test-module name collisions across workspace members
+# that use the same file basenames (e.g. tests/test_smoke.py).
+[tool.pytest.ini_options]
+addopts = "--import-mode=importlib"
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    # Needed to author and validate the migrations under db/.
+    "alembic>=1.13",
+    "sqlalchemy>=2.0",
+]
