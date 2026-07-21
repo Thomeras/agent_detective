@@ -1,0 +1,621 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-detective-demo"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "openinference.instrumentation.demo",
+            "version": "0.1.0"
+          },
+          "spans": [
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000001",
+              "name": "orchestrator.run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328000000000000",
+              "endTimeUnixNano": "1751328020000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "orchestrator"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "1.4.0"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Publish three localized products. Source pages do not list prices."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"orchestrate\", \"summary\": \"Localized and published 3 products.\", \"agents\": [\"scraper-agent\", \"translator-agent\", \"compliance-agent\", \"publisher-agent\"]}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "1200"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "300"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.012
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              }
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000002",
+              "name": "orchestrator.plan_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328000200000000",
+              "endTimeUnixNano": "1751328000900000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "140"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "60"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000001"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000003",
+              "name": "scraper.run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328001000000000",
+              "endTimeUnixNano": "1751328006000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "scraper-agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "0.9.2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Scrape three product pages. The pages do not list prices."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"scrape\", \"products\": [{\"sku\": \"SKU-001\", \"name\": \"Wireless Mouse\", \"price\": \"$24.99\"}, {\"sku\": \"SKU-002\", \"name\": \"USB-C Hub\", \"price\": \"$39.50\"}, {\"sku\": \"SKU-003\", \"name\": \"Laptop Stand\", \"price\": \"$15.00\"}], \"note\": \"prices extracted\"}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "800"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "220"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.006
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000001"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000004",
+              "name": "scraper.extract_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328001500000000",
+              "endTimeUnixNano": "1751328004000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "620"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "160"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000003"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000005",
+              "name": "translator.run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328002000000000",
+              "endTimeUnixNano": "1751328007000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "translator-agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "1.1.0"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Translate the three product names to Polish."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"translate\", \"products\": [{\"sku\": \"SKU-001\", \"name_pl\": \"Mysz bezprzewodowa\"}, {\"sku\": \"SKU-002\", \"name_pl\": \"Koncentrator USB-C\"}, {\"sku\": \"SKU-003\", \"name_pl\": \"Podstawka pod laptopa\"}], \"language\": \"pl\"}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "400"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "260"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.004
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000001"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000006",
+              "name": "translator.translate_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328002500000000",
+              "endTimeUnixNano": "1751328005000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "300"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "200"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000005"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000007",
+              "name": "compliance.run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328008000000000",
+              "endTimeUnixNano": "1751328014000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "compliance-agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "2.0.1"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Validate localized product data against the compliance policy."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"compliance\", \"products\": [{\"sku\": \"SKU-001\", \"name_pl\": \"Mysz bezprzewodowa\", \"price\": \"$24.99\", \"compliant\": true}, {\"sku\": \"SKU-002\", \"name_pl\": \"Koncentrator USB-C\", \"price\": \"$39.50\", \"compliant\": true}, {\"sku\": \"SKU-003\", \"name_pl\": \"Podstawka pod laptopa\", \"price\": \"$15.00\", \"compliant\": true}], \"verdict\": \"pass\"}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "700"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "180"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.005
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000001"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000009",
+              "name": "compliance.fetch_product_data",
+              "kind": 1,
+              "startTimeUnixNano": "1751328008500000000",
+              "endTimeUnixNano": "1751328009000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "fetch_product_data"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "scraper-agent"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000007"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a00000000000000a",
+              "name": "compliance.fetch_translations",
+              "kind": 1,
+              "startTimeUnixNano": "1751328009200000000",
+              "endTimeUnixNano": "1751328009700000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "fetch_translations"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "translator-agent"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000007"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a000000000000008",
+              "name": "compliance.check_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328010000000000",
+              "endTimeUnixNano": "1751328012000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "560"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "140"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000007"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a00000000000000b",
+              "name": "publisher.run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328015000000000",
+              "endTimeUnixNano": "1751328019000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "publisher-agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "1.0.3"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Publish the compliant, localized products to the storefront."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"publish\", \"published\": [{\"sku\": \"SKU-001\", \"name_pl\": \"Mysz bezprzewodowa\", \"price\": \"$24.99\"}, {\"sku\": \"SKU-002\", \"name_pl\": \"Koncentrator USB-C\", \"price\": \"$39.50\"}, {\"sku\": \"SKU-003\", \"name_pl\": \"Podstawka pod laptopa\", \"price\": \"$15.00\"}], \"status\": \"published\"}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "500"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "300"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.007
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a000000000000001"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a00000000000000d",
+              "name": "publisher.fetch_compliance_report",
+              "kind": 1,
+              "startTimeUnixNano": "1751328015200000000",
+              "endTimeUnixNano": "1751328015700000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "fetch_compliance_report"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "compliance-agent"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a00000000000000b"
+            },
+            {
+              "traceId": "00ad0de70a11e5711ce0000000000001",
+              "spanId": "a00000000000000c",
+              "name": "publisher.publish_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328016000000000",
+              "endTimeUnixNano": "1751328018000000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "420"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "220"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "a00000000000000b"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

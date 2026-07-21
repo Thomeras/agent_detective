@@ -1,0 +1,18 @@
+[project]
+name = "mock-llm"
+version = "0.1.0"
+description = "Content-aware OpenAI-compatible mock LLM for the Agent Detective demo (build spec 6.5)"
+requires-python = ">=3.12"
+# Deliberately dependency-light: it is both the demo pipeline's LLM and the
+# worker's judge in CI, so it must start fast and pull almost nothing.
+dependencies = [
+    "fastapi>=0.115",
+    "uvicorn>=0.30",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+only-include = ["app.py"]

@@ -1,0 +1,5 @@
+# Transient demo artifacts.
+.fault_armed
+.venv/
+__pycache__/
+*.pyc
