@@ -14,6 +14,4 @@ RUN uv sync --frozen --no-dev
 
 ENV PATH="/app/.venv/bin:$PATH"
 
-# TODO(M4): replace this placeholder with the real consumer entrypoint:
-#   CMD ["python", "-m", "worker.main"]
-CMD ["python", "-c", "import time; time.sleep(10**9)"]
+CMD ["python", "-m", "worker.main"]
