@@ -112,9 +112,18 @@ class RedisStreams:
     async def read(
         self, stream: str, group: str, consumer: str, count: int, block_ms: int
     ) -> list[StreamMessage]:
-        response = await self._client.xreadgroup(
-            group, consumer, {stream: ">"}, count=count, block=block_ms
-        )
+        try:
+            response = await self._client.xreadgroup(
+                group, consumer, {stream: ">"}, count=count, block=block_ms
+            )
+        except Exception as exc:
+            # A blocking XREADGROUP that elapses on an idle stream surfaces as a
+            # TimeoutError (builtin/asyncio or redis.exceptions.TimeoutError,
+            # which need not subclass the builtin); that just means "no new
+            # messages". Re-raise anything else.
+            if isinstance(exc, TimeoutError) or type(exc).__name__ == "TimeoutError":
+                return []
+            raise
         messages: list[StreamMessage] = []
         for _stream, entries in response or []:
             for entry_id, fields in entries:

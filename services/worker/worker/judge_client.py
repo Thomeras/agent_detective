@@ -100,10 +100,17 @@ class OpenAIJudgeClient:
         if self._client is None:
             import httpx
 
+            # Only send Authorization when a key is configured; an empty key
+            # (e.g. the bundled mock LLM) would produce an illegal "Bearer "
+            # header value that httpx rejects.
+            headers = {}
+            api_key = (self._settings.judge_api_key or "").strip()
+            if api_key:
+                headers["Authorization"] = f"Bearer {api_key}"
             self._client = httpx.AsyncClient(
                 base_url=self._settings.judge_base_url,
                 timeout=self._settings.judge_timeout_s,
-                headers={"Authorization": f"Bearer {self._settings.judge_api_key}"},
+                headers=headers,
             )
         return self._client
 

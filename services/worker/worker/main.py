@@ -20,6 +20,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import signal
+from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 
 from .alerter import Alerter, HttpxWebhookClient, WebhookClient, run_alerter
@@ -114,6 +115,27 @@ async def _reaper_loop(
                 logger.exception("reaper failed for %s/%s", stream, group)
 
 
+async def _supervise(name: str, factory: "Callable[[], Awaitable[None]]", stop: asyncio.Event) -> None:
+    """Run a consumer loop, restarting it if it crashes.
+
+    A consumer that raises must not silently disappear (which would stall the
+    stream forever); log the failure loudly and restart after a short backoff
+    until shutdown is requested.
+    """
+    while not stop.is_set():
+        try:
+            await factory()
+            return
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            logger.exception("%s crashed; restarting in 2s", name)
+            try:
+                await asyncio.wait_for(stop.wait(), timeout=2.0)
+            except asyncio.TimeoutError:
+                pass
+
+
 async def run(settings: Settings, deps: Dependencies) -> None:
     """Run all consumers concurrently until a shutdown signal arrives."""
     stop = asyncio.Event()
@@ -131,9 +153,15 @@ async def run(settings: Settings, deps: Dependencies) -> None:
     alerter = Alerter(deps.repo, deps.webhook, settings)
 
     tasks = [
-        asyncio.create_task(run_tier1(deps.consumer, tier1, settings, stop=stop)),
-        asyncio.create_task(run_tier2(deps.consumer, tier2, settings, stop=stop)),
-        asyncio.create_task(run_alerter(deps.consumer, alerter, settings, stop=stop)),
+        asyncio.create_task(
+            _supervise("tier1", lambda: run_tier1(deps.consumer, tier1, settings, stop=stop), stop)
+        ),
+        asyncio.create_task(
+            _supervise("tier2", lambda: run_tier2(deps.consumer, tier2, settings, stop=stop), stop)
+        ),
+        asyncio.create_task(
+            _supervise("alerter", lambda: run_alerter(deps.consumer, alerter, settings, stop=stop), stop)
+        ),
         asyncio.create_task(_reaper_loop(deps.consumer, deps.publisher, settings, stop)),
     ]
     try:

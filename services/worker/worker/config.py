@@ -8,6 +8,7 @@ module that holds a Settings instance never touches the network.
 
 from __future__ import annotations
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,6 +16,15 @@ class Settings(BaseSettings):
     """Environment-driven settings. Field names map to upper-case env vars."""
 
     model_config = SettingsConfigDict(extra="ignore")
+
+    @field_validator("cost_budget_default_usd", mode="before")
+    @classmethod
+    def _empty_str_is_none(cls, value: object) -> object:
+        # COST_BUDGET_DEFAULT_USD is intentionally unset in compose/.env, which
+        # arrives as an empty string; treat that as "no budget" (None).
+        if isinstance(value, str) and value.strip() == "":
+            return None
+        return value
 
     database_url: str = "postgresql+asyncpg://postgres:postgres@localhost:5432/agent_detective"
     redis_url: str = "redis://localhost:6379/0"
