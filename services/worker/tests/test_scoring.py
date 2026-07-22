@@ -161,3 +161,54 @@ def test_heuristics_token_zscore_outlier():
         "varied clean output text here", run, baseline, error_span_ids=[], retry_count=0
     )
     assert outlier < 1.0
+
+
+def test_contract_violation_forces_cut_point_even_with_high_judge():
+    """The wedge fixture: think silently rewrites file_type docx->md.
+
+    A fluent judge may pass the output (task_score 1.0), but the deterministic
+    input-contract check must dominate and force the node below any sane blame
+    threshold, so blame localises here as a cut_point culprit.
+    """
+    run = make_run(1, "think")
+    input_json = '{"request": "Vytvor nabidku", "file_type": "docx"}'
+    output_json = '{"plan": {"file_type": "md", "sections": ["a", "b"]}}'
+    result = asyncio.run(
+        score_node(
+            run,
+            input_json,
+            output_json,
+            [],
+            None,
+            FakeJudge(),  # returns task_score 1.0 -> proves the override dominates
+            asyncio.Semaphore(2),
+            WEIGHTS,
+            0.5,
+            load_prompt("judge.md"),
+        )
+    )
+    assert result.score is not None and result.score <= 0.15
+    assert result.components.get("contract") == 0.0
+    assert result.unscored_reason is None
+    assert result.judge_note and "file_type" in result.judge_note
+
+
+def test_contract_preserved_is_not_penalised():
+    """When the carried-through parameter is unchanged, no contract penalty."""
+    run = make_run(2, "act")
+    result = asyncio.run(
+        score_node(
+            run,
+            '{"file_type": "md", "note": "x"}',
+            '{"plan": {"file_type": "md"}}',
+            [],
+            None,
+            FakeJudge(),
+            asyncio.Semaphore(2),
+            WEIGHTS,
+            0.5,
+            load_prompt("judge.md"),
+        )
+    )
+    assert "contract" not in result.components
+    assert result.score is not None and result.score > 0.5

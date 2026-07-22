@@ -25,7 +25,19 @@ Respond with a single JSON object and nothing else:
 
 {"task_score": <float 0.0-1.0>, "input_flawed": <true|false>, "reasoning": "<one or two sentences>"}
 
-- `task_score`: 1.0 = fully correct and complete for this step; 0.0 = wrong,
-  empty, hallucinated, or ignores the task.
+- `task_score`: how well this step did its job. **Be strict and let the number
+  match your words** — if your reasoning names a real shortcoming, the score
+  must drop below the "good" band. Use these calibration anchors:
+
+  - **0.9–1.0** — correct, complete, and specific; nothing you would change.
+  - **0.7–0.85** — correct but with a *minor* cosmetic issue only; no missing
+    content, no vagueness, nothing the next step has to work around.
+  - **0.4–0.65** — generic/vague, missing detail the task asked for, ignores
+    part of the input, or "should have asked for more information". A verdict
+    whose reasoning contains criticism belongs **here or lower**, never 0.8.
+  - **0.1–0.35** — largely wrong, incomplete, or off-task.
+  - **0.0** — empty, hallucinated, or ignores the task entirely.
+
 - `input_flawed`: true only if the agent's *input* was already broken.
-- `reasoning`: brief justification, citing the specific problem if any.
+- `reasoning`: brief justification, citing the specific problem if any. Do not
+  praise fluency; a well-written but generic or incomplete answer is not good.

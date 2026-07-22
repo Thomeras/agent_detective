@@ -15,6 +15,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import re
+import unicodedata
 from dataclasses import asdict
 from uuid import UUID
 
@@ -72,12 +73,32 @@ def classify_incident(
     return None, None
 
 
+_VERIFIER_HINTS = ("qa", "eval", "review", "verif", "validat", "check", "critic", "audit", "gate")
+
+
+def _is_verifier(name: str | None) -> bool:
+    """Verifier/gate node whose job is to PASS/FAIL work — scored on verdict
+    correctness (role-aware), not on the reviewed artifact's quality."""
+    n = (name or "").lower()
+    return any(h in n for h in _VERIFIER_HINTS)
+
+
+def _norm_text(value: str) -> str:
+    """Unicode-normalized (NFC), casefolded text for diacritic-tolerant matching."""
+    return unicodedata.normalize("NFC", value).casefold()
+
+
 def _claim_matches(claim: str, text: str) -> bool:
-    """Substring match, falling back to majority word overlap."""
-    c = claim.lower().strip()
+    """Substring match, falling back to majority word overlap.
+
+    Both sides are unicode-normalized and casefolded so Czech diacritics (and NFC
+    vs NFD encodings of the same string) compare equal rather than silently
+    missing — a false "not found" here understates real fact propagation.
+    """
+    c = _norm_text(claim).strip()
     if not c:
         return False
-    t = text.lower()
+    t = _norm_text(text)
     if c in t:
         return True
     words = [w for w in _WORD_RE.findall(c) if len(w) > 3]
@@ -111,6 +132,10 @@ class Tier2Processor:
         self._judge = judge
         self._settings = settings
         self._judge_prompt = load_prompt("judge.md")
+        # Role-aware judging: verifier/gate nodes are scored on the correctness of
+        # their PASS/FAIL verdict, not on the artifact quality — otherwise a
+        # rubber-stamp reads as "healthy" and the engine rewards the liar.
+        self._verifier_prompt = load_prompt("judge_verifier.md")
         self._claims_prompt = load_prompt("claims.md")
         self._weights = {
             "schema": settings.score_w_schema,
@@ -131,12 +156,14 @@ class Tier2Processor:
 
     async def _score_graph(
         self, bundle: GraphBundle, baselines, contracts, semaphore
-    ) -> tuple[dict[str, NodeScore], dict[UUID, str | None]]:
+    ) -> tuple[dict[str, NodeScore], dict[UUID, tuple[str | None, str | None]]]:
         payloads = {r.run_id: await self._payloads(r) for r in bundle.runs}
-        outputs = {rid: out for rid, (_inp, out) in payloads.items()}
 
         async def _one(run: RunRecord) -> NodeScore:
             input_text, output_text = payloads[run.run_id]
+            template = (
+                self._verifier_prompt if _is_verifier(run.agent_name) else self._judge_prompt
+            )
             return await score_node(
                 run,
                 input_text,
@@ -147,24 +174,26 @@ class Tier2Processor:
                 semaphore,
                 self._weights,
                 self._settings.score_min_weight,
-                self._judge_prompt,
+                template,
                 error_span_ids=[] if run.status != "failed" else ["failed"],
             )
 
         results = await asyncio.gather(*(_one(r) for r in bundle.runs))
         scores = {str(r.run_id): ns for r, ns in zip(bundle.runs, results)}
-        return scores, outputs
+        # Return full (input, output) payloads: fact propagation must inspect a
+        # successor's *input* (proof the claim reached it), not only its output.
+        return scores, payloads
 
     async def _fact_propagation(
         self,
         report: BlameReport,
-        outputs: dict[UUID, str | None],
+        payloads: dict[UUID, tuple[str | None, str | None]],
         agent_names: dict[str, str],
     ) -> list[dict] | None:
         if not report.culprit_run_ids:
             return None
         culprit = report.culprit_run_ids[0]
-        culprit_output = outputs.get(UUID(culprit))
+        _culprit_in, culprit_output = payloads.get(UUID(culprit), (None, None))
         if not culprit_output:
             return None
         prompt = render_prompt(
@@ -184,12 +213,22 @@ class Tier2Processor:
         downstream = [rid for rid in report.propagation_path if rid != culprit]
         propagation: list[dict] = []
         for claim in claims:
-            found_in = [
-                rid
-                for rid in downstream
-                if (out := outputs.get(UUID(rid))) and _claim_matches(claim, out)
-            ]
-            propagation.append({"claim": claim, "found_in": found_in})
+            found_in: list[str] = []
+            not_checkable: list[str] = []
+            for rid in downstream:
+                node_in, node_out = payloads.get(UUID(rid), (None, None))
+                # A successor's input carrying the claim proves the fact reached
+                # it; its output carrying the claim proves it was forwarded.
+                haystacks = [t for t in (node_in, node_out) if t]
+                if not haystacks:
+                    # No payload at all (e.g. the node failed) — we genuinely
+                    # cannot tell, which is NOT the same as "not found".
+                    not_checkable.append(rid)
+                elif any(_claim_matches(claim, t) for t in haystacks):
+                    found_in.append(rid)
+            propagation.append(
+                {"claim": claim, "found_in": found_in, "not_checkable": not_checkable}
+            )
         return propagation
 
     async def process(self, message: Tier2Message) -> None:
@@ -222,7 +261,7 @@ class Tier2Processor:
             tier1 = await self._repo.read_tier1_verdict(graph_id)
 
             semaphore = asyncio.Semaphore(self._settings.judge_concurrency)
-            scores, outputs = await self._score_graph(
+            scores, payloads = await self._score_graph(
                 bundle, baselines, contracts, semaphore
             )
 
@@ -260,7 +299,7 @@ class Tier2Processor:
             report = find_blame(blame_input)
 
             agent_names = {str(r.run_id): (r.agent_name or "unknown") for r in bundle.runs}
-            fact_propagation = await self._fact_propagation(report, outputs, agent_names)
+            fact_propagation = await self._fact_propagation(report, payloads, agent_names)
 
             terminal_bad = terminal_verdict is not None and terminal_verdict.bad
             incident_key, incident_trigger = classify_incident(

@@ -12,7 +12,12 @@ export default function Leaderboard() {
   return (
     <div className="screen">
       <div className="screen-head">
-        <h2>Agent leaderboard</h2>
+        <div>
+          <h2>Agent leaderboard</h2>
+          <div className="screen-sub">
+            Per-agent cost, failure rate and average quality across every graph.
+          </div>
+        </div>
         <button className="btn" onClick={reload} disabled={loading}>
           Refresh
         </button>

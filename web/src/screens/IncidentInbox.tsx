@@ -9,6 +9,14 @@ import { formatCost, formatRelative, shortId } from "../format";
 import { href } from "../router";
 import { useAsync } from "../hooks/useAsync";
 
+const TRIGGER_LABELS: Record<string, string> = {
+  terminal_failure: "Terminal failure",
+  degraded_quality: "Degraded quality",
+  cost_overrun: "Cost overrun",
+  loop_detected: "Loop detected",
+  manual: "Manual",
+};
+
 function culpritLabel(incident: IncidentSummary): string {
   const culprits = incident.latest_report?.culprit_run_ids;
   if (!culprits || culprits.length === 0) return "-";
@@ -22,7 +30,13 @@ export default function IncidentInbox() {
   return (
     <div className="screen">
       <div className="screen-head">
-        <h2>Incident inbox</h2>
+        <div>
+          <h2>Incident inbox</h2>
+          <div className="screen-sub">
+            Graphs the worker flagged for degraded quality, failure, cost overrun
+            or a runaway loop — culprit first.
+          </div>
+        </div>
         <button className="btn" onClick={reload} disabled={loading}>
           Refresh
         </button>
@@ -32,8 +46,15 @@ export default function IncidentInbox() {
       {error && <ErrorState message={error} onRetry={reload} />}
       {!loading && !error && data && data.incidents.length === 0 && (
         <EmptyState
-          title="No incidents yet"
-          hint="Incidents appear here once the worker analyses a graph and flags degraded quality, failures, cost overruns or loops."
+          title="No incidents — all clear"
+          hint={
+            <>
+              Nothing has been flagged yet. Browse every ingested run under{" "}
+              <a href={href("/graphs")}>Graphs</a>, or run{" "}
+              <span className="mono">./demo/inject_fault.sh &amp;&amp; ./demo/run.sh</span>{" "}
+              to trigger a cut-point incident.
+            </>
+          }
         />
       )}
 
@@ -65,7 +86,10 @@ export default function IncidentInbox() {
                       <a href={graphHref}>{shortId(incident.graph_id)}</a>
                     </td>
                     <td>
-                      <TypeBadge label={incident.trigger} kind={incident.trigger} />
+                      <TypeBadge
+                        label={TRIGGER_LABELS[incident.trigger] ?? incident.trigger}
+                        kind={incident.trigger}
+                      />
                     </td>
                     <td>{report?.report_type ? <TypeBadge label={report.report_type} /> : "-"}</td>
                     <td className="mono">{culpritLabel(incident)}</td>

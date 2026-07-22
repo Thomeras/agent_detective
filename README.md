@@ -48,8 +48,29 @@ services/
   api/             read API for graphs, incidents, blame reports, agent stats
 db/                Alembic migrations (full Postgres schema)
 docker/clickhouse/ ClickHouse init (otel_spans table)
-web/               UI placeholder (real UI in milestone M7)
+web/               React + Vite + cytoscape UI: incident inbox, graph list,
+                   graph view (loop-aware), agent leaderboard, findings export
 ```
+
+## What the blame report tells you
+
+For each incident the engine names **where quality broke** (the *origin* — the
+first node whose score dropped from a healthy predecessor, drilled into the
+worst member when that node is inside a retry loop) and separates it from **where
+it surfaced** (the *manifestation* — the terminal output). It flags **rubber-
+stamping verifiers** (a `qa`/`eval` node that passed bad work — `verification_gap`),
+reports **honest, capped confidence** (a fallback verdict is never sold as
+certainty), and includes a per-node **candidacy trace** explaining why each node
+was or wasn't blamed. Report types: `cut_point`, `multi_culprit`,
+`verification_gap`, `loop_detected`, `root_cause_external`, `composition_failure`,
+`unclassified`. Every graph view exports a Markdown **findings brief** (`Export
+.md`) you can hand to a coding agent to drive the fix.
+
+The per-node quality judge is any OpenAI-compatible endpoint
+(`JUDGE_BASE_URL` / `JUDGE_MODEL` / `JUDGE_API_KEY`) — the bundled mock LLM by
+default, or a local/hosted model — and is **role-aware**: producer nodes are
+judged relative to their input, verifier nodes on the correctness of their
+verdict.
 
 ## Quickstart
 

@@ -88,14 +88,40 @@ resolves this:
 - **Tier 2** (`worker/tier2.py`, stream `ad.graphs.tier2`, group `tier2`) is
   expensive and runs only on flagged or sampled graphs. It claims the job via
   `tier2_jobs (dedup_key)` `ON CONFLICT DO NOTHING` for idempotency, scores
-  every node (`worker/scoring.py`: schema / judge / heuristics components,
-  weight-renormalized, judge run per-node relative to that node's input), runs
-  the blame engine, enriches the report with post-blame fact propagation, and
-  persists incidents and blame reports.
+  every node (`worker/scoring.py`: schema / judge / heuristics / **contract**
+  components, weight-renormalized, judge run per-node relative to that node's
+  input), runs the blame engine, enriches the report with post-blame fact
+  propagation, and persists incidents and blame reports.
 
 Because tier1's terminal judge sees the *full* terminal output (not a summary),
 it does not throw away the very facts that distinguish a hallucination — one of
 the design defects the revised spec fixes.
+
+### Role-aware judging
+
+The per-node judge is **role-aware** (`worker/prompts/`): *producer* nodes are
+judged on the correctness of their transformation *relative to the input they
+received* (`judge.md`, with explicit calibration anchors so a critical reasoning
+never lands at 0.8), while *verifier / gate* nodes — `qa`, `eval`, `review`, … —
+are judged on the **correctness of their PASS/FAIL verdict** (`judge_verifier.md`).
+Without this split a verifier that rubber-stamps broken work reads as "healthy"
+and the engine rewards the liar; with it, a rubber-stamper scores low (its
+verdict was wrong) while an honest whistle-blower stays high.
+
+### Deterministic input-contract check
+
+Before the judge, `worker/scoring.py` runs a **contract** component: a node that
+silently rewrites a carried-through parameter (`file_type`, `lang`, `format`, …)
+between its input and output is a hard fault, detectable without any LLM. A
+confirmed violation forces the node below threshold, so it surfaces as a real
+`cut_point` culprit with concrete evidence rather than hiding behind a fluent
+judge — the archetypal "first node that broke quality".
+
+The judge is any OpenAI-compatible chat endpoint (`JUDGE_BASE_URL` /
+`JUDGE_MODEL` / `JUDGE_API_KEY`): the bundled mock LLM, a local Ollama, or a
+hosted model (e.g. OpenRouter). A weak model that cannot reliably emit the
+`{task_score, input_flawed, reasoning}` JSON leaves nodes unscored, so a reliable
+instruct model is recommended for production scoring.
 
 ## Blame engine
 
@@ -116,35 +142,51 @@ build spec section 3 is the authoritative description; the summary:
    loop_min_history`) puts its iteration count beyond `mean + loop_zscore*std`.
    Benign loops produce nothing.
 
-3. **Cut-point candidates** (`cutpoint.py`). Over the condensation DAG in
-   topological order, a node is a candidate when it is below `threshold` **or**
-   drops from its best known predecessor by at least `gap_threshold`, provided
-   the drop is at least `min_drop` (distinguishing an *origin* of degradation
-   from inherited low quality). **Shadowing** discards any candidate that has
-   another candidate among its ancestors; the survivors are independent origins.
-   Unknown-scored nodes are never culprits.
+3. **Edge-drop origins** (`cutpoint.py`). The cut point is where quality
+   *broke*, not merely where it is low. An **origin** is a node whose score
+   dropped past `gap_threshold` from a **healthy** (`>= threshold`), *observed*
+   predecessor — quality was fine going in and broke here — or a degraded
+   **boundary** (a source, or a node with only unknown predecessors) that is not
+   immediately cured by a healthy successor. This is deliberate: a low *source*
+   whose successors recovered is a spurious low (the "blame the orchestrator
+   instead of the node that actually broke" bug), and only becomes the culprit
+   when no real downstream drop-origin exists. A node that faithfully processed
+   already-`input_flawed` work is a propagation point, never an origin.
+   **Shadowing** keeps only the earliest origin on each branch.
 
-4. **Confidence** (`confidence.py`) blends the drop magnitude, severity, and
-   predecessor quality, then applies penalties (multi-member SCC culprit,
-   multi-culprit) and caps confidence when an unknown predecessor sits anywhere
-   upstream.
+4. **Confidence** (`confidence.py`) blends drop magnitude, severity, and
+   predecessor quality, applies penalties (multi-member SCC, multi-culprit) and
+   the unknown-ancestor cap — then a **per-report-type honest-confidence
+   ceiling** (`blame.py::_CONFIDENCE_CAP`): `composition_failure` ≤ 0.4,
+   `root_cause_external` ≤ 0.5, `multi_culprit` ≤ 0.8, `verification_gap` ≤ 0.6.
+   Only `cut_point` (a real gap) and `loop_detected` (a deterministic breach)
+   keep full confidence. A fallback verdict must never be sold as certainty.
 
-5. **Classification** (`blame.py`, first match wins) yields one of six report
+5. **Classification** (`blame.py`, first match wins) yields one of seven report
    types:
 
    | report_type | when |
    |---|---|
-   | `unclassified` | all scores unknown (`no_scores`), or nothing else matched |
-   | `root_cause_external` | the single unshadowed candidate is a condensation source with `input_flawed = True` |
-   | `loop_detected` | an anomalous loop is the culprit (or there are no candidates); culprits are its members |
-   | `cut_point` | exactly one unshadowed candidate |
-   | `multi_culprit` | more than one unshadowed candidate (parallel branches) |
-   | `composition_failure` | no candidate, terminal verdict bad, all scored nodes healthy, no significant drop, no unknowns — culprit is the source/orchestrator |
+   | `unclassified` | all scores unknown, or nothing else matched |
+   | `root_cause_external` | no in-graph origin, but a source reports `input_flawed = True` (the fault entered from outside) |
+   | `loop_detected` | an anomalous loop is the culprit (or there are no origins); culprits are its members |
+   | `cut_point` | exactly one origin |
+   | `multi_culprit` | more than one independent origin (parallel branches) |
+   | `verification_gap` | a verifier that passed bad work (low verdict-correctness score) while the terminal is bad and no producer origin localised — the rubber-stamping verifiers are blamed |
+   | `composition_failure` | no origin, terminal verdict bad, all scored nodes healthy, no significant drop, no *hidden* unknowns (a structural root left unscored does not block) — culprit is the source/orchestrator |
 
-The report also carries the **propagation path** (shortest path in the
-condensation DAG from culprit to the terminal super-node, SCCs expanded to
-members by end-time) and the **downstream cost** (the culprits' own cost plus
-all their descendants in the original graph, deduplicated).
+**Loop drill-down.** When a `cut_point` origin is a multi-member SCC (a retry
+loop), the blame is drilled into the **worst-scoring member** — where quality
+actually broke inside the loop — with its real drop against its own raw
+predecessor, not the loop's exit node that merely carried the failure downstream.
+
+The report also carries: the **propagation path** (culprit → terminal, SCCs
+expanded by end-time); the **downstream cost** (culprits' cost plus all
+descendants, deduplicated); **origin vs manifestation** (`manifestation_run_ids`
+— the terminal sinks where the failure surfaced, distinct from where it broke);
+**verification gaps**; every significant **drop** (> 0.2, not only culprits); and
+a per-node **candidacy trace** (why each node was or wasn't blamed) so the verdict
+is explainable rather than a black box.
 
 See `packages/blame_engine/blame_engine/` for the exact algorithm; the module
 split mirrors the steps above.
@@ -193,7 +235,7 @@ Postgres transaction commits; unique constraints make any redelivery a no-op.
 | `services/ingest/` | OTLP/HTTP trace ingest, ClickHouse/Postgres/MinIO writes, finalizer |
 | `services/worker/` | tier1/tier2 pipeline over Redis Streams, judge client, alerter, DLQ reaper |
 | `services/api/` | FastAPI read API: graphs, incidents, blame reports, agent leaderboard, manual analyze |
-| `web/` | React + Vite + TypeScript + cytoscape.js UI (dark-mode-first): incident inbox, graph view, agent leaderboard |
+| `web/` | React + Vite + TypeScript + cytoscape.js UI (dark-mode-first): incident inbox, graph list, loop-aware graph view, agent leaderboard, Markdown findings export (`findingsExport.ts`) |
 | `demo/mock_llm/` | OpenAI-compatible mock LLM (canned replies); default judge in Docker via `JUDGE_BASE_URL` |
 | `demo/synthetic_pipeline/` | five-agent OpenInference demo (orchestrator, scraper, translator, compliance, publisher) |
 | `db/` | Alembic migrations (full Postgres schema) |
@@ -210,7 +252,10 @@ Postgres transaction commits; unique constraints make any redelivery a no-op.
 
 The bundled mock LLM is the default judge (`JUDGE_BASE_URL` defaults to
 `http://mock-llm:8080/v1`), so the full stack — including blame analysis — runs
-with no external API keys.
+with no external API keys. To use a real judge, point `JUDGE_BASE_URL` /
+`JUDGE_MODEL` / `JUDGE_API_KEY` at any OpenAI-compatible endpoint (local Ollama,
+OpenRouter, …) via `.env` (gitignored). Set `TIER2_SAMPLE_PCT=100` to score every
+graph's nodes, not only flagged ones.
 
 ### Milestone map
 

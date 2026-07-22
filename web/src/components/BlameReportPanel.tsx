@@ -29,10 +29,42 @@ function RunRef({
   );
 }
 
+// A fallback verdict points at a *suspect*, not a proven culprit. Reflect that
+// in the wording so the UI never oversells certainty (see confidence caps in
+// blame_engine/blame.py).
+function culpritHeading(reportType: string | null, plural: boolean): string {
+  switch (reportType) {
+    case "composition_failure":
+      return "Most likely: orchestration / design issue";
+    case "root_cause_external":
+      return "Upstream / external cause";
+    case "verification_gap":
+      return plural ? "Rubber-stamping verifiers" : "Rubber-stamping verifier";
+    case "cut_point":
+      return "Origin — where quality broke";
+    case "unclassified":
+      return plural ? "Possible suspects" : "Possible suspect";
+    default:
+      return plural ? "Suspected culprits" : "Suspected culprit";
+  }
+}
+
+const FALLBACK_NOTE: Record<string, string> = {
+  composition_failure:
+    "No single node broke — the fault could not be localised. This is a suspect, not a proven culprit.",
+  root_cause_external:
+    "The fault originated outside the observed graph (the input was already flawed).",
+  verification_gap:
+    "These verifiers reported the work healthy while the final output was bad — they let it pass unflagged.",
+};
+
 export default function BlameReportPanel({ report, labelFor, onSelectRun }: BlameReportPanelProps) {
   const evidence = report.evidence;
   const culprits = report.culprit_run_ids ?? [];
   const unscored = report.unscored_run_ids ?? [];
+  const fallbackNote = report.report_type ? FALLBACK_NOTE[report.report_type] : undefined;
+  const manifestation = evidence?.manifestation_run_ids ?? [];
+  const verificationGaps = evidence?.verification_gaps ?? [];
 
   const scoreEntries = evidence ? Object.entries(evidence.score_map) : [];
   const dropEntries = evidence ? Object.entries(evidence.drops) : [];
@@ -60,18 +92,48 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
         </div>
 
         <div className="blame-section">
-          <div className="blame-label">Suspected culprit{culprits.length > 1 ? "s" : ""}</div>
+          <div className="blame-label">
+            {culpritHeading(report.report_type, culprits.length > 1)}
+          </div>
           {culprits.length === 0 ? (
             <span className="muted">none</span>
           ) : (
-            <div className="ref-list">
+            <div className={`ref-list${fallbackNote ? " ref-list-suspect" : ""}`}>
               {culprits.map((runId) => (
                 <RunRef key={runId} runId={runId} labelFor={labelFor} onSelectRun={onSelectRun} />
               ))}
             </div>
           )}
+          {fallbackNote && <p className="suspect-note">{fallbackNote}</p>}
         </div>
+
+        {manifestation.length > 0 && (
+          <div className="blame-section">
+            <div className="blame-label" title="Where the failure surfaced — the terminal output — as opposed to where it broke.">
+              Manifested at
+            </div>
+            <div className="ref-list">
+              {manifestation.map((runId) => (
+                <RunRef key={runId} runId={runId} labelFor={labelFor} onSelectRun={onSelectRun} />
+              ))}
+            </div>
+          </div>
+        )}
       </Panel>
+
+      {verificationGaps.length > 0 && (
+        <Panel title="Verification gaps">
+          <p className="suspect-note">
+            Passed while the final output was bad — a verifier that rubber-stamps bad
+            work is one of the most expensive multi-agent failure modes.
+          </p>
+          <div className="ref-list ref-list-suspect">
+            {verificationGaps.map((g) => (
+              <RunRef key={g.run_id} runId={g.run_id} labelFor={labelFor} onSelectRun={onSelectRun} />
+            ))}
+          </div>
+        </Panel>
+      )}
 
       {evidence && evidence.notes.length > 0 && (
         <Panel title="Reasoning">
@@ -92,6 +154,19 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
                 <span className="score-chip" style={{ background: scoreColor(score) }}>
                   {formatScore(score)}
                 </span>
+              </div>
+            ))}
+          </div>
+        </Panel>
+      )}
+
+      {evidence && evidence.candidacy && Object.keys(evidence.candidacy).length > 0 && (
+        <Panel title="Why each node (candidacy)">
+          <div className="judge-list">
+            {Object.entries(evidence.candidacy).map(([runId, status]) => (
+              <div key={runId} className="fact-found">
+                <RunRef runId={runId} labelFor={labelFor} onSelectRun={onSelectRun} />
+                <span className="muted small">{status}</span>
               </div>
             ))}
           </div>
@@ -145,6 +220,21 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
                     ))
                   )}
                 </div>
+                {fact.not_checkable && fact.not_checkable.length > 0 && (
+                  <div className="fact-found">
+                    <span className="muted" title="No payload to inspect (e.g. the node failed) — not the same as 'not found'.">
+                      not checkable:
+                    </span>
+                    {fact.not_checkable.map((runId) => (
+                      <RunRef
+                        key={runId}
+                        runId={runId}
+                        labelFor={labelFor}
+                        onSelectRun={onSelectRun}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
             ))}
           </div>

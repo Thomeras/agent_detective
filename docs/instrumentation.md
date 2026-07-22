@@ -76,6 +76,32 @@ conventions and OpenInference-style span kinds, so the mapper reconstructs runs
 and edges from its spans without any extra configuration. Any exporter that
 sends OTLP/HTTP JSON with these attributes is compatible.
 
+## Framework adapters (e.g. LangGraph)
+
+Two practical gotchas when wiring a real framework, learned the hard way:
+
+- **Send JSON, not protobuf.** Python's stock `OTLPSpanExporter`
+  (`opentelemetry-exporter-otlp-proto-http`) serializes to protobuf, which the
+  ingest endpoint rejects with `400`. Either configure a JSON exporter, or use a
+  small **collecting exporter** that buffers a run's spans and POSTs one
+  `ExportTraceServiceRequest` as JSON on shutdown (hex `traceId`/`spanId`,
+  key/value attributes — the shape in `packages/otel_mapper/testdata`).
+
+- **Auto-instrumentation opens no runs by itself.** Framework auto-instrumentors
+  (e.g. `openinference-instrumentation-langchain`) trace each graph node as a
+  `CHAIN` span, not `AGENT` — and Agent Detective opens a run only for `AGENT`
+  spans. Promote the real node spans to `AGENT` (set
+  `openinference.span.kind = AGENT` + `gen_ai.agent.name`) so each node becomes a
+  graph node *and* its child LLM spans roll their tokens/cost into it. Chaining
+  the node spans in execution order (each node parented to the previous) turns
+  the sequential flow into `SPAWN` edges; a `TOOL_DELEGATION` back-edge on a
+  retry closes the cycle so the loop is detected. A collecting exporter is the
+  natural place to apply all of this, since it sees the whole run at once.
+
+- **Cost.** Agent Detective ships no pricing table, so `gen_ai.usage.cost` is
+  whatever you set; if you only have token counts, compute cost = tokens × price
+  in the exporter and attach it (again, absent → unknown, never a default).
+
 ## The correlation header: `x-execution-graph-id`
 
 By default Agent Detective groups a run into an execution graph by its trace id

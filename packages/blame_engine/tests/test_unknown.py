@@ -3,7 +3,7 @@ culprit (S15). Missing score is None end-to-end, never defaulted to 1.0."""
 
 import pytest
 
-from blame_engine import TerminalVerdict, find_blame, select_candidates
+from blame_engine import NodeScore, TerminalVerdict, find_blame, select_candidates
 
 
 def test_unknown_between_healthy_and_bad(mk) -> None:
@@ -50,11 +50,18 @@ def test_unknown_node_is_never_culprit(mk) -> None:
     assert report.culprit_run_ids == ["b"]
     assert "u" not in report.culprit_run_ids
 
-    # Unknown node alone with a bad verdict: nothing blamable -> unclassified.
+    # A genuinely UNKNOWN agent (it produced output but the judge could not score
+    # it -> judge_error) plus a bad verdict: it might be the real culprit, so we
+    # stay unclassified rather than crying composition_failure. (Contrast a
+    # structural root with no output at all -> payload_missing -> non-blocking.)
+    unknown_agent = NodeScore(
+        run_id="u", score=None, components={}, input_flawed=None,
+        unscored_reason="judge_error", judge_note=None,
+    )
     inp2 = mk(
         nodes=["u", "b"],
         edges=[("u", "b")],
-        scores={"u": None, "b": 0.9},
+        scores={"u": unknown_agent, "b": 0.9},
         terminal_verdict=TerminalVerdict(bad=True, score=0.1, reasoning="bad output"),
     )
     report2 = find_blame(inp2)

@@ -1,10 +1,11 @@
 """Data types for the blame engine. Mirrors spec section 3.2 exactly."""
 
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from typing import Literal
 
 ReportType = Literal["cut_point", "multi_culprit", "composition_failure",
-                     "loop_detected", "root_cause_external", "unclassified"]
+                     "loop_detected", "root_cause_external", "verification_gap",
+                     "unclassified"]
 
 
 @dataclass(frozen=True)
@@ -77,6 +78,17 @@ class Evidence:                             # worker serializes to JSONB
     unknown_ancestors: list[str]
     fact_propagation: list[dict] | None     # filled by WORKER after blame; always None here
     notes: list[str]                        # human-readable classification rationale
+    # Where the failure surfaced (terminal sinks), distinct from where it broke
+    # (the culprit/origin). "Where it broke" and "where it showed" are different
+    # questions — a detective answers both.
+    manifestation_run_ids: list[str] = field(default_factory=list)
+    # Verifier nodes (qa/eval/review/…) that passed while a culprit sat upstream:
+    # they rubber-stamped bad work through. Each: {run_id, agent_name}.
+    verification_gaps: list[dict] = field(default_factory=list)
+    # Per-node candidacy: why each node was or wasn't the culprit (origin /
+    # loop member / inherited / verification gap / healthy / unscored). Makes the
+    # verdict explainable instead of a black box.
+    candidacy: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)

@@ -20,6 +20,7 @@ import {
 } from "../format";
 import { useAsync } from "../hooks/useAsync";
 import { href } from "../router";
+import { buildFindingsMarkdown, downloadText } from "../findingsExport";
 
 function Legend() {
   return (
@@ -57,6 +58,9 @@ function Legend() {
         </span>
         <span className="legend-item">
           <span className="path-swatch" /> propagation path
+        </span>
+        <span className="legend-item">
+          <span className="loop-swatch" /> retry loop
         </span>
       </div>
     </div>
@@ -260,6 +264,20 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
         <div className="head-actions">
           <button className="btn" onClick={graphState.reload} disabled={graphState.loading}>
             Refresh
+          </button>
+          <button
+            className="btn"
+            disabled={!graph}
+            title="Download the findings as a Markdown brief for a coding agent"
+            onClick={() =>
+              graph &&
+              downloadText(
+                `findings-${shortId(graphId)}.md`,
+                buildFindingsMarkdown(graph, report),
+              )
+            }
+          >
+            Export .md
           </button>
           <button className="btn btn-primary" onClick={runAnalyze} disabled={analyzing}>
             {analyzing ? "Analyzing..." : "Re-analyze"}

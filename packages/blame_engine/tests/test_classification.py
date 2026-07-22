@@ -22,7 +22,8 @@ def test_composition_failure_blames_source(mk) -> None:
     assert report.report_type == "composition_failure"
     assert report.culprit_run_ids == ["o"]
     assert report.propagation_path == ["o", "a", "b"]
-    assert report.confidence == pytest.approx(1.0)
+    # Fallback verdict: capped so the UI never claims certainty on a guess.
+    assert report.confidence == pytest.approx(0.4)
     assert report.downstream_cost_usd == pytest.approx(3.0)
 
 
@@ -48,8 +49,10 @@ def test_source_candidate_with_flawed_input_is_external(mk) -> None:
 
     assert report.report_type == "root_cause_external"
     assert report.culprit_run_ids == ["s"]
-    # Confidence formula still applies: gap=1.0, severity=0.4, pred=1.0.
-    assert report.confidence == pytest.approx(0.82)
+    # Confidence formula yields 0.82, but root_cause_external is capped at 0.5:
+    # the fault originated outside the observed graph, so we cannot be more sure
+    # than "the input was already bad".
+    assert report.confidence == pytest.approx(0.5)
     assert report.evidence.judge_notes == {"s": "input was already garbage"}
 
 

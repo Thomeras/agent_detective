@@ -38,6 +38,91 @@ _JUDGE_TAIL_BYTES = 4 * 1024
 
 _WORD_RE = re.compile(r"\S+")
 
+# Input-contract preservation: parameters an agent must carry through unchanged
+# unless explicitly told to change them. A silent rewrite (e.g. think flipping
+# file_type docx->md) is a deterministic fault — detectable without any LLM — and
+# is the archetypal "first node that broke quality" this product exists to catch.
+_CONTRACT_KEYS = frozenset(
+    {
+        "file_type",
+        "filetype",
+        "format",
+        "target_format",
+        "doc_kind",
+        "medium",
+        "lang",
+        "language",
+        "locale",
+    }
+)
+# A confirmed contract violation forces the node below any sane blame threshold,
+# so it surfaces as a cut_point culprit rather than hiding behind a fluent judge.
+_CONTRACT_VIOLATION_SCORE = 0.15
+
+
+def _norm(value: object) -> str:
+    """Casefolded, unicode-normalized string for tolerant value comparison."""
+    import unicodedata
+
+    return unicodedata.normalize("NFC", str(value)).strip().casefold()
+
+
+def _try_parse_json(text: str | None) -> object | None:
+    """Parse JSON, tolerating prose wrapping a single {...} object."""
+    if not text:
+        return None
+    import json as _json
+
+    try:
+        return _json.loads(text)
+    except ValueError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            try:
+                return _json.loads(match.group(0))
+            except ValueError:
+                return None
+    return None
+
+
+def _collect_contract_params(obj: object, keys: frozenset[str]) -> dict[str, object]:
+    """Recursively collect the first scalar value seen for each contract key."""
+    found: dict[str, object] = {}
+
+    def walk(node: object) -> None:
+        if isinstance(node, dict):
+            for k, v in node.items():
+                if isinstance(k, str) and k.lower() in keys and not isinstance(v, (dict, list)):
+                    found.setdefault(k.lower(), v)
+                walk(v)
+        elif isinstance(node, list):
+            for el in node:
+                walk(el)
+
+    walk(obj)
+    return found
+
+
+def contract_violations(
+    input_text: str | None, output_text: str | None, keys: frozenset[str] = _CONTRACT_KEYS
+) -> list[tuple[str, object, object]]:
+    """Contract parameters present in BOTH input and output whose value changed.
+
+    Returns ``(key, input_value, output_value)`` triples. Empty when input or
+    output is not JSON, or when every shared contract parameter was preserved.
+    """
+    parsed_in = _try_parse_json(input_text)
+    parsed_out = _try_parse_json(output_text)
+    if not isinstance(parsed_in, (dict, list)) or not isinstance(parsed_out, (dict, list)):
+        return []
+    in_params = _collect_contract_params(parsed_in, keys)
+    out_params = _collect_contract_params(parsed_out, keys)
+    violations: list[tuple[str, object, object]] = []
+    for key, in_val in in_params.items():
+        if key in out_params and _norm(in_val) != _norm(out_params[key]):
+            violations.append((key, in_val, out_params[key]))
+    return violations
+
 
 def load_prompt(name: str) -> str:
     """Load a prompt template from ``worker/prompts``."""
@@ -306,12 +391,28 @@ async def score_node(
         if isinstance(reasoning, str):
             judge_note = reasoning
 
+    # Deterministic input-contract check: a silent rewrite of a carried-through
+    # parameter (file_type, lang, format, ...) is a hard fault. Detected here
+    # from the input/output diff — no LLM, no threshold guessing.
+    violations = contract_violations(input_text, output_text)
+
     components: dict[str, float | None] = {
         "schema": schema_component,
         "judge": judge_component,
         "heuristics": heuristics_component,
     }
     score, unscored_reason = composite_score(components, weights, min_weight)
+
+    if violations:
+        # A confirmed violation is decisive: it dominates a fluent judge verdict
+        # and forces the node below threshold so blame localises here (cut_point).
+        components["contract"] = 0.0
+        detail = "; ".join(f"{k}: {a!r}->{b!r}" for k, a, b in violations)
+        contract_note = f"input contract violated (silent parameter rewrite): {detail}"
+        judge_note = f"{judge_note} | {contract_note}" if judge_note else contract_note
+        capped = _CONTRACT_VIOLATION_SCORE if score is None else min(score, _CONTRACT_VIOLATION_SCORE)
+        score, unscored_reason = capped, None
+
     return NodeScore(
         run_id=run_id,
         score=score,

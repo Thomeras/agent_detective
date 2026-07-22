@@ -20,6 +20,7 @@ export type ReportType =
   | "composition_failure"
   | "loop_detected"
   | "root_cause_external"
+  | "verification_gap"
   | "unclassified";
 
 // GET /graphs -> { graphs: GraphSummary[], limit, offset }
@@ -123,6 +124,14 @@ export interface LoopAnomaly {
 export interface FactPropagationEntry {
   claim: string;
   found_in: string[];
+  // Successors whose payload was missing (e.g. the node failed): we genuinely
+  // could not check, which is not the same as "not found".
+  not_checkable?: string[];
+}
+
+export interface VerificationGap {
+  run_id: string;
+  agent_name: string;
 }
 
 export interface Evidence {
@@ -134,6 +143,12 @@ export interface Evidence {
   unknown_ancestors: string[];
   fact_propagation: FactPropagationEntry[] | null;
   notes: string[];
+  // Where the failure surfaced (terminal sinks), distinct from the culprit.
+  manifestation_run_ids?: string[];
+  // Verifier nodes that passed while the final output was bad.
+  verification_gaps?: VerificationGap[];
+  // Per-node explanation of why it was or wasn't blamed.
+  candidacy?: Record<string, string>;
 }
 
 // serializers.report_summary

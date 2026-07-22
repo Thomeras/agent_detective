@@ -30,7 +30,7 @@ def test_flagship_diamond_cut_point(mk) -> None:
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["scraper"]
-    assert report.evidence.drops == {"scraper": pytest.approx(0.8)}
+    assert report.evidence.drops == {"scraper": pytest.approx(0.8), "compliance": pytest.approx(0.45)}
     assert report.propagation_path == ["scraper", "compliance", "publisher"]
     # Culprit + descendants only: scraper, compliance, publisher.
     assert report.downstream_cost_usd == pytest.approx(3.5)

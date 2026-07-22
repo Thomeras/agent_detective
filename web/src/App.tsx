@@ -1,5 +1,6 @@
 // App shell: top navigation plus hash-router dispatch to the three screens.
 
+import GraphList from "./screens/GraphList";
 import GraphView from "./screens/GraphView";
 import IncidentInbox from "./screens/IncidentInbox";
 import Leaderboard from "./screens/Leaderboard";
@@ -31,6 +32,9 @@ export default function App() {
       />
     );
     section = "graphs";
+  } else if (path === "/graphs") {
+    screen = <GraphList />;
+    section = "graphs";
   } else if (path === "/leaderboard") {
     screen = <Leaderboard />;
     section = "leaderboard";
@@ -48,6 +52,7 @@ export default function App() {
         </div>
         <nav className="nav">
           <NavLink to="/incidents" label="Incidents" active={section === "incidents"} />
+          <NavLink to="/graphs" label="Graphs" active={section === "graphs"} />
           <NavLink to="/leaderboard" label="Leaderboard" active={section === "leaderboard"} />
         </nav>
       </header>
