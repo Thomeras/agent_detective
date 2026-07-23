@@ -8,6 +8,7 @@ from conftest import Harness, load_fixture
 TRACE_ID = "4bf92f3577b34da6a3ce929d0e0e4736"
 ORCHESTRATOR_KEY = f"{TRACE_ID}:00000000000000a1"
 SCRAPER_KEY = f"{TRACE_ID}:00000000000000b1"
+SCRAPER_RETRY_KEY = f"{TRACE_ID}:00000000000000b3"
 
 
 def test_post_spawn_pipeline_writes_expected_rows(harness: Harness) -> None:
@@ -17,7 +18,7 @@ def test_post_spawn_pipeline_writes_expected_rows(harness: Harness) -> None:
     assert response.json() == {}
 
     # Raw spans captured for ClickHouse, one per span in the fixture.
-    assert len(harness.sink.rows) == 5
+    assert len(harness.sink.rows) == 7
     assert {r.trace_id for r in harness.sink.rows} == {TRACE_ID}
     assert harness.sink.rows[0].span_id == "00000000000000a1"
     assert "openinference.span.kind" in harness.sink.rows[0].attributes
@@ -35,6 +36,27 @@ def test_post_spawn_pipeline_writes_expected_rows(harness: Harness) -> None:
     assert orchestrator.graph_id == graph_id
     assert orchestrator.agent_name == "orchestrator"
     assert orchestrator.agent_version == "1.4.0"
+    assert orchestrator.model_name == "gpt-4o-mini"  # from the member LLM span
+    assert orchestrator.prompt_hash == "ab12cd34ef56"
+    assert orchestrator.tool_schema_hash == "0011aabbccdd"
+    # Out-of-band artifact integrity metadata: the raw opener-span attribute
+    # string lands on the run row (the worker reads it from here, never from
+    # forgeable payload text).
+    assert orchestrator.artifact_meta == (
+        '[{"path":"out/products.json","size":2048,"sha256":"deadbeefcafe",'
+        '"declared_ext":"json","detected_kind":"json","parse_ok":true,"nonempty":true}]'
+    )
+    scraper = harness.repo.runs[run_id_from_key(SCRAPER_KEY)]
+    assert scraper.artifact_meta is None  # absent on the wire -> NULL, never invented
+    assert scraper.tool_schema_hash is None  # same rule: absent -> NULL
+    # Mapper-derived TOOL-span digest lands on the run row; runs without TOOL
+    # member spans stay NULL, never an empty array.
+    assert orchestrator.tool_calls is None
+    retry = harness.repo.runs[run_id_from_key(SCRAPER_RETRY_KEY)]
+    assert retry.tool_calls == (
+        '[{"name":"fetch_page","args_sha":"5bba4ef7e89c","status":"ok"},'
+        '{"name":"scraper.parse_html","args_sha":"e3b0c44298fc","status":"error"}]'
+    )
     assert orchestrator.trace_id == TRACE_ID
     assert orchestrator.status == "ok"
     assert orchestrator.cost_usd == 0.012
@@ -80,7 +102,7 @@ def test_redelivery_is_a_noop(harness: Harness) -> None:
     assert len(harness.repo.runs) == 3
     assert len(harness.repo.edges) == 1
     # Raw span storage is append-only; duplicates there are acceptable.
-    assert len(harness.sink.rows) == 10
+    assert len(harness.sink.rows) == 14
 
 
 def test_malformed_payload_is_accepted_gracefully(harness: Harness) -> None:

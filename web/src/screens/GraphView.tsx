@@ -5,10 +5,22 @@
 import { useMemo, useState } from "react";
 
 import { api } from "../api/client";
-import type { GraphDetail, RunNodeData, RunPayloads } from "../api/types";
+import type {
+  EdgeType,
+  GraphDetail,
+  GroundTruthLabel,
+  ReportDetail,
+  ReportType,
+  RunNodeData,
+  RunPayloads,
+  TopologyClassification,
+  VersionDiffResponse,
+  VersionIdentity,
+} from "../api/types";
+import { classifyTopology } from "../topology";
 import BlameReportPanel from "../components/BlameReportPanel";
-import GraphCanvas from "../components/GraphCanvas";
-import { EmptyState, ErrorState, Loading, Panel, StatusBadge } from "../components/ui";
+import GraphCanvas, { detectLoops } from "../components/GraphCanvas";
+import { EmptyState, ErrorState, Loading, Panel, StatusBadge, TypeBadge } from "../components/ui";
 import {
   formatConfidence,
   formatCost,
@@ -22,7 +34,24 @@ import { useAsync } from "../hooks/useAsync";
 import { href } from "../router";
 import { buildFindingsMarkdown, downloadText } from "../findingsExport";
 
-function Legend() {
+// The legend is DERIVED from the loaded trace: it captions only what this
+// graph actually contains. A static key advertising edge types or markers the
+// trace does not have promises a graph the demo then fails to show — the
+// worst place for that gap, since the graph model is the product's thesis.
+function Legend({ graph, report }: { graph: GraphDetail; report: ReportDetail | null }) {
+  const edgeTypes = new Set(graph.edges.map((e) => e.data.type));
+  const { loopNodes } = detectLoops(
+    graph.nodes.map((n) => n.data.id),
+    graph.edges.map((e) => ({ source: e.data.source, target: e.data.target })),
+    new Map(),
+  );
+  const hasCulprit = (report?.culprit_run_ids ?? []).length > 0;
+  const hasPath = (report?.propagation_path ?? []).length >= 2;
+  const edgeEntries: Array<[string, string]> = [
+    ["SPAWN", "spawn"],
+    ["A2A_MESSAGE", "a2a"],
+    ["TOOL_DELEGATION", "tool"],
+  ];
   return (
     <div className="legend">
       <div className="legend-group">
@@ -40,30 +69,99 @@ function Legend() {
           <span className="swatch" style={{ background: scoreColor(null) }} /> unknown
         </span>
       </div>
+      {edgeTypes.size > 0 && (
+        <div className="legend-group">
+          <span className="legend-title">Edges</span>
+          {edgeEntries
+            .filter(([type]) => edgeTypes.has(type as EdgeType))
+            .map(([type, cls]) => (
+              <span key={type} className="legend-item">
+                <span className={`edge-swatch ${cls}`} /> {type}
+              </span>
+            ))}
+        </div>
+      )}
       <div className="legend-group">
-        <span className="legend-title">Edges</span>
+        <span className="legend-title">Node kind</span>
         <span className="legend-item">
-          <span className="edge-swatch spawn" /> SPAWN
+          <span className="swatch swatch-round" /> LLM call
         </span>
         <span className="legend-item">
-          <span className="edge-swatch a2a" /> A2A_MESSAGE
-        </span>
-        <span className="legend-item">
-          <span className="edge-swatch tool" /> TOOL_DELEGATION
+          <span className="swatch swatch-square" /> deterministic
         </span>
       </div>
-      <div className="legend-group">
-        <span className="legend-item">
-          <span className="ring-swatch" /> culprit
-        </span>
-        <span className="legend-item">
-          <span className="path-swatch" /> propagation path
-        </span>
-        <span className="legend-item">
-          <span className="loop-swatch" /> retry loop
-        </span>
-      </div>
+      {(hasCulprit || hasPath || loopNodes.size > 0) && (
+        <div className="legend-group">
+          {hasCulprit && (
+            <span className="legend-item">
+              <span className="ring-swatch" /> culprit
+            </span>
+          )}
+          {hasPath && (
+            <span className="legend-item">
+              <span className="path-swatch" /> propagation path
+            </span>
+          )}
+          {loopNodes.size > 0 && (
+            <span className="legend-item">
+              <span className="loop-swatch" /> retry loop
+            </span>
+          )}
+        </div>
+      )}
     </div>
+  );
+}
+
+// Advisory topology chip for the graph meta header. Prefers the EVIDENTIAL
+// classification recorded in the open blame report (evidence.topology) over
+// the client-side mirror computed from the loaded nodes+edges — the tooltip
+// names which source rendered. Presentational only: never affects the report.
+function TopologyChip({
+  graph,
+  evidenceTopology,
+}: {
+  graph: GraphDetail;
+  evidenceTopology: TopologyClassification | null;
+}) {
+  const clientTopology = useMemo(
+    () =>
+      graph.nodes.length === 0
+        ? null
+        : classifyTopology(
+            graph.nodes.map((n) => n.data.id),
+            graph.edges.map((e) => [e.data.source, e.data.target] as [string, string]),
+          ),
+    [graph],
+  );
+
+  const topo = evidenceTopology ?? clientTopology;
+  if (!topo) return null;
+  const disconnected = topo.primary === "disconnected";
+
+  const lines = [
+    `topology: ${topo.primary} (${
+      evidenceTopology ? "as recorded in evidence" : "computed client-side"
+    })`,
+    `nodes: ${topo.node_count}`,
+    `edges: ${topo.edge_count}`,
+    `components: ${topo.components}`,
+    `depth: ${topo.depth}`,
+    `max fan-out: ${topo.max_fan_out}`,
+    `SCCs: ${topo.scc_count}`,
+    `bidirectional pairs: ${topo.bidirectional_pairs}`,
+  ];
+  if (disconnected) {
+    lines.push(
+      "",
+      `${topo.components} weakly-connected components: runs share graph membership but lack instrumented edges between components, so blame localisation across components is impossible. Enable A2A detection or instrument SPAWN/TOOL edges.`,
+    );
+  }
+
+  return (
+    <span className="topo-chip" title={lines.join("\n")}>
+      <TypeBadge label={`topology: ${topo.primary}`} kind={disconnected ? "warn" : undefined} />
+    </span>
   );
 }
 
@@ -117,6 +215,14 @@ function NodePanel({
         <div className="kv">
           <span className="kv-key">Version</span>
           <span className="kv-val">{node.agent_version ?? "-"}</span>
+        </div>
+        <div className="kv">
+          <span className="kv-key">Model</span>
+          <span className="kv-val">{node.model_name ?? "-"}</span>
+        </div>
+        <div className="kv">
+          <span className="kv-key">Prompt hash</span>
+          <span className="kv-val mono">{node.prompt_hash ?? "-"}</span>
         </div>
         <div className="kv">
           <span className="kv-key">Cost</span>
@@ -191,6 +297,212 @@ function NodePanel({
   );
 }
 
+// The four per-run identity fields the version-diff endpoint compares
+// (roadmap 2.1 — "why did it work yesterday").
+const IDENTITY_FIELDS: { key: keyof VersionIdentity; label: string }[] = [
+  { key: "agent_version", label: "version" },
+  { key: "model_name", label: "model" },
+  { key: "prompt_hash", label: "prompt hash" },
+  { key: "tool_schema_hash", label: "tool schema" },
+];
+
+// Collapsible "why did it work yesterday" panel: identity diff between this
+// graph and the most recent clean (zero-incident) finalized graph. Fetched
+// lazily — the request only fires once the user expands the panel.
+function VersionDiffPanel({ graphId }: { graphId: string }) {
+  const [open, setOpen] = useState(false);
+  const diffState = useAsync<VersionDiffResponse | null>(
+    () => (open ? api.versionDiff(graphId, "last_clean") : Promise.resolve(null)),
+    [graphId, open],
+  );
+  const diff = diffState.data;
+
+  return (
+    <Panel title="Version diff vs last clean">
+      {!open ? (
+        <button className="btn" onClick={() => setOpen(true)}>
+          Load diff
+        </button>
+      ) : diffState.loading ? (
+        <Loading label="Loading version diff" />
+      ) : diffState.error ? (
+        <ErrorState message={diffState.error} onRetry={diffState.reload} />
+      ) : diff && diff.against === null ? (
+        <EmptyState
+          title="No clean baseline graph found"
+          hint="No other finalized graph without incidents exists to diff against."
+        />
+      ) : diff ? (
+        <>
+          <div className="muted small">
+            baseline: graph <span className="mono">{shortId(diff.against)}</span> (
+            {diff.against_mode === "last_clean" ? "last clean" : "explicit"})
+          </div>
+          {diff.per_agent.length === 0 && (
+            <div className="muted small">No agents to compare.</div>
+          )}
+          <div className="diff-list">
+            {diff.per_agent.map((row) => {
+              const changed = new Set(row.changed);
+              return (
+                <div key={row.agent_name} className="diff-agent">
+                  <div className="diff-agent-name mono">{row.agent_name}</div>
+                  {row.baseline === null && (
+                    <div className="muted small">
+                      not present in the baseline graph — nothing to diff against
+                    </div>
+                  )}
+                  {IDENTITY_FIELDS.map(({ key, label }) => {
+                    const isChanged = changed.has(key);
+                    return (
+                      <div
+                        key={key}
+                        className={`diff-field${isChanged ? " diff-changed" : ""}`}
+                      >
+                        <span className="diff-key">{label}</span>
+                        <span className="mono diff-val">
+                          {row.baseline === null
+                            ? "—"
+                            : (row.baseline[key] ?? "-")}
+                        </span>
+                        <span className="score-arrow" aria-hidden>
+                          →
+                        </span>
+                        <span className="mono diff-val">{row.current[key] ?? "-"}</span>
+                        {isChanged && <TypeBadge label="changed" kind="warn" />}
+                      </div>
+                    );
+                  })}
+                </div>
+              );
+            })}
+          </div>
+        </>
+      ) : null}
+    </Panel>
+  );
+}
+
+// Shadow-mode policy decisions recorded for this graph. Rendered only when
+// rows exist. Honesty rule: these are annotations after the fact — the wording
+// is always "would have blocked/warned", never "blocked".
+function PolicyDecisionsPanel({ graphId }: { graphId: string }) {
+  const state = useAsync(() => api.policyDecisions(graphId), [graphId]);
+  const decisions = state.data?.decisions ?? [];
+  if (decisions.length === 0) return null;
+  return (
+    <Panel title="Policy (shadow)">
+      <div className="judge-list">
+        {decisions.map((d, i) => (
+          <div key={`${d.rule_name}-${i}`} className="fact-found">
+            <TypeBadge
+              label={d.decision === "would_block" ? "would block" : "would warn"}
+              kind={d.decision === "would_block" ? "fail" : "warn"}
+            />
+            <span>
+              <span className="mono">{d.rule_name}</span>: would have{" "}
+              {d.decision === "would_block" ? "blocked" : "warned"}
+              {d.detail ? ` — ${d.detail}` : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="muted small">Shadow mode: recorded, not enforced.</p>
+    </Panel>
+  );
+}
+
+// Human ground-truth feedback on the RUN (not on the report). The report's
+// verdict implies a run label (a failing verdict type implies the run was bad;
+// degraded_recovered implies it passed); "correct/wrong" maps onto that. An
+// inconclusive report implies nothing, so the buttons name the label directly.
+function FeedbackPanel({
+  graphId,
+  reportType,
+}: {
+  graphId: string;
+  reportType: ReportType | null;
+}) {
+  const [submitting, setSubmitting] = useState(false);
+  const [submitted, setSubmitted] = useState<GroundTruthLabel | null>(null);
+  const [error, setError] = useState<string | null>(null);
+
+  const implied: GroundTruthLabel | null =
+    reportType === null || reportType === "unclassified"
+      ? null
+      : reportType === "degraded_recovered"
+        ? "ok"
+        : "bad";
+
+  const submit = (label: GroundTruthLabel) => {
+    setSubmitting(true);
+    setError(null);
+    api
+      .postFeedback(graphId, { label })
+      .then(() => setSubmitted(label))
+      .catch((err: unknown) =>
+        setError(err instanceof Error ? err.message : String(err)),
+      )
+      .finally(() => setSubmitting(false));
+  };
+
+  return (
+    <Panel title="Feedback (ground truth)">
+      <p className="muted small">
+        Label the RUN (ground truth), not the report — "bad" means the run truly
+        failed.
+      </p>
+      <div className="feedback-actions">
+        {implied !== null ? (
+          <>
+            <button
+              className="btn"
+              disabled={submitting || submitted !== null}
+              title={`Records: run ${implied}`}
+              onClick={() => submit(implied)}
+            >
+              Verdict correct
+            </button>
+            <button
+              className="btn"
+              disabled={submitting || submitted !== null}
+              title={`Records: run ${implied === "bad" ? "ok" : "bad"}`}
+              onClick={() => submit(implied === "bad" ? "ok" : "bad")}
+            >
+              Verdict wrong
+            </button>
+          </>
+        ) : (
+          // Inconclusive report: no implied label to agree/disagree with, so
+          // ask for the run's ground truth directly.
+          <>
+            <button
+              className="btn"
+              disabled={submitting || submitted !== null}
+              onClick={() => submit("ok")}
+            >
+              Run was ok
+            </button>
+            <button
+              className="btn"
+              disabled={submitting || submitted !== null}
+              onClick={() => submit("bad")}
+            >
+              Run truly failed
+            </button>
+          </>
+        )}
+      </div>
+      {submitted !== null && (
+        <div className="muted small">
+          Thanks — the run is labelled "{submitted}" as human ground truth.
+        </div>
+      )}
+      {error && <div className="state-detail error-text">{error}</div>}
+    </Panel>
+  );
+}
+
 export default function GraphView({ graphId, incidentId }: { graphId: string; incidentId: number | null }) {
   const graphState = useAsync<GraphDetail>(() => api.getGraph(graphId), [graphId]);
   const incidentState = useAsync(
@@ -254,6 +566,10 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
           {graph && (
             <div className="graph-meta">
               <StatusBadge status={graph.status} />
+              <TopologyChip
+                graph={graph}
+                evidenceTopology={report?.evidence?.topology ?? null}
+              />
               <span className="dim">{graph.graph_type ?? "unknown type"}</span>
               <span className="dim">{graph.run_count ?? graph.nodes.length} runs</span>
               <span className="dim">{formatCost(graph.total_cost_usd)}</span>
@@ -292,7 +608,7 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
       {graph && !graphState.loading && (
         <div className="graph-layout">
           <div className="graph-main">
-            <Legend />
+            <Legend graph={graph} report={report ?? null} />
             {graph.nodes.length === 0 ? (
               <EmptyState title="This graph has no runs yet" />
             ) : (
@@ -315,7 +631,12 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
               <ErrorState message={incidentState.error} onRetry={incidentState.reload} />
             )}
             {report ? (
-              <BlameReportPanel report={report} labelFor={labelFor} onSelectRun={setSelectedRunId} />
+              <>
+                <BlameReportPanel report={report} labelFor={labelFor} onSelectRun={setSelectedRunId} />
+                {/* Feedback lives in the container, not BlameReportPanel —
+                    the report panel stays presentational. */}
+                <FeedbackPanel graphId={graphId} reportType={report.report_type} />
+              </>
             ) : (
               incidentId !== null &&
               !incidentState.loading && (
@@ -334,6 +655,8 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
                 <EmptyState title="Select a node" hint="Click any node to inspect its run and payloads." />
               </Panel>
             )}
+            <PolicyDecisionsPanel graphId={graphId} />
+            <VersionDiffPanel graphId={graphId} />
           </aside>
         </div>
       )}

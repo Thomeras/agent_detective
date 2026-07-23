@@ -27,8 +27,25 @@ from typing import Any
 
 from blame_engine import NodeScore
 
+from .behavioral import (
+    duplicate_side_effect_signals,
+    loop_fingerprint_signals,
+    parse_tool_calls,
+    retry_storm_signals,
+    tool_args_signals,
+)
+from .checks_content import (
+    language_mismatch_signals,
+    required_section_signals,
+    sum_invariant_signals,
+    temporal_invariant_signals,
+    unit_inconsistency_signals,
+)
+from .checks_security import injection_signature_signals, sensitive_data_signals
+from .graph_ops import _VERIFIER_HINTS
 from .judge_client import JudgeClient, judge_json_with_retries
-from .types import AgentStat, OutputContract, RunRecord
+from .signals import artifact_integrity_signals
+from .types import AgentStat, CheckRule, OutputContract, RunRecord
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -37,6 +54,38 @@ _JUDGE_HEAD_BYTES = 12 * 1024
 _JUDGE_TAIL_BYTES = 4 * 1024
 
 _WORD_RE = re.compile(r"\S+")
+
+# Role hints for planning/orchestration nodes: their correct output is a plan
+# or a routing decision, never the deliverable's content. The role is resolved
+# deterministically HERE and stated verbatim in the judge prompt — inferring it
+# from the agent name was left to the LLM, and role-blind verdicts kept making
+# planners come out as false origins ("provides a plan but not the requested
+# one-page overview" is a category error, not a finding).
+_PLANNER_HINTS = (
+    "think", "plan", "orchestrat", "rout", "coordinat", "supervis", "dispatch"
+)
+
+
+def node_role(agent_name: str | None, *, is_deliverable_producer: bool = False) -> str:
+    """Deterministic role classification, stated to the judge as ground truth."""
+    n = (agent_name or "").lower()
+    if any(h in n for h in _PLANNER_HINTS):
+        return (
+            "PLANNER — its correct output is a plan/outline/routing decision; "
+            "the deliverable's content is produced by later nodes"
+        )
+    if any(h in n for h in _VERIFIER_HINTS):
+        return "VERIFIER — its correct output is a verdict on another node's work"
+    if is_deliverable_producer:
+        return (
+            "DELIVERABLE PRODUCER — its output IS the artifact shipped to the "
+            "user; deliverable-level requirements apply in full"
+        )
+    return (
+        "INTERMEDIATE PRODUCER — its output feeds later steps; judge it "
+        "against what its input asked THIS step to produce"
+    )
+
 
 # Input-contract preservation: parameters an agent must carry through unchanged
 # unless explicitly told to change them. A silent rewrite (e.g. think flipping
@@ -58,6 +107,54 @@ _CONTRACT_KEYS = frozenset(
 # A confirmed contract violation forces the node below any sane blame threshold,
 # so it surfaces as a cut_point culprit rather than hiding behind a fluent judge.
 _CONTRACT_VIOLATION_SCORE = 0.15
+
+# ANY fail-severity deterministic signal (artifact integrity, missing required
+# section, sum-invariant breach, language mismatch, duplicate side effect,
+# invalid tool args, ...) is a harder fact than a rewritten parameter — the
+# output is provably wrong — so the generalized ceiling sits below the contract
+# override (0.15).
+_DETERMINISTIC_FAIL_SCORE = 0.10
+
+# Structured judge flags and the deterministic score ceiling each one enforces.
+# The point is calibration the judge cannot wriggle out of: once its reasoning
+# admits a shortcoming via a flag, the number cannot stay in the "good" band
+# ("comprehensive proposal, 0.71" and "lacks requested details, 0.89" both
+# violated that). Unknown flags pass through uncapped but are still recorded.
+_JUDGE_FLAG_CAPS: dict[str, float] = {
+    "missing_required_content": 0.55,
+    "ignored_instruction": 0.55,
+    "factual_error": 0.45,
+    "unverifiable_artifact": 0.60,
+}
+
+# Output that references a binary/file artifact whose CONTENT is not present in
+# the payload. A judge reading such a payload sees a claim ("wrote report.docx"),
+# not the work — scores built on it are built on sand. Text formats that are
+# usually echoed inline (md/html/txt/json) are deliberately excluded.
+_OPAQUE_ARTIFACT_RE = re.compile(
+    r"[\w./\\:-]+\.(?:docx|doc|pdf|pptx|ppt|xlsx|xls|zip|tar|gz|png|jpe?g|bin)\b",
+    re.IGNORECASE,
+)
+# STRUCTURAL markers for embedded artifact content: the block form the
+# instrumentation appends ("[artifact_text <path>]:") or an actual JSON field
+# named artifact_text. A BARE substring is not accepted — prose that merely
+# mentions the word 'artifact_text' (an agent quoting the convention, a QA note
+# "artifact_text will be attached") must not self-exempt the payload from
+# opacity detection.
+_ARTIFACT_TEXT_MARKERS = ("[artifact_text ", '"artifact_text"')
+
+
+def opaque_artifact_refs(output_text: str | None) -> list[str]:
+    """File-artifact references in the output whose content is not embedded.
+
+    Returns the matched references when the payload names a binary artifact but
+    carries no extracted content (no structural ``artifact_text`` marker) — the
+    signal that every judge downstream is grading a description, not the
+    artifact.
+    """
+    if not output_text or any(m in output_text for m in _ARTIFACT_TEXT_MARKERS):
+        return []
+    return list(dict.fromkeys(m.group(0) for m in _OPAQUE_ARTIFACT_RE.finditer(output_text)))
 
 
 def _norm(value: object) -> str:
@@ -344,6 +441,11 @@ async def score_node(
     *,
     error_span_ids: list[str] | None = None,
     retry_count: int = 0,
+    min_artifact_bytes: int = 64,
+    artifact_meta: str | None = None,
+    check_rules: list[CheckRule] | None = None,
+    graph_type: str | None = None,
+    is_deliverable_producer: bool = False,
     judge_sleep: Any = asyncio.sleep,
 ) -> NodeScore:
     """Score one run into a ``blame_engine.NodeScore`` (run_id as a string)."""
@@ -370,10 +472,14 @@ async def score_node(
     judge_component: float | None = None
     input_flawed: bool | None = None
     judge_note: str | None = None
+    flags: list[str] = []
     prompt = render_prompt(
         judge_prompt_template,
         {
             "AGENT_NAME": run.agent_name or "unknown",
+            "NODE_ROLE": node_role(
+                run.agent_name, is_deliverable_producer=is_deliverable_producer
+            ),
             "NODE_INPUT": truncate_for_judge(input_text or ""),
             "NODE_OUTPUT": truncate_for_judge(output_text),
         },
@@ -390,6 +496,29 @@ async def score_node(
         reasoning = verdict.get("reasoning")
         if isinstance(reasoning, str):
             judge_note = reasoning
+        raw_flags = verdict.get("flags")
+        if isinstance(raw_flags, list):
+            flags = [f for f in raw_flags if isinstance(f, str) and f.strip()][:8]
+
+    # Deterministic artifact-opacity check: the output claims a file artifact
+    # but its content is not in the payload. No judge saw the actual work, so
+    # "meets all requirements" would be an assertion about an unopened file.
+    opaque_refs = opaque_artifact_refs(output_text)
+    if opaque_refs and "unverifiable_artifact" not in flags:
+        flags.append("unverifiable_artifact")
+        opaque_note = (
+            "artifact content not in payload (unverifiable): "
+            + ", ".join(opaque_refs[:3])
+        )
+        judge_note = f"{judge_note} | {opaque_note}" if judge_note else opaque_note
+
+    # Flags cap the judge component deterministically: a verdict that admits a
+    # shortcoming cannot keep a "good"-band number (score-reasoning mismatch).
+    if judge_component is not None:
+        for flag in flags:
+            cap = _JUDGE_FLAG_CAPS.get(flag)
+            if cap is not None:
+                judge_component = min(judge_component, cap)
 
     # Deterministic input-contract check: a silent rewrite of a carried-through
     # parameter (file_type, lang, format, ...) is a hard fault. Detected here
@@ -402,16 +531,129 @@ async def score_node(
         "heuristics": heuristics_component,
     }
     score, unscored_reason = composite_score(components, weights, min_weight)
+    # The judged composite BEFORE any deterministic override: when an override
+    # fires, this is the "claimed" number the UI shows struck-through next to
+    # the effective one — a producer whose judge praised work that a
+    # reproducible check refuted must be as visible as a refuted verifier.
+    judged_composite = score
 
     if violations:
         # A confirmed violation is decisive: it dominates a fluent judge verdict
         # and forces the node below threshold so blame localises here (cut_point).
+        # The violation travels as a separate deterministic evidence stream
+        # (contract_violations) — it is NOT glued into the LLM judge prose.
         components["contract"] = 0.0
-        detail = "; ".join(f"{k}: {a!r}->{b!r}" for k, a, b in violations)
-        contract_note = f"input contract violated (silent parameter rewrite): {detail}"
-        judge_note = f"{judge_note} | {contract_note}" if judge_note else contract_note
         capped = _CONTRACT_VIOLATION_SCORE if score is None else min(score, _CONTRACT_VIOLATION_SCORE)
         score, unscored_reason = capped, None
+
+    # Deterministic checks (docs/deterministic-signals.md). Every check emits
+    # named signals; identity is stamped by the engine. Sources:
+    # - artifact integrity: the OUT-OF-BAND artifact_meta attribute — never the
+    #   payload text, which document content can forge;
+    # - registered rules (check_rules table): required sections, sum invariants,
+    #   tool arg schemas — filtered to this run's agent/graph_type;
+    # - built-ins: unit/temporal consistency, language vs the lang/locale
+    #   contract param, security scans, tool-call behavioral patterns.
+    rules = [
+        r
+        for r in (check_rules or [])
+        if r.agent_name in (None, run.agent_name)
+        and r.graph_type in (None, graph_type)
+    ]
+    # Required sections are DOCUMENT-level requirements. An UNSCOPED rule
+    # (agent_name None) applies only to the deliverable producer — a planning
+    # node's correct output is an outline, and judging a plan for not containing
+    # the budget table makes planners systematically come out as origins
+    # (role-blind scoring). A rule explicitly scoped to an agent still applies
+    # to that agent's own output wherever it sits.
+    section_rules = [
+        r.spec
+        for r in rules
+        if r.kind == "required_section"
+        and (r.agent_name is not None or is_deliverable_producer)
+    ]
+    sum_rules = [r.spec for r in rules if r.kind == "sum_invariant"]
+    tool_schemas = [r.spec for r in rules if r.kind == "tool_schema"]
+    # Expected language: the carried contract param (what the INPUT asked for,
+    # falling back to the node's own declared value).
+    lang_keys = frozenset({"lang", "language", "locale"})
+    in_params = _collect_contract_params(_try_parse_json(input_text), lang_keys)
+    out_params = _collect_contract_params(_try_parse_json(output_text), lang_keys)
+    expected_lang = next(
+        (str(v) for v in list(in_params.values()) + list(out_params.values()) if v),
+        None,
+    )
+    tool_calls = parse_tool_calls(run.tool_calls)
+
+    # CONTENT checks target the WORK a node produces. A verifier's output is
+    # meta-commentary about someone else's work (an English QA report about a
+    # Czech deliverable, a verdict without the required sections) — running
+    # content checks on it manufactures false positives, the same reason fact
+    # propagation skips verifier commentary. Integrity/security/behavioral
+    # checks still apply to every node.
+    _name = (run.agent_name or "").lower()
+    is_verifier_node = any(h in _name for h in _VERIFIER_HINTS)
+    content_signals: list[dict] = []
+    if not is_verifier_node:
+        content_signals = (
+            required_section_signals(
+                output_text, section_rules, subject="this node's own output"
+            )
+            + sum_invariant_signals(output_text, sum_rules)
+            + unit_inconsistency_signals(input_text, output_text)
+            + temporal_invariant_signals(output_text, run_started_at=run.started_at)
+            + language_mismatch_signals(expected_lang, output_text)
+        )
+
+    deterministic_signals = (
+        artifact_integrity_signals(artifact_meta, min_bytes=min_artifact_bytes)
+        + content_signals
+        + sensitive_data_signals(output_text)
+        + injection_signature_signals(output_text)
+        + loop_fingerprint_signals(tool_calls)
+        + retry_storm_signals(tool_calls)
+        + duplicate_side_effect_signals(tool_calls)
+        + tool_args_signals(run.tool_calls, tool_calls, tool_schemas)
+    )
+
+    # GENERALIZED deterministic-fail override: ANY fail-severity signal is a
+    # hard, reproducible fact about this node's output — it caps the composite
+    # below the blame threshold no matter how fluent the judge verdict was
+    # (deterministic beats judge). Warn-severity signals are evidence only:
+    # they ride along without touching the number.
+    fail_names = list(
+        dict.fromkeys(
+            s["name"] for s in deterministic_signals if s["severity"] == "fail"
+        )
+    )
+    warn_names = list(
+        dict.fromkeys(
+            s["name"] for s in deterministic_signals if s["severity"] == "warn"
+        )
+    )
+    for name in fail_names + warn_names:
+        if name not in flags:
+            flags.append(name)
+    if fail_names:
+        for name in fail_names:
+            components[name] = 0.0
+        capped = (
+            _DETERMINISTIC_FAIL_SCORE
+            if score is None
+            else min(score, _DETERMINISTIC_FAIL_SCORE)
+        )
+        score, unscored_reason = capped, None
+
+    # Record the refuted "claimed" number whenever ANY override (contract or
+    # generalized deterministic fail) lowered the judged composite — the engine
+    # turns it into a score_override entry so the UI renders claimed→effective
+    # for producers exactly like it does for refuted verifiers.
+    if (
+        judged_composite is not None
+        and score is not None
+        and score < judged_composite
+    ):
+        components["pre_override_composite"] = judged_composite
 
     return NodeScore(
         run_id=run_id,
@@ -420,4 +662,7 @@ async def score_node(
         input_flawed=input_flawed,
         unscored_reason=unscored_reason,
         judge_note=judge_note,
+        flags=tuple(flags),
+        contract_violations=tuple(violations),
+        deterministic_signals=tuple(deterministic_signals),
     )

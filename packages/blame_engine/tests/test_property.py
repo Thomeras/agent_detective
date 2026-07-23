@@ -51,9 +51,15 @@ def test_random_dag_with_injected_fault_finds_culprit(data: st.DataObject) -> No
         if node == fault:
             scores[node] = _score(node, fault_score)
         elif node in descendants:
-            # Decayed descendant: inherits the degradation, never below the fault.
+            # Decayed descendant: INHERITS the degradation — stays between the
+            # fault score and just below the blame threshold, never recovering
+            # above it. (If a descendant were allowed to recover past threshold
+            # and a grandchild then re-broke from that healthy node, the engine
+            # would correctly report TWO independent origins — a legitimate
+            # multi_culprit, not the single-fault invariant this test asserts.
+            # That recovery topology is covered by the dedicated edge-drop tests.)
             delta = data.draw(st.floats(min_value=0.0, max_value=0.4))
-            scores[node] = _score(node, min(1.0, fault_score + delta))
+            scores[node] = _score(node, min(0.49, fault_score + delta))
         else:
             # Ancestors and unrelated nodes stay healthy.
             scores[node] = _score(node, data.draw(st.floats(min_value=0.8, max_value=1.0)))

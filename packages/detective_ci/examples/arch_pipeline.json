@@ -1,0 +1,67 @@
+{
+  "nodes": [
+    "ingest",
+    "plan",
+    "draft",
+    "refine",
+    "publish"
+  ],
+  "edges": [
+    [
+      "ingest",
+      "plan"
+    ],
+    [
+      "plan",
+      "draft"
+    ],
+    [
+      "draft",
+      "refine"
+    ],
+    [
+      "refine",
+      "publish"
+    ]
+  ],
+  "scores": {
+    "ingest": {
+      "score": 0.95,
+      "input_flawed": false,
+      "judge_note": "clean extraction"
+    },
+    "plan": {
+      "score": 0.9,
+      "input_flawed": false,
+      "judge_note": "coherent outline"
+    },
+    "draft": {
+      "score": 0.2,
+      "input_flawed": false,
+      "judge_note": "draft dropped half the required sections"
+    },
+    "refine": {
+      "score": 0.35,
+      "input_flawed": false,
+      "judge_note": "polished text but the sections are still missing"
+    },
+    "publish": {
+      "score": 0.3,
+      "input_flawed": false,
+      "judge_note": "published artifact is incomplete"
+    }
+  },
+  "agent_names": {
+    "ingest": "ingest",
+    "plan": "plan",
+    "draft": "draft",
+    "refine": "refine",
+    "publish": "publish"
+  },
+  "terminal_verdict": {
+    "bad": true,
+    "score": 0.3,
+    "reasoning": "published artifact is missing required sections",
+    "checkable": true
+  }
+}

@@ -21,6 +21,9 @@
               "endTimeUnixNano": "1752000009000000000",
               "attributes": [
                 {"key": "openinference.span.kind", "value": {"stringValue": "AGENT"}},
+                {"key": "agent_detective.prompt_hash", "value": {"stringValue": "ab12cd34ef56"}},
+                {"key": "agent_detective.tool_schema_hash", "value": {"stringValue": "0011aabbccdd"}},
+                {"key": "agent_detective.artifact_meta", "value": {"stringValue": "[{\"path\":\"out/products.json\",\"size\":2048,\"sha256\":\"deadbeefcafe\",\"declared_ext\":\"json\",\"detected_kind\":\"json\",\"parse_ok\":true,\"nonempty\":true}]"}},
                 {"key": "input.value", "value": {"stringValue": "Find three products and translate them."}},
                 {"key": "output.value", "value": {"stringValue": "Published 3 localized products."}},
                 {"key": "gen_ai.usage.input_tokens", "value": {"intValue": "1200"}},
@@ -40,6 +43,7 @@
               "endTimeUnixNano": "1752000002000000000",
               "attributes": [
                 {"key": "openinference.span.kind", "value": {"stringValue": "LLM"}},
+                {"key": "gen_ai.request.model", "value": {"stringValue": "gpt-4o-mini"}},
                 {"key": "llm.token_count.prompt", "value": {"intValue": "100"}},
                 {"key": "llm.token_count.completion", "value": {"intValue": "50"}}
               ],
@@ -53,7 +57,8 @@
       "resource": {
         "attributes": [
           {"key": "service.name", "value": {"stringValue": "scraper-service"}},
-          {"key": "gen_ai.agent.version", "value": {"stringValue": "0.9.2"}}
+          {"key": "gen_ai.agent.version", "value": {"stringValue": "0.9.2"}},
+          {"key": "gen_ai.request.model", "value": {"stringValue": "claude-haiku-4-5"}}
         ]
       },
       "scopeSpans": [
@@ -108,6 +113,34 @@
                 {"key": "x-execution-graph-id", "value": {"stringValue": "g-spawn-1"}}
               ],
               "status": {"code": "STATUS_CODE_OK"}
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "00000000000000c1",
+              "parentSpanId": "00000000000000b3",
+              "name": "scraper.fetch_page",
+              "kind": 3,
+              "startTimeUnixNano": "1752000004600000000",
+              "endTimeUnixNano": "1752000004900000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "TOOL"}},
+                {"key": "gen_ai.tool.name", "value": {"stringValue": "fetch_page"}},
+                {"key": "input.value", "value": {"stringValue": "{\"url\": \"https://example.com/p/1\"}"}}
+              ],
+              "status": {"code": "STATUS_CODE_OK"}
+            },
+            {
+              "traceId": "4bf92f3577b34da6a3ce929d0e0e4736",
+              "spanId": "00000000000000c2",
+              "parentSpanId": "00000000000000b3",
+              "name": "scraper.parse_html",
+              "kind": 1,
+              "startTimeUnixNano": "1752000005000000000",
+              "endTimeUnixNano": "1752000005400000000",
+              "attributes": [
+                {"key": "openinference.span.kind", "value": {"stringValue": "TOOL"}}
+              ],
+              "status": {"code": "STATUS_CODE_ERROR"}
             }
           ]
         }

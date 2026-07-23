@@ -352,7 +352,7 @@
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "{\"stage\": \"compliance\", \"products\": [{\"sku\": \"SKU-001\", \"name_pl\": \"Mysz bezprzewodowa\", \"price\": \"$24.99\", \"compliant\": true}, {\"sku\": \"SKU-002\", \"name_pl\": \"Koncentrator USB-C\", \"price\": \"$39.50\", \"compliant\": true}, {\"sku\": \"SKU-003\", \"name_pl\": \"Podstawka pod laptopa\", \"price\": \"$15.00\", \"compliant\": true}], \"verdict\": \"pass\"}"
+                    "stringValue": "{\"stage\": \"compliance\", \"products\": [{\"sku\": \"SKU-001\", \"name_pl\": \"Mysz bezprzewodowa\", \"price\": \"$24.99\", \"compliant\": true}, {\"sku\": \"SKU-002\", \"name_pl\": \"Koncentrator USB-C\", \"price\": \"$39.50\", \"compliant\": true}, {\"sku\": \"SKU-003\", \"name_pl\": \"Podstawka pod laptopa\", \"price\": \"$15.00\", \"compliant\": true}], \"price_recheck\": {\"requested_from\": \"scraper-agent\", \"task_id\": \"a2a-task-rescrape-0001\", \"reason\": \"price provenance could not be verified against source pages\", \"result\": \"scraper re-confirmed the extracted prices\"}, \"verdict\": \"pass\"}"
                   }
                 },
                 {
@@ -484,6 +484,132 @@
             {
               "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
               "spanId": "f41e00000000000b",
+              "name": "scraper.retry_run",
+              "kind": 1,
+              "startTimeUnixNano": "1751328012200000000",
+              "endTimeUnixNano": "1751328013600000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "scraper-agent"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.version",
+                  "value": {
+                    "stringValue": "0.9.2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "A2A task from compliance-agent: re-scrape the three product pages and verify the price data."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"stage\": \"re-scrape\", \"task_id\": \"a2a-task-rescrape-0001\", \"requested_by\": \"compliance-agent\", \"products\": [{\"sku\": \"SKU-001\", \"name\": \"Wireless Mouse\", \"price\": \"$24.99\"}, {\"sku\": \"SKU-002\", \"name\": \"USB-C Hub\", \"price\": \"$39.50\"}, {\"sku\": \"SKU-003\", \"name\": \"Laptop Stand\", \"price\": \"$15.00\"}], \"note\": \"re-extracted the same prices from the pages\"}"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "450"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "140"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.003
+                  }
+                },
+                {
+                  "key": "x-execution-graph-id",
+                  "value": {
+                    "stringValue": "demo-graph-faulted"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "f41e000000000007"
+            },
+            {
+              "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
+              "spanId": "f41e00000000000d",
+              "name": "scraper.handle_a2a_rescrape",
+              "kind": 2,
+              "startTimeUnixNano": "1751328012250000000",
+              "endTimeUnixNano": "1751328013550000000",
+              "attributes": [
+                {
+                  "key": "a2a.task_id",
+                  "value": {
+                    "stringValue": "a2a-task-rescrape-0001"
+                  }
+                },
+                {
+                  "key": "a2a.peer_agent",
+                  "value": {
+                    "stringValue": "compliance-agent"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "f41e00000000000b"
+            },
+            {
+              "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
+              "spanId": "f41e00000000000c",
+              "name": "scraper.reextract_llm",
+              "kind": 1,
+              "startTimeUnixNano": "1751328012400000000",
+              "endTimeUnixNano": "1751328013200000000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "LLM"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "360"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "100"
+                  }
+                }
+              ],
+              "status": {
+                "code": "STATUS_CODE_OK"
+              },
+              "parentSpanId": "f41e00000000000b"
+            },
+            {
+              "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
+              "spanId": "f41e00000000000e",
               "name": "publisher.run",
               "kind": 1,
               "startTimeUnixNano": "1751328015000000000",
@@ -551,7 +677,7 @@
             },
             {
               "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
-              "spanId": "f41e00000000000d",
+              "spanId": "f41e000000000010",
               "name": "publisher.fetch_compliance_report",
               "kind": 1,
               "startTimeUnixNano": "1751328015200000000",
@@ -579,11 +705,11 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "f41e00000000000b"
+              "parentSpanId": "f41e00000000000e"
             },
             {
               "traceId": "ca8168a8a7e7fefce9d04655276cfee4",
-              "spanId": "f41e00000000000c",
+              "spanId": "f41e00000000000f",
               "name": "publisher.publish_llm",
               "kind": 1,
               "startTimeUnixNano": "1751328016000000000",
@@ -611,7 +737,7 @@
               "status": {
                 "code": "STATUS_CODE_OK"
               },
-              "parentSpanId": "f41e00000000000b"
+              "parentSpanId": "f41e00000000000e"
             }
           ]
         }

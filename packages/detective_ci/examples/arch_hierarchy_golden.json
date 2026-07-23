@@ -1,0 +1,7 @@
+{
+  "culprit_agents": [
+    "worker_b1"
+  ],
+  "deterministic_signals": [],
+  "report_type": "cut_point"
+}

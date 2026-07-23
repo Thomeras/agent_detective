@@ -1,7 +1,9 @@
-"""SQLAlchemy Core tables mirroring db/alembic/versions/0001_initial_schema.py.
+"""SQLAlchemy Core tables mirroring the db/alembic migrations.
 
-The Alembic migration owns the schema; these definitions are read/update
-handles only. Keep column names in sync with the migration.
+The Alembic migrations own the schema (0001 base, 0006 run versioning meta,
+0009 governance tables + judge_prompt_hash/tool_schema_hash columns); these
+definitions are read/update handles only. Keep column names in sync with the
+migrations.
 """
 
 import sqlalchemy as sa
@@ -31,6 +33,9 @@ agent_runs = sa.Table(
     sa.Column("graph_id", sa.Uuid(), nullable=False),
     sa.Column("agent_name", sa.Text()),
     sa.Column("agent_version", sa.Text()),
+    sa.Column("model_name", sa.Text()),
+    sa.Column("prompt_hash", sa.Text()),
+    sa.Column("tool_schema_hash", sa.Text()),
     sa.Column("parent_run_id", sa.Uuid()),
     sa.Column("trace_id", sa.Text()),
     sa.Column("status", sa.Text(), nullable=False),
@@ -74,6 +79,7 @@ tier1_verdicts = sa.Table(
     sa.Column("flags", postgresql.JSONB()),
     sa.Column("flagged", sa.Boolean(), nullable=False),
     sa.Column("sampled", sa.Boolean(), nullable=False),
+    sa.Column("judge_prompt_hash", sa.Text()),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
     sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
 )
@@ -105,5 +111,56 @@ blame_reports = sa.Table(
     sa.Column("downstream_cost_usd", sa.Numeric()),
     sa.Column("unscored_run_ids", postgresql.ARRAY(sa.Uuid())),
     sa.Column("evidence", postgresql.JSONB()),
+    sa.Column("judge_prompt_hash", sa.Text()),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+)
+
+# --- Migration 0009 governance tables (read-side mirrors) ---
+
+policy_decisions = sa.Table(
+    "policy_decisions",
+    metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+    sa.Column("graph_id", sa.Uuid(), nullable=False),
+    sa.Column("rule_name", sa.Text(), nullable=False),
+    sa.Column("decision", sa.Text(), nullable=False),  # 'would_block' | 'would_warn' — shadow observations, never enforcement
+    sa.Column("detail", sa.Text()),
+    sa.Column("mode", sa.Text(), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+)
+
+breaker_state = sa.Table(
+    "breaker_state",
+    metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+    sa.Column("scope_kind", sa.Text(), nullable=False),  # 'agent_name' | 'agent_version'
+    sa.Column("scope_value", sa.Text(), nullable=False),
+    sa.Column("state", sa.Text(), nullable=False),  # 'open' | 'closed' — a recorded decision; enforcement only if the integration polls it
+    sa.Column("reason", sa.Text()),
+    sa.Column("opened_at", sa.DateTime(timezone=True)),
+    sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
+)
+
+evidence_ledger = sa.Table(
+    "evidence_ledger",
+    metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+    sa.Column("report_id", sa.Integer(), nullable=False),
+    sa.Column("evidence_sha256", sa.Text(), nullable=False),
+    sa.Column("prev_hash", sa.Text()),
+    sa.Column("chain_hash", sa.Text(), nullable=False),
+    sa.Column("hmac_sig", sa.Text(), nullable=False),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
+)
+
+ground_truth_labels = sa.Table(
+    "ground_truth_labels",
+    metadata,
+    sa.Column("id", sa.Integer(), primary_key=True, autoincrement=True),
+    sa.Column("graph_id", sa.Uuid(), nullable=False),
+    sa.Column("label", sa.Text(), nullable=False),  # 'ok' | 'bad'
+    sa.Column("culprit_run_id", sa.Uuid()),
+    sa.Column("source", sa.Text(), nullable=False),
+    sa.Column("note", sa.Text()),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )

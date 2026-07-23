@@ -1,0 +1,7 @@
+{
+  "culprit_agents": [
+    "peer_alpha"
+  ],
+  "deterministic_signals": [],
+  "report_type": "cut_point"
+}

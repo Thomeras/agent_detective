@@ -10,12 +10,25 @@ reconstructed by ``packages/otel_mapper``:
     scraper-agent    --TOOL_DELEGATION--> compliance-agent
     translator-agent --TOOL_DELEGATION--> compliance-agent
     compliance-agent --TOOL_DELEGATION--> publisher-agent
+    compliance-agent --SPAWN--> scraper-agent (retry run)
+    scraper-agent (retry run) --A2A_MESSAGE--> compliance-agent
 
 The propagation path ``scraper -> compliance -> publisher`` therefore exists,
 which is what the M6 acceptance test checks. SPAWN comes from each child AGENT
-span being parented by the orchestrator's AGENT run span; TOOL_DELEGATION comes
-from TOOL spans carrying ``gen_ai.tool.target_agent`` (the edge points from the
-target's run to the caller, the direction of data flow).
+span being parented by the spawning agent's AGENT run span; TOOL_DELEGATION
+comes from TOOL spans carrying ``gen_ai.tool.target_agent`` (the edge points
+from the target's run to the caller, the direction of data flow).
+
+Retry loop and A2A message: compliance-agent finds the price data suspicious
+(faulted) or unavailable (happy) and sends an A2A task back to scraper-agent
+asking for a re-scrape. The retry executes as a second ``scraper-agent`` AGENT
+span parented under compliance's run span (a separate run node — the mapper
+keys runs on the opening AGENT span, not the agent name), so SPAWN
+compliance -> retry is emitted (names differ). Inside the retry run a SERVER
+span carrying ``a2a.task_id`` + ``a2a.peer_agent=compliance-agent`` yields the
+A2A_MESSAGE edge retry -> compliance (server side: the owner's output flows to
+the peer). Together these two edges form a cycle among the run nodes —
+the graph-model shape the UI marks as a retry loop.
 
 The scenario models a localized-product publishing pipeline whose source pages
 list no prices. In a clean run every agent reports prices as unavailable. Under
@@ -31,7 +44,7 @@ from dataclasses import dataclass, field
 from opentelemetry.sdk.resources import Resource
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.trace import Status, StatusCode, set_span_in_context
+from opentelemetry.trace import SpanKind, Status, StatusCode, set_span_in_context
 
 from . import conventions as C
 from .exporter import CollectingSpanExporter, DeterministicIdGenerator
@@ -49,6 +62,9 @@ _PRODUCTS = [
 # Fabricated prices used only when hallucinating. The source pages list none.
 _FABRICATED_PRICES = ["$24.99", "$39.50", "$15.00"]
 
+# Deterministic A2A task id for the compliance -> scraper re-scrape request.
+_RESCRAPE_TASK_ID = "a2a-task-rescrape-0001"
+
 
 @dataclass(frozen=True)
 class ToolSpec:
@@ -57,6 +73,23 @@ class ToolSpec:
     start: float
     end: float
     error: bool = False
+
+
+@dataclass(frozen=True)
+class A2ASpec:
+    """An A2A task-handling span emitted inside an agent's run.
+
+    Emitted as a SERVER-kind span carrying ``a2a.task_id`` and
+    ``a2a.peer_agent`` so the mapper derives an A2A_MESSAGE edge from the
+    owning run to the peer (server side: the handler's output flows back to
+    the requesting peer).
+    """
+
+    name: str
+    peer_agent: str
+    task_id: str
+    start: float
+    end: float
 
 
 @dataclass(frozen=True)
@@ -79,6 +112,11 @@ class AgentSpec:
     llm_tokens_out: int
     is_root: bool = False
     tools: tuple[ToolSpec, ...] = field(default_factory=tuple)
+    a2a: tuple[A2ASpec, ...] = field(default_factory=tuple)
+    # Agent name whose AGENT span parents this one. None => the root
+    # orchestrator span (or no parent when is_root). Must name an agent whose
+    # spec appears earlier in the list.
+    parent_agent: str | None = None
 
 
 def _scraper_products(hallucinate: bool) -> list[dict]:
@@ -95,7 +133,8 @@ def _scraper_products(hallucinate: bool) -> list[dict]:
 
 
 def build_agent_specs(hallucinate: bool) -> list[AgentSpec]:
-    """Construct the five agent specs for the given fault mode."""
+    """Construct the agent specs (five agents + scraper retry run) for the
+    given fault mode."""
     scraped = _scraper_products(hallucinate)
     price_by_sku = {p["sku"]: p.get("price") for p in scraped}
 
@@ -111,6 +150,20 @@ def build_agent_specs(hallucinate: bool) -> list[AgentSpec]:
         ],
         "language": "pl",
     }
+    # Compliance is not sure about the price data (present but unverifiable
+    # when hallucinating, absent otherwise) and asks the scraper — over A2A —
+    # to re-scrape. The retry's answer is what compliance records here.
+    rescrape_out = {
+        "stage": "re-scrape",
+        "task_id": _RESCRAPE_TASK_ID,
+        "requested_by": "compliance-agent",
+        "products": scraped,
+        "note": (
+            "re-extracted the same prices from the pages"
+            if hallucinate
+            else "re-checked all three pages: no prices listed anywhere"
+        ),
+    }
     compliance_out = {
         "stage": "compliance",
         "products": [
@@ -122,6 +175,20 @@ def build_agent_specs(hallucinate: bool) -> list[AgentSpec]:
             }
             for p in _PRODUCTS
         ],
+        "price_recheck": {
+            "requested_from": "scraper-agent",
+            "task_id": _RESCRAPE_TASK_ID,
+            "reason": (
+                "price provenance could not be verified against source pages"
+                if hallucinate
+                else "prices missing from scraped data"
+            ),
+            "result": (
+                "scraper re-confirmed the extracted prices"
+                if hallucinate
+                else "scraper re-confirmed prices are unavailable; passing without prices"
+            ),
+        },
         "verdict": "pass",
     }
     publisher_out = {
@@ -221,6 +288,42 @@ def build_agent_specs(hallucinate: bool) -> list[AgentSpec]:
                 ToolSpec("fetch_translations", "translator-agent", 9.2, 9.7),
             ),
         ),
+        # The retry run: scraper-agent handles the A2A re-scrape task from
+        # compliance-agent. Parented under compliance's run span (SPAWN
+        # compliance -> retry) and carrying the A2A SERVER span (A2A_MESSAGE
+        # retry -> compliance), which together close a retry-loop cycle.
+        AgentSpec(
+            agent_name="scraper-agent",
+            version="0.9.2",
+            span_name="scraper.retry_run",
+            input_value=(
+                "A2A task from compliance-agent: re-scrape the three product "
+                "pages and verify the price data."
+            ),
+            output_value=json.dumps(rescrape_out),
+            tokens_in=450,
+            tokens_out=140,
+            cost=0.003,
+            start=12.2,
+            end=13.6,
+            llm_span_name="scraper.reextract_llm",
+            llm_prompt="Re-extract product prices from the fetched pages. "
+            + json.dumps(rescrape_out),
+            llm_start=12.4,
+            llm_end=13.2,
+            llm_tokens_in=360,
+            llm_tokens_out=100,
+            parent_agent="compliance-agent",
+            a2a=(
+                A2ASpec(
+                    name="scraper.handle_a2a_rescrape",
+                    peer_agent="compliance-agent",
+                    task_id=_RESCRAPE_TASK_ID,
+                    start=12.25,
+                    end=13.55,
+                ),
+            ),
+        ),
         AgentSpec(
             agent_name="publisher-agent",
             version="1.0.3",
@@ -271,9 +374,17 @@ def build_spans(
 
     root_ctx = None
     root_span = None
+    # First AGENT span context per agent name, for parent_agent resolution.
+    # First-wins so a retry run never becomes the parenting anchor.
+    ctx_by_agent: dict[str, object] = {}
 
     for spec in specs:
-        parent_ctx = None if spec.is_root else root_ctx
+        if spec.is_root:
+            parent_ctx = None
+        elif spec.parent_agent is not None:
+            parent_ctx = ctx_by_agent[spec.parent_agent]
+        else:
+            parent_ctx = root_ctx
         agent_span = tracer.start_span(
             spec.span_name,
             context=parent_ctx,
@@ -291,6 +402,7 @@ def build_spans(
         agent_span.set_status(Status(StatusCode.OK))
 
         agent_ctx = set_span_in_context(agent_span)
+        ctx_by_agent.setdefault(spec.agent_name, agent_ctx)
         if spec.is_root:
             root_span = agent_span
             root_ctx = agent_ctx
@@ -323,6 +435,20 @@ def build_spans(
                 Status(StatusCode.ERROR if tool.error else StatusCode.OK)
             )
             tool_span.end(end_time=_nanos(base_nanos, tool.end))
+
+        for a2a in spec.a2a:
+            # SERVER kind: this run handles an A2A task sent by the peer, so
+            # the mapper points the A2A_MESSAGE edge owner -> peer.
+            a2a_span = tracer.start_span(
+                a2a.name,
+                context=agent_ctx,
+                kind=SpanKind.SERVER,
+                start_time=_nanos(base_nanos, a2a.start),
+            )
+            a2a_span.set_attribute(C.A2A_TASK_ID, a2a.task_id)
+            a2a_span.set_attribute(C.A2A_PEER_AGENT, a2a.peer_agent)
+            a2a_span.set_status(Status(StatusCode.OK))
+            a2a_span.end(end_time=_nanos(base_nanos, a2a.end))
 
         agent_span.end(end_time=_nanos(base_nanos, spec.end))
 

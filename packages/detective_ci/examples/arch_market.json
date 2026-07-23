@@ -1,0 +1,26 @@
+{
+  "nodes": ["orchestrator", "bidder_a", "bidder_b", "bidder_c"],
+  "edges": [
+    ["orchestrator", "bidder_a"],
+    ["orchestrator", "bidder_b"],
+    ["orchestrator", "bidder_c"]
+  ],
+  "scores": {
+    "orchestrator": {"score": 0.95, "input_flawed": false, "judge_note": "clear bid request, sensible award to bidder_b"},
+    "bidder_a": {"score": 0.9, "input_flawed": false, "judge_note": "reasonable bid, not awarded"},
+    "bidder_b": {"score": 0.15, "input_flawed": false, "judge_note": "won the award, delivered broken work"},
+    "bidder_c": {"score": 0.88, "input_flawed": false, "judge_note": "reasonable bid, not awarded"}
+  },
+  "agent_names": {
+    "orchestrator": "orchestrator",
+    "bidder_a": "bidder_a",
+    "bidder_b": "bidder_b",
+    "bidder_c": "bidder_c"
+  },
+  "terminal_verdict": {
+    "bad": true,
+    "score": 0.2,
+    "reasoning": "the awarded bidder's deliverable is broken",
+    "checkable": true
+  }
+}

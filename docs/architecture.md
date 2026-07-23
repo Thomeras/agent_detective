@@ -170,10 +170,10 @@ build spec section 3 is the authoritative description; the summary:
    | `unclassified` | all scores unknown, or nothing else matched |
    | `root_cause_external` | no in-graph origin, but a source reports `input_flawed = True` (the fault entered from outside) |
    | `loop_detected` | an anomalous loop is the culprit (or there are no origins); culprits are its members |
-   | `cut_point` | exactly one origin |
+   | `cut_point` | exactly one origin — a single-edge drop past `gap_threshold`, **or** a cumulative degradation chain (≥ `cum_min_edges` consecutive declining edges totalling ≥ `cum_drop_threshold`; the first eroding node is the origin, the whole chain lands in `evidence.degradation_paths`) |
    | `multi_culprit` | more than one independent origin (parallel branches) |
-   | `verification_gap` | a verifier that passed bad work (low verdict-correctness score) while the terminal is bad and no producer origin localised — the rubber-stamping verifiers are blamed |
-   | `composition_failure` | no origin, terminal verdict bad, all scored nodes healthy, no significant drop, no *hidden* unknowns (a structural root left unscored does not block) — culprit is the source/orchestrator |
+   | `verification_gap` | verifiers whose PASS was wrong while no producer origin localised. Two detection routes: the role-aware judge scored the verdict itself wrong (`basis=verdict_scored_incorrect`), or — deduced — the terminal verdict is bad and the verifier let the work through with a healthy score (`basis=passed_bad_terminal`). The second route keeps the engine honest even when the judges are blind (e.g. a file artifact nobody opened). |
+   | `composition_failure` | no origin, terminal verdict bad, all scored nodes healthy, no single-edge drop **and no cumulative degradation chain**, no passing verifiers to blame, no *hidden* unknowns — suspect is the orchestration/design *layer* (shown as such in the UI), entering at the source |
 
 **Loop drill-down.** When a `cut_point` origin is a multi-member SCC (a retry
 loop), the blame is drilled into the **worst-scoring member** — where quality
@@ -183,10 +183,21 @@ predecessor, not the loop's exit node that merely carried the failure downstream
 The report also carries: the **propagation path** (culprit → terminal, SCCs
 expanded by end-time); the **downstream cost** (culprits' cost plus all
 descendants, deduplicated); **origin vs manifestation** (`manifestation_run_ids`
-— the terminal sinks where the failure surfaced, distinct from where it broke);
-**verification gaps**; every significant **drop** (> 0.2, not only culprits); and
-a per-node **candidacy trace** (why each node was or wasn't blamed) so the verdict
-is explainable rather than a black box.
+— the terminal *artifact/output* the failure surfaced in; a verifier sink is
+mapped back to the producer whose work it judged, because a verdict is not a
+manifestation); the **terminal-verdict evidence** (`evidence.terminal_verdict`
+— the tier1 judge's bad/ok + score + reasoning, so a claim like "terminal is
+bad" is never made without showing its evidence, and an explicit
+`verdict_conflict` note whenever a healthy-scored sink contradicts it);
+**verification gaps** (with their detection `basis`); **degradation paths**
+(cumulative erosion chains); every significant **drop** (> 0.2, not only
+culprits); `topo_order` + `verifier_run_ids` (so the UI renders the score map
+in pipeline order with verifiers grouped apart); per-node structured
+**flags** from scoring (e.g. `unverifiable_artifact`, `missing_required_content`
+— each deterministically caps the judge component, so a judge whose reasoning
+admits a defect cannot keep a "good"-band score); and a per-node **candidacy
+trace** carrying the actual numbers (score vs threshold, drop vs reference,
+exclusion reason) so the verdict is auditable rather than a black box.
 
 See `packages/blame_engine/blame_engine/` for the exact algorithm; the module
 split mirrors the steps above.

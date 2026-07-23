@@ -76,7 +76,10 @@ def build_dependencies(settings: Settings) -> Dependencies:
 
     streams = RedisStreams.from_url(settings.redis_url)
     return Dependencies(
-        repo=PgRepo(create_async_engine(settings.database_url)),
+        repo=PgRepo(
+            create_async_engine(settings.database_url),
+            audit_hmac_key=settings.audit_hmac_key,
+        ),
         store=MinioObjectStore.from_settings(settings),
         consumer=streams,
         publisher=streams,

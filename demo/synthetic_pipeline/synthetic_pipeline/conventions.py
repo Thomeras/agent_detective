@@ -28,6 +28,12 @@ USAGE_COST = "gen_ai.usage.cost"
 TOOL_NAME = "gen_ai.tool.name"
 TOOL_TARGET_AGENT = "gen_ai.tool.target_agent"
 
+# A2A (agent-to-agent) message correlation. ``otel_mapper`` derives an
+# A2A_MESSAGE edge from any span carrying ``a2a.task_id`` whose
+# ``a2a.peer_agent`` resolves to a known run (gated by A2A_DETECTION).
+A2A_TASK_ID = "a2a.task_id"
+A2A_PEER_AGENT = "a2a.peer_agent"
+
 # Correlation attribute that joins all runs into one execution graph
 # (build spec 6.1 fallback rule).
 GRAPH_ID = "x-execution-graph-id"

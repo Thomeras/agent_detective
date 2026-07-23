@@ -12,7 +12,8 @@ no-op):
 
 The ``Repo`` protocol is the test seam; ``PgRepo`` is the SQLAlchemy/asyncpg
 implementation. Table metadata mirrors db/alembic/versions/0001_initial_schema.py
-(only the columns ingest manages).
+plus later additive migrations (only the columns ingest manages;
+tool_schema_hash arrives with migration 0009).
 """
 
 from __future__ import annotations
@@ -62,6 +63,11 @@ agent_runs = Table(
     Column("graph_id", Uuid, nullable=False),
     Column("agent_name", Text),
     Column("agent_version", Text),
+    Column("model_name", Text),
+    Column("prompt_hash", Text),
+    Column("tool_schema_hash", Text),
+    Column("artifact_meta", Text),
+    Column("tool_calls", Text),
     Column("parent_run_id", Uuid),
     Column("trace_id", Text),
     Column("status", Text, nullable=False),
@@ -150,6 +156,11 @@ class PgRepo:
                         graph_id=run.graph_id,
                         agent_name=run.agent_name,
                         agent_version=run.agent_version,
+                        model_name=run.model_name,
+                        prompt_hash=run.prompt_hash,
+                        tool_schema_hash=run.tool_schema_hash,
+                        artifact_meta=run.artifact_meta,
+                        tool_calls=run.tool_calls,
                         trace_id=run.trace_id,
                         status=run.status,
                         input_inline=run.input_inline,

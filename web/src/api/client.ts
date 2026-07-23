@@ -3,13 +3,18 @@
 
 import type {
   AnalyzeResponse,
+  BreakersResponse,
+  FeedbackRequest,
+  FeedbackResponse,
   GraphDetail,
   GraphListResponse,
   IncidentDetail,
   IncidentListResponse,
   IncidentStatus,
   LeaderboardResponse,
+  PolicyDecisionsResponse,
   RunPayloads,
+  VersionDiffResponse,
 } from "./types";
 
 export const API_BASE_URL: string =
@@ -74,7 +79,25 @@ export const api = {
       body: JSON.stringify({ status }),
     });
   },
-  leaderboard(): Promise<LeaderboardResponse> {
-    return request(`/agents/leaderboard`);
+  leaderboard(groupBy?: "version"): Promise<LeaderboardResponse> {
+    return request(`/agents/leaderboard${groupBy ? `?group_by=${groupBy}` : ""}`);
+  },
+  versionDiff(graphId: string, against = "last_clean"): Promise<VersionDiffResponse> {
+    return request(
+      `/graphs/${graphId}/version-diff?against=${encodeURIComponent(against)}`,
+    );
+  },
+  policyDecisions(graphId: string): Promise<PolicyDecisionsResponse> {
+    return request(`/graphs/${graphId}/policy-decisions`);
+  },
+  postFeedback(graphId: string, body: FeedbackRequest): Promise<FeedbackResponse> {
+    return request(`/graphs/${graphId}/feedback`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
+  },
+  breakers(): Promise<BreakersResponse> {
+    return request(`/control/breakers`);
   },
 };

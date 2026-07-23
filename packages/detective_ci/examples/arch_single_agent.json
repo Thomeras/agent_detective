@@ -1,0 +1,18 @@
+{
+  "nodes": ["solo"],
+  "edges": [],
+  "scores": {
+    "solo": {
+      "score": 0.1,
+      "input_flawed": false,
+      "judge_note": "the answer is badly wrong and incomplete"
+    }
+  },
+  "agent_names": {"solo": "solo"},
+  "terminal_verdict": {
+    "bad": true,
+    "score": 0.1,
+    "reasoning": "deliverable does not answer the request",
+    "checkable": true
+  }
+}

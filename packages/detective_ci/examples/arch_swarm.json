@@ -1,0 +1,180 @@
+{
+  "nodes": [
+    "drone_01",
+    "drone_02",
+    "drone_03",
+    "drone_04",
+    "drone_05",
+    "drone_06",
+    "drone_07",
+    "drone_08",
+    "drone_09",
+    "drone_10",
+    "drone_11",
+    "drone_12"
+  ],
+  "edges": [
+    [
+      "drone_01",
+      "drone_02"
+    ],
+    [
+      "drone_01",
+      "drone_03"
+    ],
+    [
+      "drone_02",
+      "drone_03"
+    ],
+    [
+      "drone_02",
+      "drone_04"
+    ],
+    [
+      "drone_03",
+      "drone_04"
+    ],
+    [
+      "drone_03",
+      "drone_05"
+    ],
+    [
+      "drone_04",
+      "drone_05"
+    ],
+    [
+      "drone_04",
+      "drone_06"
+    ],
+    [
+      "drone_05",
+      "drone_06"
+    ],
+    [
+      "drone_07",
+      "drone_08"
+    ],
+    [
+      "drone_07",
+      "drone_09"
+    ],
+    [
+      "drone_08",
+      "drone_09"
+    ],
+    [
+      "drone_08",
+      "drone_10"
+    ],
+    [
+      "drone_09",
+      "drone_10"
+    ],
+    [
+      "drone_09",
+      "drone_11"
+    ],
+    [
+      "drone_10",
+      "drone_11"
+    ],
+    [
+      "drone_10",
+      "drone_12"
+    ],
+    [
+      "drone_11",
+      "drone_12"
+    ],
+    [
+      "drone_02",
+      "drone_08"
+    ],
+    [
+      "drone_06",
+      "drone_12"
+    ]
+  ],
+  "scores": {
+    "drone_01": {
+      "score": 0.95,
+      "input_flawed": false,
+      "judge_note": "healthy"
+    },
+    "drone_02": {
+      "score": 0.92,
+      "input_flawed": false,
+      "judge_note": "healthy"
+    },
+    "drone_03": {
+      "score": 0.18,
+      "input_flawed": false,
+      "judge_note": "regional failure: corrupted its shard"
+    },
+    "drone_04": {
+      "score": 0.35,
+      "input_flawed": false,
+      "judge_note": "inherited the corrupted shard"
+    },
+    "drone_05": {
+      "score": 0.3,
+      "input_flawed": false,
+      "judge_note": "inherited the corrupted shard"
+    },
+    "drone_06": {
+      "score": 0.33,
+      "input_flawed": false,
+      "judge_note": "inherited the corrupted shard"
+    },
+    "drone_07": {
+      "score": 0.93,
+      "input_flawed": false,
+      "judge_note": "healthy"
+    },
+    "drone_08": {
+      "score": 0.9,
+      "input_flawed": false,
+      "judge_note": "healthy"
+    },
+    "drone_09": {
+      "score": 0.2,
+      "input_flawed": false,
+      "judge_note": "regional failure: dropped its assignment"
+    },
+    "drone_10": {
+      "score": 0.34,
+      "input_flawed": false,
+      "judge_note": "inherited the dropped assignment"
+    },
+    "drone_11": {
+      "score": 0.31,
+      "input_flawed": false,
+      "judge_note": "inherited the dropped assignment"
+    },
+    "drone_12": {
+      "score": 0.28,
+      "input_flawed": false,
+      "judge_note": "final merge carries both regional failures"
+    }
+  },
+  "agent_names": {
+    "drone_01": "drone_01",
+    "drone_02": "drone_02",
+    "drone_03": "drone_03",
+    "drone_04": "drone_04",
+    "drone_05": "drone_05",
+    "drone_06": "drone_06",
+    "drone_07": "drone_07",
+    "drone_08": "drone_08",
+    "drone_09": "drone_09",
+    "drone_10": "drone_10",
+    "drone_11": "drone_11",
+    "drone_12": "drone_12"
+  },
+  "terminal_verdict": {
+    "bad": true,
+    "score": 0.25,
+    "reasoning": "swarm output is corrupted in two independent regions",
+    "checkable": true
+  }
+}

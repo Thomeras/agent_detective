@@ -15,6 +15,7 @@ run from within the worker directory.
 from __future__ import annotations
 
 import re
+from dataclasses import replace
 from typing import Any
 from uuid import UUID
 
@@ -22,15 +23,20 @@ from blame_engine import NodeScore
 
 from worker.config import Settings
 from worker.judge_client import JudgeError
+from worker.repository import ledger_entry, welford_step
 from worker.types import (
     AgentStat,
     AlertContext,
     BlameDraft,
+    BreakerState,
+    CheckRule,
     ClaimResult,
     EdgeRecord,
     GraphBundle,
     NodeScoreRow,
     OutputContract,
+    PolicyDecision,
+    PolicyRule,
     RunRecord,
     StreamMessage,
     Tier1Verdict,
@@ -55,6 +61,9 @@ def make_run(
     cost_usd: float | None = 0.0,
     tokens_out: int | None = None,
     end_time: float = 0.0,
+    artifact_meta: str | None = None,
+    tool_calls: str | None = None,
+    tool_schema_hash: str | None = None,
 ) -> RunRecord:
     from datetime import datetime, timezone
 
@@ -75,6 +84,9 @@ def make_run(
         tokens_out=tokens_out,
         started_at=None,
         ended_at=ended,
+        artifact_meta=artifact_meta,
+        tool_calls=tool_calls,
+        tool_schema_hash=tool_schema_hash,
     )
 
 
@@ -110,7 +122,15 @@ class FakeRepo:
         self.incidents: dict[tuple[UUID, str], dict[str, Any]] = {}
         self.blame_reports: list[dict[str, Any]] = []
         self.agent_stats: dict[str, AgentStat] = {}
+        self.check_rules: list[CheckRule] = []
         self.contracts: list[OutputContract] = []
+        self.policy_rules: list[PolicyRule] = []
+        self.policy_decisions: list[dict[str, Any]] = []
+        self.breakers: dict[tuple[str, str], dict[str, Any]] = {}
+        # Evidence-ledger mirror: same chain algorithm as PgRepo
+        # (ledger_entry is imported, not reimplemented), dev default key.
+        self.ledger: list[dict[str, Any]] = []
+        self.audit_hmac_key = "dev-insecure-key"
         self._next_incident_id = 1
         self._next_blame_id = 1
         self.fail_ping = False
@@ -142,6 +162,45 @@ class FakeRepo:
     async def read_agent_stats(self, graph_type: str | None) -> dict[str, AgentStat]:
         return dict(self.agent_stats)
 
+    async def upsert_agent_stats(
+        self,
+        agent_name: str,
+        graph_type: str,
+        *,
+        tokens_out: float | None,
+        cost: float | None,
+        iterations: float | None,
+    ) -> None:
+        # Mirror of PgRepo.upsert_agent_stats: one shared sample_count bump
+        # per call, one welford_step per non-None metric (same math — the
+        # helper is imported from worker.repository, not reimplemented).
+        prev = self.agent_stats.get(agent_name) or AgentStat(
+            tokens_out_mean=None,
+            tokens_out_std=None,
+            iterations_mean=None,
+            iterations_std=None,
+            sample_count=0,
+        )
+        n1 = (prev.sample_count or 0) + 1
+        updates: dict[str, Any] = {"sample_count": n1}
+        if tokens_out is not None:
+            mean, m2, std = welford_step(
+                n1, prev.tokens_out_mean, prev.tokens_out_m2, float(tokens_out)
+            )
+            updates.update(tokens_out_mean=mean, tokens_out_m2=m2, tokens_out_std=std)
+        if cost is not None:
+            mean, m2, std = welford_step(n1, prev.cost_mean, prev.cost_m2, float(cost))
+            updates.update(cost_mean=mean, cost_m2=m2, cost_std=std)
+        if iterations is not None:
+            mean, m2, std = welford_step(
+                n1, prev.iterations_mean, prev.iterations_m2, float(iterations)
+            )
+            updates.update(iterations_mean=mean, iterations_m2=m2, iterations_std=std)
+        self.agent_stats[agent_name] = replace(prev, **updates)
+
+    async def read_check_rules(self) -> list[CheckRule]:
+        return list(self.check_rules)
+
     async def read_output_contracts(self) -> list[OutputContract]:
         return list(self.contracts)
 
@@ -154,6 +213,7 @@ class FakeRepo:
         incident_key: str | None,
         incident_trigger: str | None,
         blame: BlameDraft | None,
+        supersede_others: bool = False,
     ) -> Tier2Outcome:
         for row in node_scores:
             self.node_scores[row.run_id] = row
@@ -204,8 +264,36 @@ class FakeRepo:
                         "downstream_cost_usd": blame.downstream_cost_usd,
                         "unscored_run_ids": blame.unscored_run_ids,
                         "evidence": blame.evidence,
+                        "judge_prompt_hash": blame.judge_prompt_hash,
                     }
                 )
+                # Evidence-ledger mirror (same math as PgRepo via
+                # ledger_entry): chain onto the globally last link.
+                prev_hash = self.ledger[-1]["chain_hash"] if self.ledger else None
+                evidence_sha256, chain_hash, hmac_sig = ledger_entry(
+                    blame.evidence, prev_hash, self.audit_hmac_key
+                )
+                self.ledger.append(
+                    {
+                        "report_id": blame_report_id,
+                        "evidence_sha256": evidence_sha256,
+                        "prev_hash": prev_hash,
+                        "chain_hash": chain_hash,
+                        "hmac_sig": hmac_sig,
+                    }
+                )
+
+        if supersede_others:
+            # Mirror of the SQL semantics: the latest completed analysis is
+            # authoritative for its graph — other live incidents reflect an
+            # outdated classification and are superseded (resolved stay history).
+            for inc in self.incidents.values():
+                if (
+                    inc["graph_id"] == graph_id
+                    and inc["id"] != incident_id
+                    and inc["status"] in ("open", "acknowledged")
+                ):
+                    inc["status"] = "superseded"
 
         if dedup_key in self.jobs:
             self.jobs[dedup_key]["status"] = "done"
@@ -236,6 +324,84 @@ class FakeRepo:
             confidence=report["confidence"] if report else None,
             downstream_cost_usd=report["downstream_cost_usd"] if report else None,
         )
+
+    async def read_policy_rules(self) -> list[PolicyRule]:
+        return [r for r in self.policy_rules if r.enabled]
+
+    async def insert_policy_decisions(
+        self, graph_id: UUID, decisions: list[PolicyDecision]
+    ) -> None:
+        for d in decisions:
+            self.policy_decisions.append(
+                {
+                    "graph_id": graph_id,
+                    "rule_name": d.rule_name,
+                    "decision": d.decision,
+                    "detail": d.detail,
+                    "mode": "shadow",
+                }
+            )
+
+    async def upsert_breaker(
+        self, scope_kind: str, scope_value: str, state: str, reason: str | None
+    ) -> None:
+        from datetime import datetime, timezone
+
+        key = (scope_kind, scope_value)
+        now = datetime.now(timezone.utc)
+        prev = self.breakers.get(key)
+        # opened_at is stamped exactly once per closed->open transition
+        # (mirror of the SQL CASE in PgRepo.upsert_breaker).
+        if state == "open" and (prev is None or prev["state"] != "open"):
+            opened_at = now
+        else:
+            opened_at = prev["opened_at"] if prev else None
+        self.breakers[key] = {
+            "scope_kind": scope_kind,
+            "scope_value": scope_value,
+            "state": state,
+            "reason": reason,
+            "opened_at": opened_at,
+            "updated_at": now,
+        }
+
+    async def read_breakers(self) -> list[BreakerState]:
+        return [
+            BreakerState(
+                scope_kind=b["scope_kind"],
+                scope_value=b["scope_value"],
+                state=b["state"],
+                reason=b["reason"],
+            )
+            for b in self.breakers.values()
+        ]
+
+    async def count_open_incidents_for_agent(self, agent_name: str) -> int:
+        # Mirror of the PgRepo join: live incidents x latest blame report x
+        # culprit runs' agent_name (runs looked up across all bundles).
+        run_agent: dict[UUID, str | None] = {}
+        for bundle in self.bundles.values():
+            for run in bundle.runs:
+                run_agent[run.run_id] = run.agent_name
+        count = 0
+        for inc in self.incidents.values():
+            if inc["status"] not in ("open", "acknowledged"):
+                continue
+            latest = next(
+                (
+                    b
+                    for b in self.blame_reports
+                    if b["incident_id"] == inc["id"] and b["is_latest"]
+                ),
+                None,
+            )
+            if latest is None:
+                continue
+            if any(
+                run_agent.get(rid) == agent_name for rid in latest["culprit_run_ids"]
+            ):
+                count += 1
+        return count
 
     async def ping(self) -> None:
         if self.fail_ping:

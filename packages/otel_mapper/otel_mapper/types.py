@@ -33,6 +33,14 @@ class AgentRunCandidate:
     trace_id: str
     agent_name: str | None
     agent_version: str | None
+    model_name: str | None
+    prompt_hash: str | None
+    tool_schema_hash: str | None  # agent_detective.tool_schema_hash identity attribute
+    artifact_meta: str | None  # raw agent_detective.artifact_meta span attribute
+    # Compact JSON digest of the run's TOOL member spans, in execution order:
+    # [{"name": ..., "args_sha": <12 hex of sha256(input.value)>, "status":
+    # "ok"|"error"}, ...]. None when the run has no TOOL member spans.
+    tool_calls: str | None
     tokens_in: int | None
     tokens_out: int | None
     cost_usd: float | None

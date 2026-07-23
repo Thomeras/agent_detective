@@ -28,6 +28,9 @@ def make_run(run_id: uuid.UUID, graph_id: uuid.UUID = GRAPH_ID, **overrides: Any
         "graph_id": graph_id,
         "agent_name": "scraper-agent",
         "agent_version": "1.0.0",
+        "model_name": "mock-model",
+        "prompt_hash": "abc123abc123",
+        "tool_schema_hash": "def456def456",
         "parent_run_id": None,
         "trace_id": f"trace-{run_id.hex[:8]}",
         "status": "ok",
@@ -104,6 +107,23 @@ def make_report(report_id: int = 10, incident_id: int = 1, **overrides: Any) -> 
     return report
 
 
+def make_verdict(graph_id: uuid.UUID = GRAPH_ID, **overrides: Any) -> dict[str, Any]:
+    verdict = {
+        "graph_id": graph_id,
+        "terminal_judge_verdict": "ok",
+        "terminal_judge_score": 0.9,
+        "terminal_judge_reasoning": "deliverable matches the brief",
+        "flags": [],
+        "flagged": False,
+        "sampled": False,
+        "judge_prompt_hash": "judgehash001",
+        "created_at": T0,
+        "updated_at": T0,
+    }
+    verdict.update(overrides)
+    return verdict
+
+
 class FakeRepository:
     """In-memory stand-in implementing the Repository protocol."""
 
@@ -115,6 +135,11 @@ class FakeRepository:
         incidents: list[dict[str, Any]] | None = None,
         reports: list[dict[str, Any]] | None = None,
         tier1_graph_ids: set[uuid.UUID] | None = None,
+        verdicts: list[dict[str, Any]] | None = None,
+        policy_decisions: list[dict[str, Any]] | None = None,
+        breakers: list[dict[str, Any]] | None = None,
+        ledger_rows: list[dict[str, Any]] | None = None,
+        labels: list[dict[str, Any]] | None = None,
     ):
         self.graphs = {g["graph_id"]: g for g in graphs or []}
         self.runs = runs or []
@@ -122,6 +147,11 @@ class FakeRepository:
         self.incidents = {i["id"]: i for i in incidents or []}
         self.reports = reports or []
         self.tier1_graph_ids = tier1_graph_ids or set()
+        self.verdicts = {v["graph_id"]: v for v in verdicts or []}
+        self.policy_decisions = policy_decisions or []
+        self.breakers = breakers or []
+        self.ledger_rows = ledger_rows or []
+        self.labels = labels or []
         self.now = T0 + timedelta(hours=1)
 
     async def list_graphs(self, limit: int, offset: int) -> list[dict[str, Any]]:
@@ -195,8 +225,109 @@ class FakeRepository:
         rows.sort(key=lambda r: (-r["total_cost_usd"], r["agent_name"]))
         return rows
 
+    async def leaderboard_by_version(self) -> list[dict[str, Any]]:
+        by_identity: dict[tuple, list[dict[str, Any]]] = {}
+        for run in self.runs:
+            key = (run["agent_name"], run.get("agent_version"), run.get("model_name"), run.get("prompt_hash"))
+            by_identity.setdefault(key, []).append(run)
+        rows = []
+        for (agent_name, agent_version, model_name, prompt_hash), identity_runs in by_identity.items():
+            scored = [r["quality_score"] for r in identity_runs if r["quality_score"] is not None]
+            failed = sum(1 for r in identity_runs if r["status"] == "failed")
+            rows.append(
+                {
+                    "agent_name": agent_name,
+                    "agent_version": agent_version,
+                    "model_name": model_name,
+                    "prompt_hash": prompt_hash,
+                    "total_cost_usd": sum((r["cost_usd"] or Decimal("0")) for r in identity_runs),
+                    "run_count": len(identity_runs),
+                    "failure_rate": failed / len(identity_runs),
+                    "avg_quality_score": (sum(scored) / len(scored)) if scored else None,
+                }
+            )
+        rows.sort(key=lambda r: (-r["total_cost_usd"], r["agent_name"], str(r["agent_version"])))
+        return rows
+
     async def has_tier1_verdict(self, graph_id: uuid.UUID) -> bool:
-        return graph_id in self.tier1_graph_ids
+        return graph_id in self.tier1_graph_ids or graph_id in self.verdicts
+
+    async def find_last_clean_graph(self, exclude_graph_id: uuid.UUID) -> dict[str, Any] | None:
+        incident_graph_ids = {i["graph_id"] for i in self.incidents.values()}
+        candidates = [
+            g
+            for g in self.graphs.values()
+            if g["graph_id"] != exclude_graph_id
+            and g["status"] == "finalized"
+            and g["graph_id"] not in incident_graph_ids
+        ]
+        if not candidates:
+            return None
+        return max(candidates, key=lambda g: (g.get("finalized_at") is not None, g.get("finalized_at")))
+
+    async def agent_version_stats(self, agent_name: str, agent_version: str) -> dict[str, Any]:
+        version_runs = [
+            r for r in self.runs if r["agent_name"] == agent_name and r.get("agent_version") == agent_version
+        ]
+        graph_ids = {r["graph_id"] for r in version_runs}
+        scored = [r["quality_score"] for r in version_runs if r["quality_score"] is not None]
+        verdicts = [self.verdicts[g] for g in graph_ids if g in self.verdicts]
+        incident_count = sum(1 for i in self.incidents.values() if i["graph_id"] in graph_ids)
+        return {
+            "agent_version": agent_version,
+            "graphs": len(graph_ids),
+            "runs": len(version_runs),
+            "avg_quality": (sum(scored) / len(scored)) if scored else None,
+            "flag_rate": (sum(1 for v in verdicts if v["flagged"]) / len(verdicts)) if verdicts else None,
+            "terminal_bad_rate": (
+                sum(1 for v in verdicts if v["terminal_judge_verdict"] == "bad") / len(verdicts)
+            )
+            if verdicts
+            else None,
+            "incidents": incident_count,
+        }
+
+    async def list_policy_decisions(self, graph_id: uuid.UUID) -> list[dict[str, Any]]:
+        rows = [d for d in self.policy_decisions if d["graph_id"] == graph_id]
+        rows.sort(key=lambda d: (d["created_at"], d["id"]))
+        return rows
+
+    async def insert_feedback(
+        self, graph_id: uuid.UUID, label: str, culprit_run_id: uuid.UUID | None, note: str | None
+    ) -> int:
+        label_id = max((row["id"] for row in self.labels), default=0) + 1
+        self.labels.append(
+            {
+                "id": label_id,
+                "graph_id": graph_id,
+                "label": label,
+                "culprit_run_id": culprit_run_id,
+                "source": "human",
+                "note": note,
+                "created_at": self.now,
+            }
+        )
+        return label_id
+
+    async def calibration_rows(self) -> list[dict[str, Any]]:
+        rows = []
+        for row in sorted(self.labels, key=lambda r: r["id"]):
+            verdict = self.verdicts.get(row["graph_id"])
+            rows.append(
+                {
+                    "graph_id": row["graph_id"],
+                    "label": row["label"],
+                    "terminal_judge_verdict": verdict["terminal_judge_verdict"] if verdict else None,
+                    "judge_prompt_hash": verdict.get("judge_prompt_hash") if verdict else None,
+                }
+            )
+        return rows
+
+    async def list_breakers(self) -> list[dict[str, Any]]:
+        return sorted(self.breakers, key=lambda b: (b["scope_kind"], b["scope_value"]))
+
+    async def list_ledger_rows(self) -> list[dict[str, Any]]:
+        return sorted(self.ledger_rows, key=lambda r: r["id"])
 
 
 class FakePayloadStore:
@@ -250,6 +381,16 @@ def run_factory():
 @pytest.fixture
 def graph_factory():
     return make_graph
+
+
+@pytest.fixture
+def verdict_factory():
+    return make_verdict
+
+
+@pytest.fixture
+def incident_factory():
+    return make_incident
 
 
 @pytest.fixture

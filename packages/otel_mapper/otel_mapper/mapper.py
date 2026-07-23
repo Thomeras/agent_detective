@@ -56,6 +56,21 @@ Field extraction per run:
 - ``agent_name`` / ``agent_version``: ``gen_ai.agent.name`` /
   ``gen_ai.agent.version``, span attributes first, then resource attributes.
   Missing values stay ``None`` — the mapper never invents identity.
+- ``model_name``: ``gen_ai.request.model`` — opening AGENT span attributes
+  first, then resource attributes, then the first member span in execution
+  order carrying the attribute (standard GenAI semconv emits it on child LLM
+  spans, not the AGENT span). ``None`` when absent everywhere.
+- ``prompt_hash``: ``agent_detective.prompt_hash`` — opening AGENT span
+  attributes, then resource attributes. ``None`` when absent.
+- ``tool_schema_hash``: ``agent_detective.tool_schema_hash`` — opening AGENT
+  span attributes, then resource attributes (same rule as ``prompt_hash``).
+  ``None`` when absent.
+- ``artifact_meta``: the raw ``agent_detective.artifact_meta`` string from
+  the opening AGENT span attributes ONLY — no resource fallback, because it
+  is per-run data: a resource-level value would smear one node's artifact
+  onto every run exported under that resource. Never invented; ``None``
+  when absent. The string is passed through verbatim (downstream parses it
+  tolerantly).
 - ``tokens_in`` / ``tokens_out``: ``gen_ai.usage.input_tokens`` /
   ``gen_ai.usage.output_tokens`` (OpenInference ``llm.token_count.prompt`` /
   ``llm.token_count.completion`` accepted as fallback). If the opening AGENT
@@ -64,6 +79,13 @@ Field extraction per run:
 - ``cost_usd``: ``gen_ai.usage.cost`` with the same AGENT-wins / children-sum
   rule. ``None`` when absent; this package deliberately ships no pricing
   table.
+- ``tool_calls``: compact JSON digest of the run's member spans of kind TOOL
+  (``openinference.span.kind == 'TOOL'``), in execution order (start time,
+  span_id tiebreak). One entry per TOOL span:
+  ``{"name": <gen_ai.tool.name attr, else span name>, "args_sha": <first 12
+  hex chars of sha256 over input.value ('' when absent)>, "status": 'error'
+  when the span status is ERROR else 'ok'}``. ``None`` when the run has no
+  TOOL member spans — never an empty array, so absence stays distinguishable.
 - ``input`` / ``output``: OpenInference ``input.value`` / ``output.value`` of
   the opening AGENT span. Non-string values are JSON-serialized.
 - ``status``: ``"failed"`` when any member span reports an OTLP ERROR status,
@@ -119,6 +141,7 @@ a forest of independent runs.
 
 from __future__ import annotations
 
+import hashlib
 import json
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
@@ -519,6 +542,32 @@ def _header_graph_id(attrs: dict[str, Any]) -> str | None:
     return None
 
 
+def _tool_calls_digest(acc: _RunAcc) -> str | None:
+    """Compact JSON digest of the run's TOOL member spans; None when none.
+
+    Execution order (start time, span_id tiebreak) so the digest is
+    deterministic regardless of input order. ``args_sha`` is the first 12 hex
+    chars of sha256 over the span's ``input.value`` ('' when absent) — enough
+    to compare tool arguments across runs without shipping the arguments.
+    """
+    tools = [m for m in acc.members if _kind_label(m) == "TOOL"]
+    if not tools:
+        return None
+    tools.sort(key=lambda m: (m.start or _MIN_TIME, m.span_id))
+    digest = []
+    for m in tools:
+        name = _first_str(m.attrs.get("gen_ai.tool.name")) or m.name
+        args = _text(m.attrs.get("input.value")) or ""
+        digest.append(
+            {
+                "name": name,
+                "args_sha": hashlib.sha256(args.encode("utf-8")).hexdigest()[:12],
+                "status": "error" if m.error else "ok",
+            }
+        )
+    return json.dumps(digest, separators=(",", ":"))
+
+
 def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     opener = acc.opener
     name = _first_str(
@@ -527,6 +576,33 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     version = _first_str(
         opener.attrs.get("gen_ai.agent.version"),
         opener.resource_attrs.get("gen_ai.agent.version"),
+    )
+    model_name = _first_str(
+        opener.attrs.get("gen_ai.request.model"),
+        opener.resource_attrs.get("gen_ai.request.model"),
+    )
+    if model_name is None:
+        # Standard GenAI semconv emits gen_ai.request.model on child LLM
+        # spans, not the AGENT span: fall back to the first member span in
+        # execution order carrying it. Ties on start time break on span_id
+        # so the result is deterministic regardless of input order.
+        for m in sorted(acc.members, key=lambda m: (m.start or _MIN_TIME, m.span_id)):
+            if m is opener:
+                continue
+            model_name = _first_str(m.attrs.get("gen_ai.request.model"))
+            if model_name is not None:
+                break
+    # Opening AGENT span attributes ONLY — no resource fallback: this is
+    # per-run data, and a resource-level value would smear one node's
+    # artifact metadata onto every run under that resource. Never invented.
+    artifact_meta = _first_str(opener.attrs.get("agent_detective.artifact_meta"))
+    prompt_hash = _first_str(
+        opener.attrs.get("agent_detective.prompt_hash"),
+        opener.resource_attrs.get("agent_detective.prompt_hash"),
+    )
+    tool_schema_hash = _first_str(
+        opener.attrs.get("agent_detective.tool_schema_hash"),
+        opener.resource_attrs.get("agent_detective.tool_schema_hash"),
     )
     tokens_in = _metric(acc, ("gen_ai.usage.input_tokens", "llm.token_count.prompt"), integer=True)
     tokens_out = _metric(
@@ -547,6 +623,11 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
         trace_id=acc.trace_id,
         agent_name=name,
         agent_version=version,
+        model_name=model_name,
+        prompt_hash=prompt_hash,
+        tool_schema_hash=tool_schema_hash,
+        artifact_meta=artifact_meta,
+        tool_calls=_tool_calls_digest(acc),
         tokens_in=tokens_in if tokens_in is None else int(tokens_in),
         tokens_out=tokens_out if tokens_out is None else int(tokens_out),
         cost_usd=cost if cost is None else float(cost),

@@ -43,6 +43,9 @@ def run_node(row: Mapping[str, Any]) -> dict[str, Any]:
         [
             "agent_name",
             "agent_version",
+            "model_name",
+            "prompt_hash",
+            "tool_schema_hash",
             "parent_run_id",
             "trace_id",
             "status",

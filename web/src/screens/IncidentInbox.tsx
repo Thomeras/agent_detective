@@ -4,16 +4,49 @@
 
 import { api } from "../api/client";
 import type { IncidentSummary } from "../api/types";
-import { EmptyState, ErrorState, Loading, StatusBadge, TypeBadge } from "../components/ui";
+import { EmptyState, ErrorState, Loading, Panel, StatusBadge, TypeBadge } from "../components/ui";
 import { formatCost, formatRelative, shortId } from "../format";
 import { href } from "../router";
 import { useAsync } from "../hooks/useAsync";
+
+// Circuit-breaker states recorded by the worker. Rendered only when rows
+// exist. Honesty rule: this is a RECORDED decision, not an intervention —
+// Agent Detective observes and cannot stop an agent unless the integration
+// polls this state via the SDK opt-in hook.
+function BreakersSection() {
+  const { data } = useAsync(() => api.breakers(), []);
+  const breakers = data?.breakers ?? [];
+  if (breakers.length === 0) return null;
+  return (
+    <Panel title="Circuit breakers">
+      <div className="breaker-list">
+        {breakers.map((b) => (
+          <div key={`${b.scope_kind}:${b.scope_value}`} className="breaker-row">
+            <span
+              className={`badge ${b.state === "open" ? "badge-status-open" : "badge-status-resolved"}`}
+            >
+              {b.state.toUpperCase()}
+            </span>
+            <span className="mono">{b.scope_value}</span>
+            <span className="muted small">
+              ({b.scope_kind}){b.reason ? ` — ${b.reason}` : ""}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="muted small">
+        Recorded state; enforcement requires the SDK opt-in hook.
+      </p>
+    </Panel>
+  );
+}
 
 const TRIGGER_LABELS: Record<string, string> = {
   terminal_failure: "Terminal failure",
   degraded_quality: "Degraded quality",
   cost_overrun: "Cost overrun",
   loop_detected: "Loop detected",
+  latent_defect: "Latent defect shipped",
   manual: "Manual",
 };
 
@@ -42,6 +75,8 @@ export default function IncidentInbox() {
         </button>
       </div>
 
+      <BreakersSection />
+
       {loading && <Loading label="Loading incidents" />}
       {error && <ErrorState message={error} onRetry={reload} />}
       {!loading && !error && data && data.incidents.length === 0 && (
@@ -67,7 +102,9 @@ export default function IncidentInbox() {
                 <th>Graph</th>
                 <th>Trigger</th>
                 <th>Report</th>
-                <th>Suspected culprit</th>
+                {/* degraded_recovered rows point at a FRAGILE node, not a
+                    culprit — a blame-neutral header covers both honestly. */}
+                <th>Blamed / fragile node</th>
                 <th className="num">Downstream cost</th>
                 <th>Status</th>
                 <th>Time</th>

@@ -36,6 +36,7 @@ x-app-env: &app-env
   JUDGE_MODEL: "${JUDGE_MODEL:-mock}"
   JUDGE_TIMEOUT_S: "${JUDGE_TIMEOUT_S:-30}"
   JUDGE_CONCURRENCY: "${JUDGE_CONCURRENCY:-4}"
+  JUDGE_SEED: "${JUDGE_SEED:-}"
   SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
 
 services:
@@ -126,7 +127,16 @@ services:
     build:
       context: .
       dockerfile: services/ingest/Dockerfile
-    environment: *app-env
+    environment:
+      <<: *app-env
+      # A2A edge detection is ON by default for ingest: mesh / peer-to-peer
+      # architectures (agents exchanging a2a.task_id-correlated messages, e.g.
+      # market bid exchanges) need A2A_MESSAGE edges — peer traffic crosses
+      # traces, so no SPAWN edge can link the peers. Without it, peer traffic
+      # degrades to membership-without-edges (runs share a graph via the
+      # correlation header, but blame cannot be localised between peers).
+      # Override with A2A_DETECTION=false in .env to restore the old default.
+      A2A_DETECTION: "${A2A_DETECTION:-true}"
     ports:
       - "${INGEST_PORT:-8001}:8001"
     depends_on:

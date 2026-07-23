@@ -1,0 +1,7 @@
+{
+  "culprit_agents": [
+    "draft"
+  ],
+  "deterministic_signals": [],
+  "report_type": "cut_point"
+}

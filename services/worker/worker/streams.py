@@ -64,10 +64,16 @@ class StreamConsumer(Protocol):
 
 
 def _decode(fields: dict[Any, Any]) -> dict[str, Any]:
-    """Decode a raw XREADGROUP field mapping into the JSON payload dict."""
+    """Decode a raw XREADGROUP field mapping into the JSON payload dict.
+
+    The canonical shape is a single ``data`` field holding the JSON payload.
+    A message published as flat key/value fields is decoded as-is instead of
+    being dropped — a producer-convention mismatch must never silently ack-drop
+    a job (that is exactly how manual /analyze triggers used to vanish).
+    """
     raw = fields.get(b"data") if b"data" in fields else fields.get("data")
     if raw is None:
-        return {}
+        return {_as_str(k): _as_str(v) for k, v in fields.items()}
     if isinstance(raw, bytes):
         raw = raw.decode()
     try:

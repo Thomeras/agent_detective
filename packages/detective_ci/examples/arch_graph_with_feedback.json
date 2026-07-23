@@ -1,0 +1,38 @@
+{
+  "nodes": ["start", "think", "act", "render", "qa", "eval"],
+  "edges": [
+    ["start", "think"],
+    ["think", "act"],
+    ["act", "render"],
+    ["render", "qa"],
+    ["qa", "eval"],
+    ["eval", "act"]
+  ],
+  "scores": {
+    "think": {
+      "score": 0.15,
+      "flags": ["missing_required_content"],
+      "contract_violations": [["file_type", "docx", "md"]],
+      "input_flawed": false,
+      "judge_note": "only an outline, no content; silently switched docx to md"
+    },
+    "act": {"score": 0.93, "input_flawed": false, "judge_note": "recovered the content"},
+    "render": {"score": 0.93, "input_flawed": false, "judge_note": "clean render"},
+    "qa": {"score": 1.0, "input_flawed": false, "judge_note": "correct PASS"},
+    "eval": {"score": 1.0, "input_flawed": false, "judge_note": "correct final PASS"}
+  },
+  "agent_names": {
+    "start": "start",
+    "think": "think",
+    "act": "act",
+    "render": "render",
+    "qa": "qa",
+    "eval": "eval"
+  },
+  "terminal_verdict": {
+    "bad": false,
+    "score": 1.0,
+    "reasoning": "comprehensive deliverable, aligns with the request",
+    "checkable": true
+  }
+}

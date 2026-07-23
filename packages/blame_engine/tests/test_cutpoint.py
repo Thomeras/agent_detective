@@ -12,10 +12,16 @@ def test_source_below_threshold_is_cut_point(mk) -> None:
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["s"]
-    # "t" inherited the low quality (drop 0.0 from base 0.4) and is not a candidate.
-    assert report.evidence.drops == {"s": pytest.approx(0.6)}
-    # gap=1.0 (0.6/0.5 clamped), severity=0.2, pred=1.0 -> 0.5 + 0.06 + 0.2
-    assert report.confidence == pytest.approx(0.76)
+    # A source has NO measured predecessor: its 1.0 baseline is assumed, so no
+    # drop is fabricated into the evidence ("-0.60 from best-scored predecessor"
+    # against a fiction). The assumption still informs confidence and is declared
+    # in the notes/candidacy instead.
+    assert report.evidence.drops == {}
+    assert "ASSUMED" in " ".join(report.evidence.notes)
+    # Raw formula would give 0.76, but the origin sits at the OBSERVABILITY
+    # BOUNDARY (assumed baseline, no contract evidence) -> hard cap 0.6.
+    assert report.confidence == pytest.approx(0.6)
+    assert any("attribution_capped" in n for n in report.evidence.notes)
     assert report.propagation_path == ["s", "t"]
     assert report.downstream_cost_usd == pytest.approx(2.0)
 
@@ -29,8 +35,9 @@ def test_single_node_bad_score_is_cut_point(mk) -> None:
     assert report.culprit_run_ids == ["x"]
     assert report.propagation_path == ["x"]
     assert report.downstream_cost_usd == pytest.approx(1.0)
-    # gap=1.0 (0.8/0.5 clamped), severity=0.6, pred=1.0 -> 0.5 + 0.18 + 0.2
-    assert report.confidence == pytest.approx(0.88)
+    # Raw formula would give 0.88, but a single-node graph is ALL boundary:
+    # no predecessor was ever measured -> attribution hard-capped at 0.6.
+    assert report.confidence == pytest.approx(0.6)
 
 
 def test_gradient_degradation_blames_gap_origin(mk) -> None:
@@ -60,7 +67,9 @@ def test_below_threshold_small_drop_is_not_candidate(mk) -> None:
 
     report = find_blame(inp)
     assert report.culprit_run_ids == ["a"]
-    assert report.evidence.drops == {"a": pytest.approx(0.7)}
+    # "a" is a source: no measured predecessor, so no fabricated drop against the
+    # assumed 1.0 baseline appears in the evidence.
+    assert report.evidence.drops == {}
 
 
 def test_shadowing_drops_downstream_candidate(mk) -> None:

@@ -57,8 +57,9 @@ def test_scc_bad_exit_is_culprit_with_penalty(mk) -> None:
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["c"]  # exit node represents the SCC
-    raw = 0.88  # gap=1.0, severity=0.6, pred=1.0 -> 0.5 + 0.18 + 0.2
-    assert report.confidence == pytest.approx(raw * 0.8)
+    # Raw 0.88 * SCC penalty 0.8 = 0.704, then the observability-boundary
+    # cap (assumed baseline, no measured predecessor) clamps to 0.6.
+    assert report.confidence == pytest.approx(0.6)
     # SCC expands chronologically on the propagation path.
     assert report.propagation_path == ["a", "b", "c", "t"]
 

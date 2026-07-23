@@ -72,6 +72,11 @@ class RunRow:
     graph_id: UUID
     agent_name: str | None
     agent_version: str | None
+    model_name: str | None
+    prompt_hash: str | None
+    tool_schema_hash: str | None  # agent_detective.tool_schema_hash identity attribute
+    artifact_meta: str | None  # raw agent_detective.artifact_meta opener-span attribute
+    tool_calls: str | None  # compact JSON digest of the run's TOOL spans (mapper-derived)
     trace_id: str
     status: str  # 'ok' | 'failed' (schema also allows 'degraded', set downstream)
     input_inline: str | None

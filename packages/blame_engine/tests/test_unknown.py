@@ -24,12 +24,19 @@ def test_unknown_between_healthy_and_bad(mk) -> None:
 
 
 def test_unknown_ancestor_anywhere_upstream_caps_confidence(mk) -> None:
-    """S13: unknown predecessor anywhere in the upstream cone caps confidence
-    at unknown_confidence_cap (0.6), even hops away."""
+    """S13: a GENUINELY unknown predecessor anywhere in the upstream cone caps
+    confidence at unknown_confidence_cap (0.6), even hops away. 'Genuine' =
+    judge_error (it produced output we could not score, so it might hide the
+    origin) — as opposed to a structural root (payload_missing), which is
+    excluded by design (see the next test)."""
+    unknown_agent = NodeScore(
+        run_id="u", score=None, components={}, input_flawed=None,
+        unscored_reason="judge_error", judge_note=None,
+    )
     inp = mk(
         nodes=["u", "m", "b", "c"],
         edges=[("u", "m"), ("m", "b"), ("b", "c")],
-        scores={"u": None, "m": 0.9, "b": 1.0, "c": 0.2},
+        scores={"u": unknown_agent, "m": 0.9, "b": 1.0, "c": 0.2},
     )
     report = find_blame(inp)
 
@@ -38,6 +45,26 @@ def test_unknown_ancestor_anywhere_upstream_caps_confidence(mk) -> None:
     # raw would be 0.88 (gap=1.0, severity=0.6, pred=1.0); capped at 0.6.
     assert report.confidence == pytest.approx(0.6)
     assert report.evidence.unknown_ancestors == ["u"]
+
+
+def test_structural_root_ancestor_does_not_cap_confidence(mk) -> None:
+    """Fix #2: a structural root (payload_missing SOURCE — an orchestrator entry
+    with no output) is excluded by design as a culprit, so it must NOT suppress
+    confidence as a 'hidden origin'. A directly-observed failure downstream of it
+    keeps its full, honest confidence and the root is not an unknown_ancestor."""
+    inp = mk(
+        nodes=["start", "m", "b", "c"],
+        edges=[("start", "m"), ("m", "b"), ("b", "c")],
+        scores={"start": None, "m": 0.9, "b": 1.0, "c": 0.2},
+    )
+    report = find_blame(inp)
+
+    assert report.report_type == "cut_point"
+    assert report.culprit_run_ids == ["c"]
+    # NOT capped: raw 0.88 stands (gap=1.0, severity=0.6, pred=1.0).
+    assert report.confidence == pytest.approx(0.88)
+    # The structural root is excluded from the hidden-origin set.
+    assert report.evidence.unknown_ancestors == []
 
 
 def test_unknown_node_is_never_culprit(mk) -> None:

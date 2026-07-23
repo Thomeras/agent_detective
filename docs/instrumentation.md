@@ -158,6 +158,16 @@ otherwise they are summed over member spans; absent everywhere → unknown
 (`None`, never a default). A missing score is treated as unknown all the way
 through blame analysis — it is never assumed healthy.
 
+**File artifacts must be embedded, not referenced.** A payload that only names
+a produced file (`{"artifact_path": "report.docx"}`) gives every judge a
+*description* of the work instead of the work: verifier verdicts over such
+payloads are unverifiable, and the worker flags the node
+`unverifiable_artifact` (capping its judge component). Instrument the exporter
+to extract the artifact's text at flush time and append it to
+`input.value`/`output.value` under an `artifact_text` marker — that marker is
+what tells the scorer the content is actually visible. (The `generative_simon`
+reference exporter does this for docx/md/html.)
+
 ### Edges
 
 | Edge type | How it is detected |
@@ -170,12 +180,93 @@ Edges point in the direction of influence: `from_run`'s output feeds `to_run`.
 That is the direction the blame engine expects — a node's predecessors explain
 its quality. Every edge records which rule fired in `detection_method`.
 
+## Deterministic signal & versioning conventions (universal)
+
+These conventions are agent-agnostic: they are attribute names, not an SDK
+requirement. The dependency-free helper package `packages/detective_sdk`
+(pure stdlib, `pip install -e packages/detective_sdk`) computes the values for
+**any** instrumentation — a LangChain exporter, an OpenAI-SDK wrapper, a custom
+loop. `generative_simon` is merely the reference integration that consumes it
+the same way a third-party agent would.
+
+### The `agent_detective.artifact_meta` span attribute
+
+The worker cannot open files — artifacts live on the instrumented host. The
+exporter already opens them to embed `artifact_text`; it also computes a
+deterministic integrity record per artifact and ships it **out-of-band as a
+span attribute** on the same node spans (including the deliverable fallback
+for terminal spans):
+
+```
+agent_detective.artifact_meta =
+  [{"path":"report.docx","declared_ext":"docx","detected_kind":"zip",
+    "nonempty":true,"parse_ok":true,"sha256":"ab12…","size":12345}]
+```
+
+A compact JSON **array** string, one entry per artifact path found in that
+span's output. Ingest lands it verbatim in `agent_runs.artifact_meta`, and the
+worker checks it into deterministic `artifact_integrity_fail` signals —
+evidence that overrides LLM judgment, so a corrupt or mislabeled artifact is
+caught without a judge call.
+
+**Why an attribute and not a payload marker:** payload text is written by the
+agent and can *contain document content* — content that could quote or forge an
+integrity block, forcing a false deterministic `bad` on a healthy run or
+masking a genuinely corrupt artifact. Span attributes are set by the exporter
+alone; document content cannot inject them. The worker therefore never parses
+integrity metadata out of payload text.
+
+`detective_sdk.artifact_meta(path)` computes each entry: `detected_kind` from
+magic bytes (`PK\x03\x04` → `zip`, `%PDF` → `pdf`, decodable UTF-8 → `text`,
+zero bytes → `empty`, else `binary`; missing file → `missing`), `parse_ok` from
+a format-appropriate open (docx/xlsx/pptx = zip opens and the main part exists,
+pdf = header + `%%EOF`, md/txt/html/json = UTF-8 decode).
+
+### Per-run identity attributes
+
+Four attributes answer "why did this work yesterday?" by making every run
+diffable. Set them as **span attributes on the `AGENT` span first**; resource
+attributes are the fallback (the same span-attrs-then-resource rule as
+`gen_ai.agent.name`):
+
+| Attribute | Meaning | Helper |
+|---|---|---|
+| `gen_ai.agent.version` | the agent codebase version | `detective_sdk.git_version(repo_dir)` — short sha, `-dirty` suffix on uncommitted changes, cached per repo |
+| `gen_ai.request.model` | the model identifier the run used | your model constant/config |
+| `agent_detective.prompt_hash` | 12 hex chars of sha256 over the files that define the agent's prompts | `detective_sdk.content_hash(paths)` |
+| `agent_detective.tool_schema_hash` | 12 hex chars of sha256 over the agent's tool JSON schemas (canonical sorted JSON — insensitive to key order and schema list order) | `detective_sdk.tool_schema_hash(schemas)` (constant: `detective_sdk.TOOL_SCHEMA_HASH_ATTRIBUTE`) |
+
+All four are recorded per run and shown in the UI; diffing them between a
+good graph and a bad one is the fastest deterministic answer to a regression.
+
+### Control hook (opt-in)
+
+Agent Detective **cannot stop anything** — it observes. When its worker
+records an open circuit breaker for an agent, that decision sits in the
+database and on the API (`GET /control/breakers`) until an integration
+chooses to act on it. `detective_sdk.should_halt(endpoint, agent_name)` is
+that opt-in: call it in your agent loop before doing work, and it returns
+`True` only when the API positively reports an open breaker scoped to your
+agent's name (`scope_kind = agent_name`). Everything else — connection
+refused, timeout, a non-2xx response, unparseable JSON — returns `False`,
+because observability must never take the agent down. An agent that never
+calls the hook is completely unaffected; enforcement exists only where the
+integration adds it.
+
 ## Limitations
 
-- **A2A detection is off by default.** `A2A_MESSAGE` edges are only produced
-  when `A2A_DETECTION=true` (default `false`, per build spec 6.1). With it off,
-  A2A interactions still land in the same graph via the correlation header, but
-  as membership without directed edges.
+- **A2A detection is feature-flagged — enabled by default in the reference
+  compose.** `A2A_MESSAGE` edges are only produced when `A2A_DETECTION=true`
+  (the mapper-level default stays `false`, per build spec 6.1, but
+  `docker-compose.yml` now sets `A2A_DETECTION=true` on the ingest service;
+  override with `A2A_DETECTION=false` in `.env`). Peer-to-peer / mesh
+  architectures — agents exchanging `a2a.task_id`-correlated messages
+  directly, e.g. market bid exchanges — **require** this flag: peer traffic
+  crosses traces, so no SPAWN edge can ever link the peers, and the A2A rule
+  is the only source of structure. Degraded mode with the flag off: the same
+  interactions still land in one graph via the correlation header, but as
+  membership without directed edges — blame localisation between the peers is
+  impossible.
 - **Correlation-header membership caveat.** `x-execution-graph-id` groups runs
   into one graph but conveys no edge direction (see above). Cross-process call
   structure must come from trace-context propagation or tool-delegation

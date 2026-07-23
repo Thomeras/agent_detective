@@ -10,7 +10,7 @@ from .config import Settings
 from .db import create_engine, create_session_factory
 from .payloads import MinioPayloadStore
 from .repository import SqlRepository
-from .routers import agents, graphs, health, incidents
+from .routers import agents, audit, calibration, control, graphs, health, incidents
 from .streams import RedisStreamPublisher
 
 
@@ -41,6 +41,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(graphs.router)
     app.include_router(incidents.router)
     app.include_router(agents.router)
+    app.include_router(calibration.router)
+    app.include_router(control.router)
+    app.include_router(audit.router)
     return app
 
 

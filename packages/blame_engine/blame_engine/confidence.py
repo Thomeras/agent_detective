@@ -38,3 +38,28 @@ def compute_confidence(
     if candidate.unknown_upstream:
         confidence = min(confidence, config.unknown_confidence_cap)
     return _clamp(confidence)
+
+
+# Deterministic defect signals (a contract violation, an admitted content flag)
+# make the "is this output defective?" question near-certain — a hard check, not
+# a graded judge opinion. 0.95 rather than 1.0 leaves room for an
+# instrumentation artifact; it is never a bare 1.0 "certainty".
+_DETERMINISTIC_OBSERVATION = 0.95
+
+
+def compute_observation_confidence(
+    candidate: Candidate, config: BlameConfig, *, deterministic: bool = False
+) -> float:
+    """How sure we are the culprit's OUTPUT is defective — independent of whether
+    the fault ORIGINATED here (that is attribution, above).
+
+    A deterministic signal (contract violation / content flag) pins this near
+    certain. Otherwise it scales with severity: how far the score fell below the
+    quality threshold. This is deliberately NOT the gap/pred formula — a node can
+    be certainly-bad (severity high) while its origin is uncertain (gap unknown).
+    """
+    if deterministic:
+        return _DETERMINISTIC_OBSERVATION
+    if config.threshold <= 0:
+        return 0.0
+    return _clamp((config.threshold - candidate.score) / config.threshold)

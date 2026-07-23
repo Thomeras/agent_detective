@@ -1,0 +1,12 @@
+{
+  "culprit_agents": [
+    "think"
+  ],
+  "deterministic_signals": [
+    "contract_violation"
+  ],
+  "flags": [
+    "missing_required_content"
+  ],
+  "report_type": "degraded_recovered"
+}

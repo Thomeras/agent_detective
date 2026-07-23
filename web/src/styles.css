@@ -272,23 +272,39 @@ a:hover {
   border-color: rgba(88, 166, 255, 0.4);
   background: rgba(88, 166, 255, 0.12);
 }
+/* Machine-closed: a later analysis reclassified the run — stale, not alarming.
+   Muted on purpose so it never competes with live open/acknowledged rows. */
+.badge-status-superseded {
+  color: var(--text-dim);
+  border-color: var(--border);
+  background: var(--bg-elev-2);
+}
 .badge-type {
   color: var(--purple);
   border-color: rgba(188, 140, 255, 0.4);
   background: rgba(188, 140, 255, 0.12);
 }
 .badge-type-terminal_failure,
-.badge-type-max_iterations {
+.badge-type-latent_defect,
+.badge-type-max_iterations,
+.badge-type-fail {
   color: var(--danger);
   border-color: rgba(248, 81, 73, 0.4);
   background: rgba(248, 81, 73, 0.12);
 }
 .badge-type-cost_overrun,
 .badge-type-degraded_quality,
-.badge-type-statistical {
+.badge-type-statistical,
+.badge-type-warn {
   color: var(--warn);
   border-color: rgba(210, 153, 34, 0.4);
   background: rgba(210, 153, 34, 0.12);
+}
+
+/* Advisory topology chip in the graph meta header — the tooltip (title) holds
+   the attribute breakdown and which source rendered (evidence vs client). */
+.topo-chip {
+  cursor: help;
 }
 
 /* State placeholders */
@@ -402,6 +418,14 @@ a:hover {
   border-radius: 3px;
   display: inline-block;
 }
+.swatch-round {
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.swatch-square {
+  border-radius: 2px;
+  background: var(--text-faint);
+}
 .edge-swatch {
   width: 18px;
   height: 0;
@@ -491,9 +515,214 @@ a:hover {
   font-style: italic;
   color: var(--warn);
 }
+/* Qualifier under the terminal-verdict badge: the "ok" holds for content only
+   (carried contract breached/unverified). Must stay visible next to the badge. */
+.terminal-caveat {
+  margin: 4px 0 0;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: var(--warn);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  border-radius: 4px;
+  background: rgba(210, 153, 34, 0.1);
+}
 .ref-list-suspect .run-ref {
   border-color: rgba(210, 153, 34, 0.4);
   background: rgba(210, 153, 34, 0.1);
+}
+.layer-suspect {
+  display: inline-block;
+  padding: 3px 10px;
+  border-radius: 4px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--warn);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  background: rgba(210, 153, 34, 0.1);
+}
+.degradation-chain {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+}
+.degradation-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.score-group-label {
+  margin-top: 8px;
+  padding-top: 6px;
+  border-top: 1px dashed var(--border);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  font-size: 10px;
+}
+.score-row-verifier .run-ref {
+  border-style: dashed;
+}
+.score-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+/* Ground-truth override: two chips ("claimed" struck → "effective"), each
+   captioned so the pair never reads as a bare "0.56 / 0.10". */
+.score-override {
+  align-items: flex-end;
+  gap: 6px;
+}
+.chip-col {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.chip-caption {
+  font-size: 9px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.score-arrow {
+  color: var(--text-faint);
+  font-size: 12px;
+}
+.score-refuted {
+  text-decoration: line-through;
+  opacity: 0.55;
+  background: transparent;
+  border: 1px solid var(--border);
+  /* .score-chip hardcodes dark text (#0d1117) for chips sitting on a light
+     scoreColor() fill; on the transparent refuted chip that text vanished
+     into the dark panel background. */
+  color: var(--text-dim);
+}
+/* An unverified claim keeps its score chip but wears this badge: the number is
+   the node's own claim, not independent evidence it passed. */
+.unverified-badge {
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--warn);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  background: rgba(210, 153, 34, 0.12);
+  cursor: help;
+}
+/* "split" tag beside a headline confidence whose origin is not settled. */
+.conf-split-tag {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--warn);
+  border: 1px solid rgba(210, 153, 34, 0.4);
+  background: rgba(210, 153, 34, 0.12);
+  cursor: help;
+  vertical-align: middle;
+}
+
+/* Confidence split: two captioned chips (observed defect / attribution) sitting
+   under the headline number, reusing the chip-col/chip-caption pattern. */
+.conf-breakdown {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 10px;
+  margin-top: 6px;
+}
+/* A score-chip carrying a plain confidence figure (no scoreColor background):
+   give it a neutral fill so its dark text stays legible in both themes. */
+.conf-chip {
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Competing-origins breakdown: one row per hypothesis, weight as a bar. */
+.hypothesis-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.hypothesis-row {
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr auto;
+  align-items: center;
+  gap: 8px;
+}
+.hypothesis-basis {
+  grid-column: 1 / -1;
+  line-height: 1.35;
+}
+.hypothesis-bar-track {
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, 0.15);
+  overflow: hidden;
+}
+.hypothesis-bar {
+  display: block;
+  height: 100%;
+  border-radius: 999px;
+  background: var(--warn);
+}
+.hypothesis-bar-unresolved {
+  background: rgba(127, 127, 127, 0.5);
+}
+.hypothesis-weight {
+  font-variant-numeric: tabular-nums;
+  font-size: 12px;
+  color: var(--text-faint);
+  min-width: 34px;
+  text-align: right;
+}
+
+/* Quality-drop row: "<from> → <to>  -<drop>" on one baseline-aligned line. */
+.drop-cell {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* Deterministic contract breach: "<key>: <from> → <to>" — the value chips hold
+   arbitrary rewritten parameters (strings, not scores), so they take the same
+   neutral fill as the confidence chips rather than a scoreColor background. */
+.contract-diff {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.contract-key {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.contract-chip {
+  min-width: 0;
+  background: var(--bg-elev-2);
+  color: var(--text);
+  border: 1px solid var(--border);
+}
+
+/* Deterministic signals: the stable signal name is an identifier (keys
+   alerting/dashboards), so monospace like contract-key; the basis line sits
+   under the row as muted provenance. */
+.signal-item {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.signal-name {
+  font-family: var(--mono);
+  font-size: 12px;
+  color: var(--text);
 }
 
 /* Key-value grid */
@@ -554,6 +783,158 @@ a:hover {
   gap: 4px;
   font-size: 13px;
 }
+/* Terminal verdict: two independent axes (content / contract). */
+.terminal-axes {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.terminal-axis {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.terminal-axis .kv-key {
+  min-width: 60px;
+}
+/* A required element missing everywhere is the headline negative finding. */
+.fact-missing {
+  color: var(--danger);
+  font-weight: 600;
+}
+.fact-source {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+/* Refuted judge prose: the annotation must outrank the fluent note below it. */
+.judge-refuted {
+  margin: 2px 0;
+  font-size: 12px;
+  color: var(--warn);
+}
+
+/* Verdict banner: the answer first — passed/failed, why, where. */
+.verdict-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  border-radius: 8px;
+  border: 1px solid var(--border);
+  margin-bottom: 8px;
+}
+.verdict-status {
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+.verdict-failed {
+  border-color: rgba(248, 81, 73, 0.5);
+  background: rgba(248, 81, 73, 0.1);
+}
+.verdict-failed .verdict-status {
+  color: var(--danger);
+}
+.verdict-warning {
+  border-color: rgba(210, 153, 34, 0.5);
+  background: rgba(210, 153, 34, 0.1);
+}
+.verdict-warning .verdict-status {
+  color: var(--warn);
+}
+.verdict-inconclusive .verdict-status {
+  color: var(--text-dim);
+}
+.verdict-terminal {
+  margin-left: auto;
+}
+.verdict-where,
+.verdict-why {
+  display: flex;
+  gap: 10px;
+  align-items: baseline;
+  margin-top: 6px;
+}
+.verdict-where .kv-key,
+.verdict-why .kv-key {
+  min-width: 44px;
+}
+.verdict-why-line {
+  font-size: 13px;
+}
+.verdict-why-gist {
+  overflow-wrap: anywhere;
+}
+/* Divider between the verdict/why layer and the audit-trail panels. */
+.detail-divider {
+  margin: 14px 2px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 4px;
+}
+
+/* Reasoning: headline-per-note with the full prose behind a disclosure. */
+.note-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.note-item {
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--bg-elev-2);
+}
+.note-summary {
+  cursor: pointer;
+  padding: 7px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  list-style: none;
+}
+.note-summary::-webkit-details-marker {
+  display: none;
+}
+.note-summary::before {
+  content: "▸";
+  float: left;
+  margin-right: 6px;
+  color: var(--text-dim);
+}
+.note-item[open] .note-summary::before {
+  content: "▾";
+}
+.note-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+/* A finding refuted by later verified evidence: same visual language as a
+   refuted judge assessment (struck through, dimmed), the text stays legible. */
+.note-superseded {
+  text-decoration: line-through;
+  color: var(--text-dim);
+}
+.note-gist {
+  overflow-wrap: anywhere;
+}
+/* Collapsed rows keep the gist as a one-line teaser; expanding shows the full
+   note, so the teaser disappears to avoid duplicated text. */
+.note-item[open] .note-gist {
+  display: none;
+}
+.note-full {
+  margin: 0;
+  padding: 0 10px 9px 10px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
 
 /* Score / drop maps */
 .score-map {
@@ -608,6 +989,7 @@ a:hover {
   border: 1px solid var(--border-soft);
   border-radius: 6px;
   padding: 6px 8px;
+  overflow-wrap: anywhere;
 }
 .fact-found {
   display: flex;
@@ -615,6 +997,24 @@ a:hover {
   align-items: center;
   gap: 6px;
   font-size: 12px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+/* Long unbroken evidence strings (claims, ids, paths) must WRAP inside their
+   own panel, never bleed into the neighbouring column. Wrapping, not clipping:
+   overflow:hidden here cut whole panels off. */
+.blame-panel,
+.blame-panel > *,
+.judge-item,
+.fact-item {
+  min-width: 0;
+}
+.blame-panel .muted.small,
+.blame-section,
+.score-map,
+.judge-list,
+.fact-list {
+  overflow-wrap: anywhere;
 }
 
 /* Node panel */
@@ -669,4 +1069,75 @@ a:hover {
   word-break: break-word;
   max-height: 240px;
   overflow: auto;
+}
+/* Per-defect attribution rows under the confidence chips. */
+.attr-breakdown {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-top: 4px;
+}
+.attr-breakdown-row strong {
+  font-family: var(--mono);
+  font-weight: 600;
+  color: var(--text);
+}
+/* Version diff panel: per-agent identity rows, baseline -> current.
+   Changed fields warn; unchanged stay muted. */
+.diff-list {
+  display: flex;
+  flex-direction: column;
+  margin-top: 6px;
+}
+.diff-agent {
+  padding: 6px 0;
+  border-top: 1px solid var(--border-soft);
+}
+.diff-agent:first-child {
+  border-top: 0;
+  padding-top: 0;
+}
+.diff-agent-name {
+  font-weight: 600;
+  font-size: 12px;
+  margin-bottom: 2px;
+}
+.diff-field {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  padding: 1px 0;
+}
+.diff-key {
+  min-width: 82px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-faint);
+}
+.diff-val {
+  word-break: break-all;
+}
+.diff-changed,
+.diff-changed .diff-key {
+  color: var(--warn);
+}
+/* Ground-truth feedback buttons under the blame report. */
+.feedback-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+/* Breaker rows on the incident inbox. */
+.breaker-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.breaker-row {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
 }

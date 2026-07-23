@@ -20,6 +20,10 @@ is one transaction, so callers XACK only after it commits.
 
 from __future__ import annotations
 
+import hashlib
+import hmac as hmac_mod
+import json
+import math
 from typing import Protocol
 from uuid import UUID
 
@@ -44,11 +48,15 @@ from sqlalchemy.dialects.postgresql import insert as pg_insert
 from .types import (
     AgentStat,
     BlameDraft,
+    BreakerState,
+    CheckRule,
     ClaimResult,
     EdgeRecord,
     GraphBundle,
     NodeScoreRow,
     OutputContract,
+    PolicyDecision,
+    PolicyRule,
     RunRecord,
     Tier1Verdict,
     Tier2Outcome,
@@ -90,6 +98,15 @@ agent_runs = Table(
     Column("tokens_out", Integer),
     Column("started_at", DateTime(timezone=True)),
     Column("ended_at", DateTime(timezone=True)),
+    # Out-of-band artifact integrity record (migration 0006). Raw attribute
+    # string; the worker parses it tolerantly (signals.parse_artifact_meta).
+    Column("artifact_meta", Text),
+    # Compact JSON digest of the run's TOOL spans (migration 0007). Raw
+    # string; checks parse it tolerantly.
+    Column("tool_calls", Text),
+    # Tool schema fingerprint (migration 0009) — per-run identity for
+    # version-diff views.
+    Column("tool_schema_hash", Text),
 )
 
 edges = Table(
@@ -112,6 +129,12 @@ tier1_verdicts = Table(
     Column("flags", JSONB),
     Column("flagged", Boolean, nullable=False),
     Column("sampled", Boolean, nullable=False),
+    # Fingerprint of the rule set the deterministic verdict basis ran under
+    # (migration 0008) — reconciliation provenance.
+    Column("check_rules_hash", Text),
+    # Worker judge-prompt fingerprint (migration 0009) — calibration slicing.
+    # The judge MODEL is not recorded, a known limitation.
+    Column("judge_prompt_hash", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -157,19 +180,37 @@ blame_reports = Table(
     Column("downstream_cost_usd", Numeric),
     Column("unscored_run_ids", ARRAY(Uuid)),
     Column("evidence", JSONB),
+    # Worker judge-prompt fingerprint (migration 0009).
+    Column("judge_prompt_hash", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
 agent_stats = Table(
     "agent_stats",
     metadata,
-    Column("agent_name", Text, nullable=False),
-    Column("graph_type", Text, nullable=False),
+    Column("agent_name", Text, primary_key=True),
+    Column("graph_type", Text, primary_key=True),
     Column("tokens_out_mean", REAL),
     Column("tokens_out_std", REAL),
     Column("iterations_mean", REAL),
     Column("iterations_std", REAL),
     Column("sample_count", Integer),
+    # Welford running-variance accumulators + cost baseline (migration 0007).
+    Column("cost_mean", REAL),
+    Column("cost_std", REAL),
+    Column("tokens_out_m2", REAL),
+    Column("cost_m2", REAL),
+    Column("iterations_m2", REAL),
+)
+
+check_rules = Table(
+    "check_rules",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("agent_name", Text),
+    Column("graph_type", Text),
+    Column("kind", Text, nullable=False),
+    Column("spec", JSONB, nullable=False),
 )
 
 output_contracts = Table(
@@ -180,6 +221,105 @@ output_contracts = Table(
     Column("agent_version_pattern", Text),
     Column("json_schema", JSONB),
 )
+
+# Shadow policy gates (migration 0009, roadmap 2.2). Rules annotate — they
+# never intercept; decisions record what WOULD have happened.
+policy_rules = Table(
+    "policy_rules",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("name", Text, nullable=False, unique=True),
+    Column("predicate", JSONB, nullable=False),
+    Column("action", Text, nullable=False),
+    Column("shadow", Boolean, nullable=False),
+    Column("enabled", Boolean, nullable=False),
+)
+
+policy_decisions = Table(
+    "policy_decisions",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("graph_id", Uuid, nullable=False),
+    Column("rule_name", Text, nullable=False),
+    Column("decision", Text, nullable=False),
+    Column("detail", Text),
+    Column("mode", Text, nullable=False),
+    Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+)
+
+# Recorded circuit-breaker decisions (migration 0009, roadmap 2.3). A record,
+# not an enforcement — enforcement happens only if the integration polls it.
+breaker_state = Table(
+    "breaker_state",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("scope_kind", Text, nullable=False),
+    Column("scope_value", Text, nullable=False),
+    Column("state", Text, nullable=False),
+    Column("reason", Text),
+    Column("opened_at", DateTime(timezone=True)),
+    Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
+    sa.UniqueConstraint("scope_kind", "scope_value", name="uq_breaker_state_scope"),
+)
+
+# Append-only evidence hash chain (migration 0009, roadmap 2.6).
+evidence_ledger = Table(
+    "evidence_ledger",
+    metadata,
+    Column("id", Integer, primary_key=True, autoincrement=True),
+    Column("report_id", Integer, nullable=False),
+    Column("evidence_sha256", Text, nullable=False),
+    Column("prev_hash", Text),
+    Column("chain_hash", Text, nullable=False),
+    Column("hmac_sig", Text, nullable=False),
+)
+
+
+def ledger_entry(
+    evidence: dict[str, object], prev_hash: str | None, hmac_key: str
+) -> tuple[str, str, str]:
+    """Compute one evidence-ledger link: ``(evidence_sha256, chain_hash, hmac_sig)``.
+
+    The frozen algorithm (roadmap 2.6): sha256 over the canonically-serialized
+    evidence (sorted keys, no whitespace, unescaped non-ASCII), chained onto
+    the previous link's ``chain_hash`` (empty string for the first link), and
+    signed with HMAC-SHA256 under ``hmac_key``. Shared by PgRepo and the
+    in-memory test fake so both implement identical math. ``hmac_key`` MUST
+    be overridden in production (Settings.audit_hmac_key) — signatures under
+    the well-known dev default prove nothing.
+    """
+    canonical = json.dumps(
+        evidence, sort_keys=True, ensure_ascii=False, separators=(",", ":")
+    )
+    evidence_sha256 = hashlib.sha256(canonical.encode("utf-8")).hexdigest()
+    chain_hash = hashlib.sha256(
+        ((prev_hash or "") + evidence_sha256).encode("utf-8")
+    ).hexdigest()
+    hmac_sig = hmac_mod.new(
+        hmac_key.encode("utf-8"), chain_hash.encode("utf-8"), hashlib.sha256
+    ).hexdigest()
+    return evidence_sha256, chain_hash, hmac_sig
+
+
+def welford_step(
+    n1: int, mean: float | None, m2: float | None, x: float
+) -> tuple[float, float, float | None]:
+    """One Welford running-variance update for a single metric.
+
+    ``n1`` is the NEW sample count (old count + 1); ``mean``/``m2`` are the
+    stored accumulators (None on the first sample). Returns
+    ``(new_mean, new_m2, new_std)`` where ``new_std`` is
+    ``sqrt(m2 / (n1 - 1))`` for n1 > 1 and None otherwise (a single sample
+    has no variance). Shared by PgRepo and the in-memory test fake so both
+    implement identical math.
+    """
+    mean0 = mean if mean is not None else 0.0
+    m20 = m2 if m2 is not None else 0.0
+    delta = x - mean0
+    new_mean = mean0 + delta / n1
+    new_m2 = m20 + delta * (x - new_mean)
+    new_std = math.sqrt(new_m2 / (n1 - 1)) if n1 > 1 else None
+    return new_mean, new_m2, new_std
 
 
 class Repo(Protocol):
@@ -199,6 +339,24 @@ class Repo(Protocol):
 
     async def read_agent_stats(self, graph_type: str | None) -> dict[str, AgentStat]: ...
 
+    async def upsert_agent_stats(
+        self,
+        agent_name: str,
+        graph_type: str,
+        *,
+        tokens_out: float | None,
+        cost: float | None,
+        iterations: float | None,
+    ) -> None:
+        """Fold ONE observed sample into the agent's baseline (Welford step).
+
+        Metrics whose value is None are skipped (their accumulators stay
+        untouched); ``sample_count`` advances once per call.
+        """
+        ...
+
+    async def read_check_rules(self) -> list[CheckRule]: ...
+
     async def read_output_contracts(self) -> list[OutputContract]: ...
 
     async def persist_tier2_result(
@@ -210,9 +368,34 @@ class Repo(Protocol):
         incident_key: str | None,
         incident_trigger: str | None,
         blame: BlameDraft | None,
+        supersede_others: bool = False,
     ) -> Tier2Outcome: ...
 
     async def load_alert_context(self, incident_id: int) -> AlertContext | None: ...
+
+    async def read_policy_rules(self) -> list[PolicyRule]:
+        """Enabled shadow-gate rules only (disabled rules never evaluate)."""
+        ...
+
+    async def insert_policy_decisions(
+        self, graph_id: UUID, decisions: list[PolicyDecision]
+    ) -> None:
+        """Record which rules WOULD have fired (mode='shadow', always)."""
+        ...
+
+    async def upsert_breaker(
+        self, scope_kind: str, scope_value: str, state: str, reason: str | None
+    ) -> None:
+        """Record a breaker decision; ``opened_at`` is stamped once on the
+        closed->open transition and preserved otherwise."""
+        ...
+
+    async def read_breakers(self) -> list[BreakerState]: ...
+
+    async def count_open_incidents_for_agent(self, agent_name: str) -> int:
+        """Count live (open/acknowledged) incidents whose latest blame report
+        names a run of ``agent_name`` as culprit."""
+        ...
 
     async def ping(self) -> None: ...
 
@@ -220,8 +403,12 @@ class Repo(Protocol):
 
 
 class PgRepo:
-    def __init__(self, engine: "object") -> None:
+    def __init__(self, engine: "object", audit_hmac_key: str = "dev-insecure-key") -> None:
+        # The default key exists only so tests construct PgRepo without
+        # settings; production (worker main) passes Settings.audit_hmac_key,
+        # which MUST be overridden from its dev default there.
         self._engine = engine
+        self._audit_hmac_key = audit_hmac_key
 
     async def load_graph(self, graph_id: UUID) -> GraphBundle | None:
         graph_stmt = select(
@@ -258,6 +445,9 @@ class PgRepo:
                 tokens_out=r.tokens_out,
                 started_at=r.started_at,
                 ended_at=r.ended_at,
+                artifact_meta=r.artifact_meta,
+                tool_calls=r.tool_calls,
+                tool_schema_hash=r.tool_schema_hash,
             )
             for r in run_rows
         ]
@@ -286,6 +476,8 @@ class PgRepo:
             flags=verdict.flags,
             flagged=verdict.flagged,
             sampled=verdict.sampled,
+            check_rules_hash=verdict.check_rules_hash,
+            judge_prompt_hash=verdict.judge_prompt_hash,
         )
         stmt = stmt.on_conflict_do_update(
             index_elements=["graph_id"],
@@ -296,6 +488,8 @@ class PgRepo:
                 "flags": stmt.excluded.flags,
                 "flagged": stmt.excluded.flagged,
                 "sampled": stmt.excluded.sampled,
+                "check_rules_hash": stmt.excluded.check_rules_hash,
+                "judge_prompt_hash": stmt.excluded.judge_prompt_hash,
                 "updated_at": func.now(),
             },
         )
@@ -316,6 +510,8 @@ class PgRepo:
             flags=list(row.flags or []),
             flagged=row.flagged,
             sampled=row.sampled,
+            check_rules_hash=row.check_rules_hash,
+            judge_prompt_hash=row.judge_prompt_hash,
         )
 
     async def claim_tier2_job(
@@ -365,9 +561,89 @@ class PgRepo:
                 iterations_mean=row.iterations_mean,
                 iterations_std=row.iterations_std,
                 sample_count=row.sample_count,
+                cost_mean=row.cost_mean,
+                cost_std=row.cost_std,
+                tokens_out_m2=row.tokens_out_m2,
+                cost_m2=row.cost_m2,
+                iterations_m2=row.iterations_m2,
             )
             for row in rows
         }
+
+    async def upsert_agent_stats(
+        self,
+        agent_name: str,
+        graph_type: str,
+        *,
+        tokens_out: float | None,
+        cost: float | None,
+        iterations: float | None,
+    ) -> None:
+        async with self._engine.begin() as conn:
+            # Upsert-then-lock: guarantee the row exists, then serialize
+            # concurrent Welford steps on it with FOR UPDATE so no update is
+            # lost (mean/m2 read-modify-write must not interleave).
+            await conn.execute(
+                pg_insert(agent_stats)
+                .values(agent_name=agent_name, graph_type=graph_type, sample_count=0)
+                .on_conflict_do_nothing(index_elements=["agent_name", "graph_type"])
+            )
+            row = (
+                await conn.execute(
+                    select(agent_stats)
+                    .where(
+                        agent_stats.c.agent_name == agent_name,
+                        agent_stats.c.graph_type == graph_type,
+                    )
+                    .with_for_update()
+                )
+            ).first()
+            n1 = (row.sample_count or 0) + 1
+            values: dict[str, object] = {"sample_count": n1}
+            # ONE Welford step per metric; None-valued metrics are skipped
+            # and their accumulators stay untouched.
+            if tokens_out is not None:
+                mean, m2, std = welford_step(
+                    n1, row.tokens_out_mean, row.tokens_out_m2, float(tokens_out)
+                )
+                values.update(tokens_out_mean=mean, tokens_out_m2=m2, tokens_out_std=std)
+            if cost is not None:
+                mean, m2, std = welford_step(n1, row.cost_mean, row.cost_m2, float(cost))
+                values.update(cost_mean=mean, cost_m2=m2, cost_std=std)
+            if iterations is not None:
+                mean, m2, std = welford_step(
+                    n1, row.iterations_mean, row.iterations_m2, float(iterations)
+                )
+                values.update(iterations_mean=mean, iterations_m2=m2, iterations_std=std)
+            await conn.execute(
+                sa.update(agent_stats)
+                .where(
+                    agent_stats.c.agent_name == agent_name,
+                    agent_stats.c.graph_type == graph_type,
+                )
+                .values(**values)
+            )
+
+    async def read_check_rules(self) -> list[CheckRule]:
+        stmt = select(
+            check_rules.c.id,
+            check_rules.c.agent_name,
+            check_rules.c.graph_type,
+            check_rules.c.kind,
+            check_rules.c.spec,
+        )
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(stmt)).all()
+        return [
+            CheckRule(
+                id=row.id,
+                agent_name=row.agent_name,
+                graph_type=row.graph_type,
+                kind=row.kind,
+                spec=row.spec or {},
+            )
+            for row in rows
+        ]
 
     async def read_output_contracts(self) -> list[OutputContract]:
         stmt = select(
@@ -395,6 +671,7 @@ class PgRepo:
         incident_key: str | None,
         incident_trigger: str | None,
         blame: BlameDraft | None,
+        supersede_others: bool = False,
     ) -> Tier2Outcome:
         async with self._engine.begin() as conn:
             for row in node_scores:
@@ -463,10 +740,57 @@ class PgRepo:
                                 downstream_cost_usd=blame.downstream_cost_usd,
                                 unscored_run_ids=blame.unscored_run_ids,
                                 evidence=blame.evidence,
+                                judge_prompt_hash=blame.judge_prompt_hash,
                             )
                             .returning(blame_reports.c.id)
                         )
                     ).scalar_one()
+
+                    # Evidence ledger (roadmap 2.6): append the hash-chain
+                    # link in the SAME transaction that persists the report,
+                    # so a report row and its ledger entry commit atomically.
+                    # FOR UPDATE on the tail serializes concurrent appends —
+                    # two writers cannot chain onto the same predecessor.
+                    prev_row = (
+                        await conn.execute(
+                            select(evidence_ledger.c.chain_hash)
+                            .order_by(evidence_ledger.c.id.desc())
+                            .limit(1)
+                            .with_for_update()
+                        )
+                    ).first()
+                    prev_hash = prev_row.chain_hash if prev_row is not None else None
+                    evidence_sha256, chain_hash, hmac_sig = ledger_entry(
+                        blame.evidence, prev_hash, self._audit_hmac_key
+                    )
+                    await conn.execute(
+                        pg_insert(evidence_ledger).values(
+                            report_id=blame_report_id,
+                            evidence_sha256=evidence_sha256,
+                            prev_hash=prev_hash,
+                            chain_hash=chain_hash,
+                            hmac_sig=hmac_sig,
+                        )
+                    )
+
+            if supersede_others:
+                # The latest completed analysis is authoritative for its graph:
+                # each analysis yields at most ONE classification, so any OTHER
+                # live incident of this graph reflects an outdated verdict class
+                # (e.g. degraded_quality before an escalation reclassified the
+                # run to latent_defect, or any open incident after a re-analysis
+                # came back clean). Leaving it open would page two stories about
+                # one run. Resolved incidents are history and stay untouched.
+                stale = (
+                    sa.update(incidents)
+                    .where(incidents.c.graph_id == graph_id)
+                    .where(incidents.c.status.in_(("open", "acknowledged")))
+                )
+                if incident_id is not None:
+                    stale = stale.where(incidents.c.id != incident_id)
+                await conn.execute(
+                    stale.values(status="superseded", updated_at=func.now())
+                )
 
             await conn.execute(
                 sa.update(tier2_jobs)
@@ -512,6 +836,111 @@ class PgRepo:
             if row.downstream_cost_usd is not None
             else None,
         )
+
+    async def read_policy_rules(self) -> list[PolicyRule]:
+        stmt = select(policy_rules).where(policy_rules.c.enabled)
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(stmt)).all()
+        return [
+            PolicyRule(
+                id=row.id,
+                name=row.name,
+                predicate=row.predicate or {},
+                action=row.action,
+                shadow=row.shadow,
+                enabled=row.enabled,
+            )
+            for row in rows
+        ]
+
+    async def insert_policy_decisions(
+        self, graph_id: UUID, decisions: list[PolicyDecision]
+    ) -> None:
+        if not decisions:
+            return
+        async with self._engine.begin() as conn:
+            await conn.execute(
+                pg_insert(policy_decisions),
+                [
+                    {
+                        "graph_id": graph_id,
+                        "rule_name": d.rule_name,
+                        "decision": d.decision,
+                        "detail": d.detail,
+                        # Always shadow in v1: these rows record what WOULD
+                        # have happened; nothing was actually blocked.
+                        "mode": "shadow",
+                    }
+                    for d in decisions
+                ],
+            )
+
+    async def upsert_breaker(
+        self, scope_kind: str, scope_value: str, state: str, reason: str | None
+    ) -> None:
+        stmt = pg_insert(breaker_state).values(
+            scope_kind=scope_kind,
+            scope_value=scope_value,
+            state=state,
+            reason=reason,
+            opened_at=func.now() if state == "open" else None,
+        )
+        stmt = stmt.on_conflict_do_update(
+            index_elements=["scope_kind", "scope_value"],
+            set_={
+                "state": stmt.excluded.state,
+                "reason": stmt.excluded.reason,
+                "updated_at": func.now(),
+                # Stamp opened_at exactly once per closed->open transition;
+                # re-recording an already-open breaker keeps the original.
+                "opened_at": sa.case(
+                    (
+                        (breaker_state.c.state != "open")
+                        & (stmt.excluded.state == "open"),
+                        func.now(),
+                    ),
+                    else_=breaker_state.c.opened_at,
+                ),
+            },
+        )
+        async with self._engine.begin() as conn:
+            await conn.execute(stmt)
+
+    async def read_breakers(self) -> list[BreakerState]:
+        stmt = select(breaker_state)
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(stmt)).all()
+        return [
+            BreakerState(
+                scope_kind=row.scope_kind,
+                scope_value=row.scope_value,
+                state=row.state,
+                reason=row.reason,
+            )
+            for row in rows
+        ]
+
+    async def count_open_incidents_for_agent(self, agent_name: str) -> int:
+        # One statement: live incidents x latest blame report x culprit runs.
+        # ``run_id = ANY(culprit_run_ids)`` fans an incident out per culprit,
+        # so count DISTINCT incident ids.
+        stmt = (
+            select(func.count(sa.distinct(incidents.c.id)))
+            .select_from(
+                incidents.join(
+                    blame_reports,
+                    (blame_reports.c.incident_id == incidents.c.id)
+                    & (blame_reports.c.is_latest),
+                ).join(
+                    agent_runs,
+                    blame_reports.c.culprit_run_ids.any(agent_runs.c.run_id),
+                )
+            )
+            .where(incidents.c.status.in_(("open", "acknowledged")))
+            .where(agent_runs.c.agent_name == agent_name)
+        )
+        async with self._engine.connect() as conn:
+            return (await conn.execute(stmt)).scalar_one()
 
     async def ping(self) -> None:
         async with self._engine.connect() as conn:

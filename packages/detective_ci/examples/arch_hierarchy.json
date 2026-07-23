@@ -1,0 +1,112 @@
+{
+  "nodes": [
+    "manager",
+    "lead_alpha",
+    "lead_beta",
+    "worker_a1",
+    "worker_a2",
+    "worker_b1",
+    "worker_b2",
+    "merge"
+  ],
+  "edges": [
+    [
+      "manager",
+      "lead_alpha"
+    ],
+    [
+      "manager",
+      "lead_beta"
+    ],
+    [
+      "lead_alpha",
+      "worker_a1"
+    ],
+    [
+      "lead_alpha",
+      "worker_a2"
+    ],
+    [
+      "lead_beta",
+      "worker_b1"
+    ],
+    [
+      "lead_beta",
+      "worker_b2"
+    ],
+    [
+      "worker_a1",
+      "merge"
+    ],
+    [
+      "worker_a2",
+      "merge"
+    ],
+    [
+      "worker_b1",
+      "merge"
+    ],
+    [
+      "worker_b2",
+      "merge"
+    ]
+  ],
+  "scores": {
+    "manager": {
+      "score": 0.95,
+      "input_flawed": false,
+      "judge_note": "sensible plan"
+    },
+    "lead_alpha": {
+      "score": 0.92,
+      "input_flawed": false,
+      "judge_note": "good subtasking"
+    },
+    "lead_beta": {
+      "score": 0.9,
+      "input_flawed": false,
+      "judge_note": "good subtasking"
+    },
+    "worker_a1": {
+      "score": 0.88,
+      "input_flawed": false,
+      "judge_note": "solid work"
+    },
+    "worker_a2": {
+      "score": 0.9,
+      "input_flawed": false,
+      "judge_note": "solid work"
+    },
+    "worker_b1": {
+      "score": 0.15,
+      "input_flawed": false,
+      "judge_note": "fabricated numbers, task ignored"
+    },
+    "worker_b2": {
+      "score": 0.87,
+      "input_flawed": false,
+      "judge_note": "solid work"
+    },
+    "merge": {
+      "score": 0.3,
+      "input_flawed": false,
+      "judge_note": "merged output inherits the fabricated section"
+    }
+  },
+  "agent_names": {
+    "manager": "manager",
+    "lead_alpha": "lead_alpha",
+    "lead_beta": "lead_beta",
+    "worker_a1": "worker_a1",
+    "worker_a2": "worker_a2",
+    "worker_b1": "worker_b1",
+    "worker_b2": "worker_b2",
+    "merge": "merge"
+  },
+  "terminal_verdict": {
+    "bad": true,
+    "score": 0.3,
+    "reasoning": "final document contains fabricated figures",
+    "checkable": true
+  }
+}

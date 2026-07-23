@@ -33,8 +33,10 @@ def test_spurious_low_source_does_not_shadow_real_downstream_origin(mk):
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["render"]
-    # eval is the sink where it surfaced — the manifestation, not the cause.
-    assert report.evidence.manifestation_run_ids == ["eval"]
+    # The failure surfaced in the terminal ARTIFACT — render's output. The eval
+    # sink is a verifier: it issued a verdict about that artifact, it did not
+    # manifest anything, so the verifier sink maps back to the producer.
+    assert report.evidence.manifestation_run_ids == ["render"]
 
 
 def test_faulty_source_that_propagates_is_still_blamed(mk):

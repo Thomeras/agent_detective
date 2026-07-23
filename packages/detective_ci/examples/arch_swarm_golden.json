@@ -1,0 +1,8 @@
+{
+  "culprit_agents": [
+    "drone_03",
+    "drone_09"
+  ],
+  "deterministic_signals": [],
+  "report_type": "multi_culprit"
+}

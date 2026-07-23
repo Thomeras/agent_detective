@@ -71,6 +71,16 @@ const stylesheet: Stylesheet[] = [
     },
   },
   {
+    // Deterministic node (no LLM tokens): square, so the LLM/non-LLM split of
+    // the pipeline is visible at a glance. LLM nodes stay round.
+    selector: "node.deterministic",
+    style: {
+      shape: "round-rectangle",
+      width: 30,
+      height: 30,
+    },
+  },
+  {
     selector: "edge",
     style: {
       width: 2,
@@ -146,7 +156,8 @@ const stylesheet: Stylesheet[] = [
 // Nodes that lie on a directed cycle, and the edges that close those cycles.
 // Robust to how the loop is encoded (SPAWN chain + TOOL back-edge): we look at
 // structure, not edge type. Small graphs -> plain per-node BFS is fine.
-function detectLoops(
+// Exported so the legend can key its "retry loop" entry off the same detection.
+export function detectLoops(
   nodeIds: string[],
   edges: Array<{ source: string; target: string }>,
   startAt: Map<string, number>,
@@ -224,6 +235,10 @@ export default function GraphCanvas({
 
     cy.nodes().forEach((node) => {
       if (node.data("status") === "failed") node.addClass("failed");
+      // LLM call vs deterministic step: token usage is the ground truth — a
+      // node whose subtree consumed no tokens did its work without a model.
+      const tokens = (node.data("tokens_in") ?? 0) + (node.data("tokens_out") ?? 0);
+      if (tokens === 0) node.addClass("deterministic");
     });
 
     // Mark cycle (loop) members and their closing edge so a ReAct / retry loop

@@ -127,6 +127,11 @@ class OpenAIJudgeClient:
             "max_tokens": self._settings.judge_max_tokens,
             "temperature": 0,
         }
+        # Determinism knob (JUDGE_SEED): forwarded verbatim when configured.
+        # Backends that ignore "seed" still accept the request; None sends
+        # nothing so the default body is byte-identical to before.
+        if self._settings.judge_seed is not None:
+            body["seed"] = self._settings.judge_seed
         try:
             response = await self._http().post("/chat/completions", json=body)
             response.raise_for_status()

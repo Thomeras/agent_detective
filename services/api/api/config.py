@@ -17,3 +17,9 @@ class Settings(BaseSettings):
 
     api_port: int = 8000
     web_origin: str = "http://localhost:5173"
+
+    # HMAC key for evidence-ledger signature verification (env AUDIT_HMAC_KEY).
+    # The default is deliberately insecure and MUST be overridden in production:
+    # with the default key anyone can forge ledger signatures, so verification
+    # proves nothing. Must match the worker's Settings.audit_hmac_key.
+    audit_hmac_key: str = "dev-insecure-key"

@@ -225,6 +225,179 @@ def test_agent_name_falls_back_to_resource_attributes() -> None:
     assert run.agent_version == "3.1"
 
 
+def test_model_and_prompt_hash_span_attrs_win_over_resource() -> None:
+    span = _agent_span()
+    span["attributes"]["gen_ai.request.model"] = "span-model"
+    span["attributes"]["agent_detective.prompt_hash"] = "aaaa00000001"
+    span["attributes"]["agent_detective.tool_schema_hash"] = "cccc00000003"
+    span["resource_attributes"] = {
+        "gen_ai.request.model": "res-model",
+        "agent_detective.prompt_hash": "bbbb00000002",
+        "agent_detective.tool_schema_hash": "dddd00000004",
+    }
+    run = map_spans([span]).runs[0]
+    assert run.model_name == "span-model"
+    assert run.prompt_hash == "aaaa00000001"
+    assert run.tool_schema_hash == "cccc00000003"
+
+
+def test_model_and_prompt_hash_fall_back_to_resource_attributes() -> None:
+    span = _agent_span()
+    span["resource_attributes"] = {
+        "gen_ai.request.model": "res-model",
+        "agent_detective.prompt_hash": "bbbb00000002",
+        "agent_detective.tool_schema_hash": "dddd00000004",
+    }
+    run = map_spans([span]).runs[0]
+    assert run.model_name == "res-model"
+    assert run.prompt_hash == "bbbb00000002"
+    assert run.tool_schema_hash == "dddd00000004"
+
+
+def test_model_and_prompt_hash_are_none_when_absent() -> None:
+    run = map_spans([_agent_span()]).runs[0]
+    assert run.model_name is None
+    assert run.prompt_hash is None
+    assert run.tool_schema_hash is None
+
+
+def test_model_falls_back_to_first_member_llm_span_in_execution_order() -> None:
+    # Standard GenAI semconv emits gen_ai.request.model on child LLM spans,
+    # not the AGENT span. The earliest-starting member carrying it wins.
+    later = {
+        "trace_id": "t1",
+        "span_id": "s3",
+        "parent_span_id": "s1",
+        "start_time": "1752000003000000000",
+        "attributes": {"openinference.span.kind": "LLM", "gen_ai.request.model": "late-model"},
+    }
+    earlier = {
+        "trace_id": "t1",
+        "span_id": "s2",
+        "parent_span_id": "s1",
+        "start_time": "1752000001000000000",
+        "attributes": {"openinference.span.kind": "LLM", "gen_ai.request.model": "early-model"},
+    }
+    # Input order is later-first: execution order (start time) must win.
+    run = map_spans([_agent_span(), later, earlier]).runs[0]
+    assert run.model_name == "early-model"
+
+
+def test_opener_and_resource_model_win_over_member_llm_span() -> None:
+    child = {
+        "trace_id": "t1",
+        "span_id": "s2",
+        "parent_span_id": "s1",
+        "attributes": {"openinference.span.kind": "LLM", "gen_ai.request.model": "child-model"},
+    }
+    opener = _agent_span()
+    opener["attributes"]["gen_ai.request.model"] = "opener-model"
+    assert map_spans([opener, child]).runs[0].model_name == "opener-model"
+
+    via_resource = _agent_span(resource_attributes={"gen_ai.request.model": "res-model"})
+    assert map_spans([via_resource, child]).runs[0].model_name == "res-model"
+
+
+ARTIFACT_META = '[{"path":"out/report.md","size":10,"sha256":"aa","parse_ok":true}]'
+
+
+def test_artifact_meta_extracted_verbatim_from_opener_span() -> None:
+    span = _agent_span()
+    span["attributes"]["agent_detective.artifact_meta"] = ARTIFACT_META
+    run = map_spans([span]).runs[0]
+    assert run.artifact_meta == ARTIFACT_META
+
+
+def test_artifact_meta_absent_is_none() -> None:
+    assert map_spans([_agent_span()]).runs[0].artifact_meta is None
+
+
+def test_artifact_meta_has_no_resource_fallback() -> None:
+    # artifact_meta is per-run data: a resource-level value would smear one
+    # node's artifact onto every run exported under that resource.
+    span = _agent_span(resource_attributes={"agent_detective.artifact_meta": ARTIFACT_META})
+    assert map_spans([span]).runs[0].artifact_meta is None
+
+
+def test_artifact_meta_on_member_span_does_not_leak_to_the_run() -> None:
+    child = {
+        "trace_id": "t1",
+        "span_id": "s2",
+        "parent_span_id": "s1",
+        "attributes": {
+            "openinference.span.kind": "TOOL",
+            "agent_detective.artifact_meta": ARTIFACT_META,
+        },
+    }
+    assert map_spans([_agent_span(), child]).runs[0].artifact_meta is None
+
+
+def _tool_span(span_id: str, *, name: str, start: str, attrs: dict, status="ok") -> dict:
+    return {
+        "trace_id": "t1",
+        "span_id": span_id,
+        "parent_span_id": "s1",
+        "name": name,
+        "start_time": start,
+        "attributes": {"openinference.span.kind": "TOOL", **attrs},
+        "status": status,
+    }
+
+
+def test_tool_calls_digest_two_tools_including_error() -> None:
+    import hashlib
+    import json
+
+    args = '{"url": "https://example.com/p/1"}'
+    ok_tool = _tool_span(
+        "s2",
+        name="span.fetch",
+        start="1752000001000000000",
+        attrs={"gen_ai.tool.name": "fetch_page", "input.value": args},
+    )
+    # No gen_ai.tool.name -> span name; no input.value -> sha over ''.
+    err_tool = _tool_span(
+        "s3", name="parse_html", start="1752000002000000000", attrs={}, status="error"
+    )
+    # Input order is error-first: execution order (start time) must win.
+    run = map_spans([_agent_span(), err_tool, ok_tool]).runs[0]
+    assert run.tool_calls is not None
+    assert json.loads(run.tool_calls) == [
+        {
+            "name": "fetch_page",
+            "args_sha": hashlib.sha256(args.encode()).hexdigest()[:12],
+            "status": "ok",
+        },
+        {
+            "name": "parse_html",
+            "args_sha": hashlib.sha256(b"").hexdigest()[:12],
+            "status": "error",
+        },
+    ]
+    # Compact serialization: no whitespace after separators.
+    assert ": " not in run.tool_calls and ", " not in run.tool_calls
+
+
+def test_tool_calls_digest_tiebreaks_on_span_id_at_equal_start() -> None:
+    a = _tool_span("s2", name="a", start="1752000001000000000", attrs={})
+    b = _tool_span("s3", name="b", start="1752000001000000000", attrs={})
+    import json
+
+    run = map_spans([_agent_span(), b, a]).runs[0]
+    assert [t["name"] for t in json.loads(run.tool_calls)] == ["a", "b"]
+
+
+def test_tool_calls_is_none_without_tool_member_spans() -> None:
+    llm_child = {
+        "trace_id": "t1",
+        "span_id": "s2",
+        "parent_span_id": "s1",
+        "attributes": {"openinference.span.kind": "LLM"},
+    }
+    run = map_spans([_agent_span(), llm_child]).runs[0]
+    assert run.tool_calls is None  # None, never an empty array
+
+
 def test_edge_type_enum_matches_database_values() -> None:
     assert {e.value for e in EdgeType} == {"SPAWN", "A2A_MESSAGE", "TOOL_DELEGATION"}
     assert EdgeType.SPAWN == "SPAWN"

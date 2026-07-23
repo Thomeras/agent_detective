@@ -28,6 +28,12 @@ def test_spawn_pipeline_runs(fixture_json) -> None:
     orch = by_key[ORCH_KEY]
     assert orch.agent_name == "orchestrator"  # from resource attributes
     assert orch.agent_version == "1.4.0"
+    assert orch.model_name == "gpt-4o-mini"  # member LLM span fallback (semconv)
+    assert orch.prompt_hash == "ab12cd34ef56"  # span attribute
+    assert orch.artifact_meta == (
+        '[{"path":"out/products.json","size":2048,"sha256":"deadbeefcafe",'
+        '"declared_ext":"json","detected_kind":"json","parse_ok":true,"nonempty":true}]'
+    )  # raw opener-span attribute, passed through verbatim
     assert (orch.tokens_in, orch.tokens_out) == (1200, 300)  # AGENT span wins
     assert orch.cost_usd == pytest.approx(0.012)
     assert orch.input == "Find three products and translate them."
@@ -40,12 +46,24 @@ def test_spawn_pipeline_runs(fixture_json) -> None:
     scraper = by_key[SCRAPER_KEY]
     assert scraper.agent_name == "scraper-agent"  # span attribute
     assert scraper.agent_version == "0.9.2"  # resource attribute fallback
+    assert scraper.model_name == "claude-haiku-4-5"  # resource attribute fallback
+    assert scraper.prompt_hash is None  # never invented when absent
+    assert scraper.artifact_meta is None  # never invented when absent
     assert (scraper.tokens_in, scraper.tokens_out) == (800, 200)  # children sum
     assert scraper.cost_usd == pytest.approx(0.004)
+
+    assert scraper.tool_calls is None  # no TOOL member spans -> None
 
     retry = by_key[SCRAPER_RETRY_KEY]
     assert retry.agent_name == "scraper-agent"
     assert retry.tokens_in is None and retry.cost_usd is None
+    # Two TOOL member spans in execution order: named tool with hashed args,
+    # then an errored tool falling back to the span name with sha256('').
+    assert retry.tool_calls == (
+        '[{"name":"fetch_page","args_sha":"5bba4ef7e89c","status":"ok"},'
+        '{"name":"scraper.parse_html","args_sha":"e3b0c44298fc","status":"error"}]'
+    )
+    assert retry.status == "failed"  # the errored TOOL span fails the run
 
 
 def test_spawn_pipeline_edges(fixture_json) -> None:

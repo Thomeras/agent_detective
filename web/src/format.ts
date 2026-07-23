@@ -12,6 +12,12 @@ export function formatUsd(value: number | null | undefined): string {
 
 export function formatCost(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
+  if (value === 0) return "$0";
+  // LLM runs cost fractions of a cent: two decimals rendered real spend as
+  // "$0.00" while the per-node panel showed the money. Scale the precision to
+  // the magnitude instead of flooring small amounts away.
+  if (value < 0.01) return `$${value.toFixed(4)}`;
+  if (value < 1) return `$${value.toFixed(3)}`;
   return `$${value.toFixed(2)}`;
 }
 

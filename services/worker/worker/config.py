@@ -17,11 +17,12 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    @field_validator("cost_budget_default_usd", mode="before")
+    @field_validator("cost_budget_default_usd", "judge_seed", mode="before")
     @classmethod
     def _empty_str_is_none(cls, value: object) -> object:
-        # COST_BUDGET_DEFAULT_USD is intentionally unset in compose/.env, which
-        # arrives as an empty string; treat that as "no budget" (None).
+        # COST_BUDGET_DEFAULT_USD / JUDGE_SEED are intentionally unset in
+        # compose/.env, which arrives as an empty string; treat that as None
+        # ("no budget" / "no seed").
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
@@ -42,6 +43,10 @@ class Settings(BaseSettings):
     judge_timeout_s: float = 30.0
     judge_concurrency: int = 4
     judge_max_tokens: int = 1024
+    # Determinism knob: sent as "seed" in /chat/completions when set. Best
+    # effort — temperature=0 + seed still does not guarantee bitwise-identical
+    # completions on most backends; measure with scripts/determinism_probe.py.
+    judge_seed: int | None = None
 
     # Scoring weights and the renormalization floor (spec 4.3 step 2).
     score_w_schema: float = 0.35
@@ -59,15 +64,35 @@ class Settings(BaseSettings):
     # Cost budget per graph_type; None disables the cost_overrun flag.
     cost_budget_default_usd: float | None = None
 
+    # Artifact integrity (docs/deterministic-signals.md A1): a declared artifact
+    # smaller than this is treated as empty/truncated -> artifact_integrity_fail.
+    min_artifact_bytes: int = 64
+
     # Blame engine knobs (mirrors BlameConfig defaults).
     max_loop_iterations: int = 10
     blame_threshold: float = 0.5
     gap_threshold: float = 0.25
     min_drop: float = 0.10
+    # Cumulative degradation: total decline over >= cum_min_edges consecutive
+    # dropping edges that counts as an origin even without a single big drop.
+    cum_drop_threshold: float = 0.30
+    cum_min_edges: int = 2
+    cum_step_min: float = 0.05
 
     # Alerting.
     slack_webhook_url: str | None = None
     ui_base_url: str = "http://localhost:5173"
+
+    # Evidence-ledger HMAC key (roadmap 2.6). The default is intentionally
+    # loud about being insecure: it MUST be overridden in production
+    # (AUDIT_HMAC_KEY env var), otherwise the ledger's signatures prove
+    # nothing — anyone with the default key can forge them.
+    audit_hmac_key: str = "dev-insecure-key"
+
+    # Circuit breaker (roadmap 2.3): number of open incidents blamed on one
+    # agent that RECORDS an open breaker decision. Recording only — Agent
+    # Detective observes; enforcement happens only if the integration polls.
+    breaker_open_incidents: int = 3
 
     # Stream consumer operations.
     consumer_name: str = "worker-1"

@@ -1,0 +1,18 @@
+[project]
+name = "detective-sdk"
+version = "0.1.0"
+description = "Universal, dependency-free instrumentation helpers for Agent Detective conventions"
+requires-python = ">=3.12"
+dependencies = []
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

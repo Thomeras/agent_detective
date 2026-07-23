@@ -56,3 +56,41 @@ async def test_leaderboard_empty(client, repo):
     response = await client.get("/agents/leaderboard")
     assert response.status_code == 200
     assert response.json() == {"agents": []}
+
+
+async def test_leaderboard_group_by_version(client, repo, run_factory):
+    repo.runs = [
+        run_factory(uuid.uuid4(), agent_name="scraper-agent", agent_version="1.0.0", prompt_hash="hash-old", quality_score=0.5, cost_usd=Decimal("0.10")),
+        run_factory(uuid.uuid4(), agent_name="scraper-agent", agent_version="1.0.0", prompt_hash="hash-old", quality_score=0.7, cost_usd=Decimal("0.10"), status="failed"),
+        run_factory(uuid.uuid4(), agent_name="scraper-agent", agent_version="2.0.0", prompt_hash="hash-new", quality_score=0.9, cost_usd=Decimal("0.30")),
+    ]
+    response = await client.get("/agents/leaderboard", params={"group_by": "version"})
+    assert response.status_code == 200
+    agents = response.json()["agents"]
+    assert len(agents) == 2  # one row per identity tuple, not per agent
+
+    by_version = {a["agent_version"]: a for a in agents}
+    old = by_version["1.0.0"]
+    assert old["agent_name"] == "scraper-agent"
+    assert old["model_name"] == "mock-model"
+    assert old["prompt_hash"] == "hash-old"
+    assert old["run_count"] == 2
+    assert old["failure_rate"] == pytest.approx(0.5)
+    assert old["avg_quality_score"] == pytest.approx(0.6)
+
+    new = by_version["2.0.0"]
+    assert new["prompt_hash"] == "hash-new"
+    assert new["run_count"] == 1
+    assert new["total_cost_usd"] == pytest.approx(0.30)
+
+
+async def test_leaderboard_without_param_has_no_version_fields(client, repo, run_factory):
+    # Default behavior unchanged without group_by.
+    repo.runs = [run_factory(uuid.uuid4(), agent_name="scraper-agent")]
+    agent = (await client.get("/agents/leaderboard")).json()["agents"][0]
+    assert set(agent) == {"agent_name", "total_cost_usd", "run_count", "failure_rate", "avg_quality_score"}
+
+
+async def test_leaderboard_rejects_unknown_group_by(client):
+    response = await client.get("/agents/leaderboard", params={"group_by": "model"})
+    assert response.status_code == 422

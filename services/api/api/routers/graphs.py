@@ -1,7 +1,8 @@
-"""Graph endpoints: list, cytoscape-shaped detail, run payloads, manual analyze."""
+"""Graph endpoints: list, cytoscape-shaped detail, run payloads, manual analyze,
+version diff, policy decisions (shadow observations) and human feedback."""
 
 from datetime import datetime, timezone
-from typing import Annotated, Any
+from typing import Annotated, Any, Mapping
 from uuid import UUID, uuid4
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -100,3 +101,116 @@ async def analyze_graph(
     }
     stream_id = await publisher.publish_tier2(message)
     return AnalyzeResponse(dedup_key=dedup_key, stream_id=stream_id)
+
+
+# --- Version diff (roadmap 2.1: "why did it work yesterday?") ---
+
+_IDENTITY_FIELDS = ["agent_version", "model_name", "prompt_hash", "tool_schema_hash"]
+
+_EPOCH = datetime.min.replace(tzinfo=timezone.utc)
+
+
+def _latest_identity_per_agent(runs: list[Mapping[str, Any]]) -> dict[Any, dict[str, Any]]:
+    """Per agent_name, the identity fields of the latest run by started_at.
+
+    Runs without started_at sort earliest; ties break on run_id for determinism.
+    """
+    latest_run: dict[Any, Mapping[str, Any]] = {}
+
+    def order(run: Mapping[str, Any]) -> tuple[datetime, str]:
+        return (run.get("started_at") or _EPOCH, str(run["run_id"]))
+
+    for run in runs:
+        name = run.get("agent_name")
+        if name not in latest_run or order(run) > order(latest_run[name]):
+            latest_run[name] = run
+    return {
+        name: {field: run.get(field) for field in _IDENTITY_FIELDS}
+        for name, run in latest_run.items()
+    }
+
+
+@router.get("/graphs/{graph_id}/version-diff")
+async def version_diff(graph_id: UUID, repo: Repo, against: str = "last_clean") -> dict[str, Any]:
+    graph = await repo.get_graph(graph_id)
+    if graph is None:
+        raise HTTPException(status_code=404, detail="graph not found")
+
+    if against == "last_clean":
+        against_mode = "last_clean"
+        # Most recent OTHER finalized graph with zero incidents rows; None when
+        # no such graph exists (then every baseline below is null — no guessing).
+        baseline_graph = await repo.find_last_clean_graph(exclude_graph_id=graph_id)
+        baseline_id = baseline_graph["graph_id"] if baseline_graph is not None else None
+    else:
+        against_mode = "explicit"
+        try:
+            baseline_id = UUID(against)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="against must be 'last_clean' or a graph UUID")
+        if await repo.get_graph(baseline_id) is None:
+            raise HTTPException(status_code=404, detail="against graph not found")
+
+    current = _latest_identity_per_agent(await repo.list_runs(graph_id))
+    baseline = _latest_identity_per_agent(await repo.list_runs(baseline_id)) if baseline_id else {}
+
+    per_agent = []
+    for agent_name in sorted(current, key=str):
+        cur, base = current[agent_name], baseline.get(agent_name)
+        # changed = fields whose values differ; null-vs-value counts as changed.
+        # With no baseline (agent absent / no clean graph) there is nothing to
+        # diff against, so changed stays empty and baseline is null.
+        changed = [f for f in _IDENTITY_FIELDS if base is not None and cur[f] != base[f]]
+        per_agent.append(
+            {"agent_name": agent_name, "current": cur, "baseline": base, "changed": changed}
+        )
+    return {
+        "graph_id": str(graph_id),
+        "against": str(baseline_id) if baseline_id else None,
+        "against_mode": against_mode,
+        "per_agent": per_agent,
+    }
+
+
+# --- Policy decisions (roadmap 2.2, shadow mode) ---
+
+
+@router.get("/graphs/{graph_id}/policy-decisions")
+async def get_policy_decisions(graph_id: UUID, repo: Repo) -> dict[str, Any]:
+    """Shadow-mode gate observations: 'would_block'/'would_warn' annotations
+    recorded post-hoc — Agent Detective observed, it did not intercept."""
+    if await repo.get_graph(graph_id) is None:
+        raise HTTPException(status_code=404, detail="graph not found")
+    rows = await repo.list_policy_decisions(graph_id)
+    return {
+        "decisions": [
+            json_row(row, ["rule_name", "decision", "detail", "mode", "created_at"]) for row in rows
+        ]
+    }
+
+
+# --- Human feedback (roadmap 2.7: ground-truth labels) ---
+
+
+class FeedbackBody(BaseModel):
+    # label is validated by hand so a bad value returns the contract's 400
+    # (pydantic Literal would produce a 422 instead).
+    label: str
+    culprit_run_id: str | None = None
+    note: str | None = None
+
+
+@router.post("/graphs/{graph_id}/feedback")
+async def post_feedback(graph_id: UUID, body: FeedbackBody, repo: Repo) -> dict[str, Any]:
+    if body.label not in ("ok", "bad"):
+        raise HTTPException(status_code=400, detail="label must be 'ok' or 'bad'")
+    culprit_run_id: UUID | None = None
+    if body.culprit_run_id is not None:
+        try:
+            culprit_run_id = UUID(body.culprit_run_id)
+        except ValueError:
+            raise HTTPException(status_code=400, detail="culprit_run_id must be a UUID")
+    if await repo.get_graph(graph_id) is None:
+        raise HTTPException(status_code=404, detail="graph not found")
+    label_id = await repo.insert_feedback(graph_id, body.label, culprit_run_id, body.note)
+    return {"id": label_id}

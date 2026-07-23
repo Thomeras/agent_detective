@@ -20,6 +20,8 @@ def test_malformed_unknown_agent_fields_are_none(fixture_json) -> None:
     for run in result.runs:
         assert run.agent_name is None
         assert run.agent_version is None
+        assert run.model_name is None
+        assert run.prompt_hash is None
         assert run.tokens_in is None
         assert run.tokens_out is None
         assert run.cost_usd is None

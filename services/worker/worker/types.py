@@ -28,6 +28,8 @@ FLAG_COST_OVERRUN = "cost_overrun"
 FLAG_LOOP_ANOMALY = "loop_anomaly"
 FLAG_SCHEMA_VIOLATION = "schema_violation"
 FLAG_DEGENERATE_OUTPUT = "degenerate_output"
+FLAG_ARTIFACT_INTEGRITY = "artifact_integrity"
+FLAG_REQUIRED_SECTION = "required_section_missing"
 
 
 @dataclass(frozen=True)
@@ -49,6 +51,19 @@ class RunRecord:
     tokens_out: int | None
     started_at: datetime | None
     ended_at: datetime | None
+    # Raw ``agent_detective.artifact_meta`` span attribute (JSON array string)
+    # landed by ingest. OUT-OF-BAND by design: payload text is forgeable by
+    # document content, span attributes are not — integrity checks read ONLY
+    # this field, never the payload (docs/deterministic-signals.md).
+    artifact_meta: str | None = None
+    # Compact JSON digest of the run's TOOL spans, derived by otel_mapper and
+    # landed by ingest (migration 0007): array of {"name", "args_sha",
+    # "status"} in execution order. None when the run had no TOOL spans.
+    # Text on purpose — checks parse it tolerantly.
+    tool_calls: str | None = None
+    # Fingerprint of the tool schema the run executed under (migration 0009);
+    # completes the per-run identity tuple used by version-diff views.
+    tool_schema_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -73,13 +88,41 @@ class GraphBundle:
 
 @dataclass(frozen=True)
 class AgentStat:
-    """Baseline statistics for one agent_name within a graph_type."""
+    """Baseline statistics for one agent_name within a graph_type.
+
+    The ``*_m2`` fields are Welford running-variance accumulators (sum of
+    squared deviations from the running mean, migration 0007); the ``*_std``
+    fields remain the derived view (``sqrt(m2 / (n - 1))`` for n > 1). New
+    fields are appended with ``None`` defaults so existing keyword and
+    positional construction stays valid.
+    """
 
     tokens_out_mean: float | None
     tokens_out_std: float | None
     iterations_mean: float | None
     iterations_std: float | None
     sample_count: int | None
+    cost_mean: float | None = None
+    cost_std: float | None = None
+    tokens_out_m2: float | None = None
+    cost_m2: float | None = None
+    iterations_m2: float | None = None
+
+
+@dataclass(frozen=True)
+class CheckRule:
+    """One registered deterministic requirement (``check_rules`` row).
+
+    ``agent_name`` / ``graph_type`` are None for "applies to any"; ``kind``
+    is one of 'required_section' | 'sum_invariant' | 'tool_schema' (DB CHECK
+    constraint); ``spec`` holds the kind-specific rule payload.
+    """
+
+    id: int
+    agent_name: str | None
+    graph_type: str | None
+    kind: str
+    spec: dict[str, Any]
 
 
 @dataclass(frozen=True)
@@ -94,12 +137,22 @@ class Tier1Verdict:
     """A tier1 verdict row (upsert payload and read result)."""
 
     graph_id: UUID
-    terminal_judge_verdict: str  # 'ok' | 'bad' | 'error'
+    terminal_judge_verdict: str  # 'ok' | 'bad' | 'not_checkable' | 'error'
     terminal_judge_score: float | None
     terminal_judge_reasoning: str | None
     flags: list[str]
     flagged: bool
     sampled: bool
+    # Fingerprint of the rule set + check settings the verdict was computed
+    # under (signals.check_rules_fingerprint, migration 0008). Lets a later
+    # reconciliation distinguish "rules changed" from "artifact/payload
+    # diverged" with certainty. None on verdicts that predate stamping.
+    check_rules_hash: str | None = None
+    # Fingerprint of the worker's OWN judge prompts (12 hex of sha256 over the
+    # sorted worker/prompts/*.md bytes, migration 0009) so calibration can be
+    # sliced by judge-prompt version. The judge MODEL is not recorded — a
+    # known limitation. None on verdicts that predate stamping.
+    judge_prompt_hash: str | None = None
 
 
 @dataclass(frozen=True)
@@ -140,6 +193,50 @@ class BlameDraft:
     downstream_cost_usd: float
     unscored_run_ids: list[UUID]
     evidence: dict[str, Any]
+    # Judge-prompt fingerprint the blame analysis ran under (migration 0009).
+    judge_prompt_hash: str | None = None
+
+
+@dataclass(frozen=True)
+class PolicyRule:
+    """One enabled ``policy_rules`` row (shadow policy gate, roadmap 2.2).
+
+    ``predicate`` is the JSONB DSL v1 dict; ``action`` is 'warn' | 'block';
+    ``shadow`` is always true in v1 — rules annotate, they never intercept.
+    """
+
+    id: int
+    name: str
+    predicate: dict[str, Any]
+    action: str
+    shadow: bool
+    enabled: bool
+
+
+@dataclass(frozen=True)
+class PolicyDecision:
+    """One rule firing on a graph. ``decision`` is 'would_block' |
+    'would_warn' — the names keep the honesty requirement (shadow mode
+    records what WOULD have happened; nothing was blocked)."""
+
+    rule_name: str
+    decision: str
+    detail: str | None
+
+
+@dataclass(frozen=True)
+class BreakerState:
+    """One recorded circuit-breaker decision (``breaker_state`` row).
+
+    A RECORD of a decision, not an enforcement: Agent Detective observes and
+    cannot stop anything — enforcement only happens if the integration polls
+    this state.
+    """
+
+    scope_kind: str  # 'agent_name' | 'agent_version'
+    scope_value: str
+    state: str  # 'open' | 'closed'
+    reason: str | None
 
 
 @dataclass(frozen=True)
