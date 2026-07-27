@@ -106,6 +106,7 @@ def _run_record(candidate: AgentRunCandidate) -> RunRecord:
         started_at=_epoch(candidate.start_time),
         ended_at=_epoch(candidate.end_time),
         artifact_meta=candidate.artifact_meta,
+        contract_params=candidate.contract_params,
         tool_calls=candidate.tool_calls,
         tool_schema_hash=candidate.tool_schema_hash,
     )

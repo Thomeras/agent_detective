@@ -148,3 +148,20 @@ class TestBundles:
     def test_total_cost_is_none_when_no_run_reported_one(self):
         # Absent cost data must not render as $0.00 — that is a claim.
         assert bundles_from_exports([linear_pipeline()])[0].total_cost_usd is None
+
+    def test_contract_params_attribute_reaches_the_run_record(self):
+        # span.contract(...) lands as agent_detective.contract_params; local
+        # mode must carry it into the RunRecord, or the deterministic contract
+        # check silently never runs on a check the deployed ingest does store.
+        declared = '{"price": "$12/user/month"}'
+        spans = [
+            span(
+                name="writer.run",
+                span_id="a" * 16,
+                agent_name="writer",
+                extra_attributes={"agent_detective.contract_params": declared},
+            )
+        ]
+        bundle = bundles_from_exports([export(spans)])[0]
+        run = next(r for r in bundle.runs if r.agent_name == "writer")
+        assert run.contract_params == declared

@@ -387,6 +387,30 @@ def test_contract_propagation_param_match_corrected():
     assert results[0]["basis"] == "contract param match"
 
 
+def test_contract_propagation_declared_key_outside_builtin_list_verifies():
+    """A breach on a DECLARED key (span.contract(price=...)) must be observable
+    in the deliverable: the collection widens by the violations' own keys — the
+    same widening contract_violations applies on the output side. Without it,
+    propagation on declared contracts could never verify (found via
+    examples/diamond_eval.py, where the shipped rewrite reported unverified)."""
+    from worker.tier2 import contract_propagation_check
+
+    violation = {
+        "run_id": "r-mkt",
+        "agent": "marketing_writer",
+        "key": "price",
+        "from": "$12/user/month",
+        "to": "from $5/user/month",
+    }
+    results = contract_propagation_check(
+        [violation], "r-edit", "press_editor", '{"price": "from $5/user/month"}'
+    )
+
+    assert len(results) == 1
+    assert results[0]["status"] == "propagated"
+    assert results[0]["basis"] == "contract param match"
+
+
 def test_propagated_breach_claims_no_content_recovery_when_content_was_unmeasured():
     """A --no-judge run must not be told its content recovered.
 

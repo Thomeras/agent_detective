@@ -74,6 +74,49 @@ channel needs nothing but the trace. Set `JUDGE_BASE_URL` / `JUDGE_MODEL`
 (any OpenAI-compatible endpoint) to also turn on the per-node quality judge —
 without it, nodes report *unscored*, never silently "fine".
 
+## Example: catch a fault in a diamond topology
+
+[examples/diamond_eval.py](examples/diamond_eval.py) instruments a diamond —
+one extractor, two parallel writers, one editor — and gates on the verdict.
+Each writer declares the facts it was handed as a **contract**; `--inject`
+makes the marketing branch silently rewrite the price:
+
+```python
+with r.branch("marketing_writer", input=facts) as s:
+    s.contract(price=facts["price"], availability=facts["availability"])
+    s.output = write_marketing(facts, inject)    # --inject rewrites the price
+```
+
+```bash
+$ python examples/diamond_eval.py --inject
+graph 0a68bb06: cut_point — culprit: marketing_writer    # exit code 1
+```
+
+The verdict names the branch that rewrote the fact — not the editor who merged
+it downstream — and verifies the breach actually shipped, all with no LLM:
+
+```
+FAILED  ·  cut_point  ·  confidence 95%
+
+Origin — where quality broke
+  marketing_writer
+
+● Contract breach — marketing_writer
+  supporting: contract_breach (rule input_contract:price)
+  supporting: breach_propagated at terminal (contract-propagation check on the deliverable)
+
+Deterministic signals
+  fail contract_violation (marketing_writer) price: $12/user/month → from $5/user/month
+```
+
+Point the same script at the full stack and the graph appears in the web UI:
+
+```bash
+AGENT_DETECTIVE_ENDPOINT=http://localhost:8001 python examples/diamond_eval.py --inject
+```
+
+<!-- TODO(screenshot): web UI graph view of the injected diamond run -->
+
 ## Full stack — continuous ingest, inbox, history
 
 ```bash

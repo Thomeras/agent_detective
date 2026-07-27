@@ -329,9 +329,16 @@ def contract_propagation_check(
     # either outcome — that is "unverified", the status this function already has
     # for "nothing observable", and it must not be resolved by whichever value
     # the walk reached first.
+    # Widened by the violations' own keys, mirroring contract_violations'
+    # out_keys: a breach on a DECLARED key outside the built-in list must be
+    # observable in the deliverable too, or propagation on declared contracts
+    # could never verify.
+    violation_keys = frozenset(
+        str(v.get("key", "")).lower() for v in contract_violations if v.get("key")
+    )
     params = (
         _unambiguous_contract_params(
-            _collect_contract_params(structured, _CONTRACT_KEYS)
+            _collect_contract_params(structured, _CONTRACT_KEYS | violation_keys)
         )
         if structured
         else {}
