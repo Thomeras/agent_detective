@@ -76,7 +76,8 @@ jobs:
       - name: Build agent-detective and its workspace dependencies
         run: |
           set -e
-          for pkg in blame-engine otel-mapper agent-detective-worker agent-detective; do
+          for pkg in blame-engine otel-mapper detective-sdk detective-ci \
+                     agent-detective-worker agent-detective; do
             uv build --package "$pkg"
           done
           ls -l dist/

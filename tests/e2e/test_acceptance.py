@@ -167,8 +167,12 @@ def test_faulted_run_produces_cut_point_incident_on_scraper() -> None:
     culprit_names = [name_by_run.get(rid) for rid in full.get("culprit_run_ids", [])]
     assert culprit_names == ["scraper-agent"], culprit_names
 
+    # The propagation path is loop-aware: the compliance -> scraper retry puts
+    # scraper-agent on the path twice (attempt #1's fault flowed through
+    # attempt #2 before reaching compliance and the shipped deliverable).
     path_names = [name_by_run.get(rid) for rid in full.get("propagation_path", [])]
     assert path_names == [
+        "scraper-agent",
         "scraper-agent",
         "compliance-agent",
         "publisher-agent",

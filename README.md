@@ -199,7 +199,8 @@ Building the pip distribution (CI does this on every push, then installs it
 into a clean environment and analyses the demo traces with it):
 
 ```bash
-for p in blame-engine otel-mapper agent-detective-worker agent-detective; do
+for p in blame-engine otel-mapper detective-sdk detective-ci \
+         agent-detective-worker agent-detective; do
   uv build --package "$p"
 done
 ```
