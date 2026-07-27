@@ -11,6 +11,45 @@ agent step and emits exactly the same standard spans — see
 [Nothing instrumented yet](#nothing-instrumented-yet-detective-sdk) below. It is
 optional and dependency-free; you are never locked into it.
 
+## Step by step
+
+**1. Pick a receiver.** One run locally: `detective capture` (from
+`pip install agent-detective`, listens on `127.0.0.1:8900`). Continuous
+ingest: the compose stack (`docker compose up`, listens on `:8001`). Same
+endpoint, same spans — nothing in your agent changes between them.
+
+**2. Pick your path.**
+
+- **A — already emit OTEL** (OpenInference / OpenLLMetry): two env vars and
+  you are done:
+
+  ```bash
+  export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+  export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:8900   # or http://<host>:8001
+  ```
+
+- **B — nothing instrumented yet**: `detective-sdk`, a context manager per
+  step → [Nothing instrumented yet](#nothing-instrumented-yet-detective-sdk).
+
+- **C — framework auto-instrumentation** (LangGraph, CrewAI, …): three lines
+  with `detective_sdk.otel.collect` →
+  [Framework adapters](#framework-adapters-eg-langgraph).
+
+**3. Put the work in the payloads.** `output.value` must carry the step's
+actual product (the document, the rows, the answer) — never a status record
+like `{"ok": true}`; a judge handed a progress ping grades the ping.
+
+**4. Verify.**
+
+```bash
+detective doctor run.json
+```
+
+It reports what the trace can and cannot support, with a concrete fix per
+finding — before you trust any verdict built on it.
+
+Everything below is the detail behind these four steps.
+
 ## Two receivers, one protocol
 
 Both ends of Agent Detective speak the same endpoint, so instrumentation is

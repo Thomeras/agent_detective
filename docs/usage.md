@@ -1,10 +1,87 @@
 # Using Agent Detective
 
 One page that routes you through the whole product: instrumenting an agent,
-analyzing its runs, and consuming verdicts from CI or another agent. Depth
-lives in the linked docs; this page is the map.
+analyzing its runs, and consuming verdicts from CI or another agent. Start
+with the step-by-step; everything below it is the detail behind each step.
 
-**Pick your role:**
+## Step by step: zero → verdict
+
+**1. Install.**
+
+```bash
+pip install agent-detective
+```
+
+**2. Start a receiver** (terminal 1). It waits for one run, saves it, and
+analyzes it the moment your agent finishes:
+
+```bash
+detective capture --once --out run.json
+```
+
+**3. Point your agent at it** (terminal 2) — pick one:
+
+*Your agent already emits OpenTelemetry (OpenInference / OpenLLMetry):*
+
+```bash
+export OTEL_EXPORTER_OTLP_PROTOCOL=http/json
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://127.0.0.1:8900
+python -m your_agent
+```
+
+*Nothing instrumented yet — add `detective-sdk` (pure stdlib, zero deps):*
+
+```python
+from detective_sdk import run
+
+with run("my-pipeline", task=user_request) as r:
+    with r.step("write") as s:
+        s.output = the_actual_result       # the work, not {"ok": true}
+```
+
+```bash
+AGENT_DETECTIVE_ENDPOINT=http://127.0.0.1:8900 python -m your_agent
+```
+
+**4. Read the verdict.** Terminal 1 prints it when the run ends; exit code 1
+means an incident. Re-analyze the saved trace any time:
+
+```bash
+detective analyze run.json --markdown   # findings brief for a coding agent
+detective analyze run.json --json       # complete typed verdict
+```
+
+**5. Trust check.** Ask what this trace can actually support — every finding
+comes with a concrete fix:
+
+```bash
+detective doctor run.json
+```
+
+**6. Optional — per-node LLM judge.** Off by default; without it nodes report
+*unscored*, never silently "fine":
+
+```bash
+JUDGE_BASE_URL=http://localhost:11434/v1 JUDGE_MODEL=qwen2.5 \
+  detective analyze run.json
+```
+
+**7. Optional — CI gate.**
+
+```bash
+detective analyze run.json --fail-on-unverified   # exit 1 on incident OR unmeasurable trace
+```
+
+**8. Optional — the full stack** (incident inbox, graph UI, cross-run history):
+
+```bash
+docker compose up --build     # web UI at :5173, ingest at :8001
+```
+
+---
+
+That is the whole loop. The rest of this page is the detail, organized by
+role:
 
 | You are… | Start at |
 |---|---|
