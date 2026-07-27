@@ -19,8 +19,12 @@ import type {
 } from "../api/types";
 import { classifyTopology } from "../topology";
 import BlameReportPanel from "../components/BlameReportPanel";
+import DefectCard from "../components/DefectCard";
 import GraphCanvas, { detectLoops } from "../components/GraphCanvas";
 import { EmptyState, ErrorState, Loading, Panel, StatusBadge, TypeBadge } from "../components/ui";
+import { Badge, Disclosure } from "../ui/primitives";
+import { toSchemaTwo, type SchemaTwoEvidence } from "../verdict/types";
+import { defectDescriptor, originPhrase, verdictDescriptor } from "../verdict/descriptor";
 import {
   formatConfidence,
   formatCost,
@@ -503,6 +507,88 @@ function FeedbackPanel({
   );
 }
 
+// The ANSWER, first (§9.2): the verdict badge + the projected verdict sentence,
+// derived from the typed report_type — never from a note string.
+function VerdictBanner({
+  reportType,
+  evidence,
+  labelFor,
+}: {
+  reportType: ReportType | null;
+  evidence: SchemaTwoEvidence;
+  labelFor: (runId: string) => string;
+}) {
+  const verdict = verdictDescriptor(reportType);
+  // A compact per-defect summary line, so the header answers "where / what kind"
+  // without scrolling to the cards. Claims nothing beyond each defect's own
+  // kind + origin (§2.4).
+  const defectLines = evidence.defects.map((d, i) => {
+    const desc = defectDescriptor(d.kind, d.origin);
+    const where = originPhrase(d.origin, labelFor);
+    return {
+      key: `${d.kind}-${i}`,
+      text: `${desc.label} at ${where}`,
+      tone: desc.tone,
+    };
+  });
+  return (
+    <div className={`verdict-banner ad-tone-${verdict.tone}`}>
+      <div className="verdict-banner-head">
+        <Badge tone={verdict.tone}>{verdict.label}</Badge>
+        <span className="verdict-sentence">{verdict.template}</span>
+      </div>
+      {defectLines.length > 0 && (
+        <ul className="verdict-defect-lines">
+          {defectLines.map((l) => (
+            <li key={l.key}>
+              <span className={`verdict-dot ad-tone-${l.tone}`} aria-hidden />
+              {l.text}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
+// The primary object of the screen (§9.2): one DefectCard per Defect. Selecting
+// a card lifts its index so the container can highlight that defect's path on
+// the canvas.
+function DefectCardsSection({
+  evidence,
+  labelFor,
+  selectedDefectIndex,
+  onSelectDefect,
+}: {
+  evidence: SchemaTwoEvidence;
+  labelFor: (runId: string) => string;
+  selectedDefectIndex: number | null;
+  onSelectDefect: (index: number | null) => void;
+}) {
+  if (evidence.defects.length === 0) {
+    return (
+      <EmptyState
+        title="No defect localised"
+        hint="Analysis ran and found nothing to blame — a clean or inconclusive verdict."
+      />
+    );
+  }
+  return (
+    <div className="defect-grid">
+      {evidence.defects.map((defect, i) => (
+        <DefectCard
+          key={`${defect.kind}-${defect.origin.kind}-${i}`}
+          defect={defect}
+          findings={evidence.findings}
+          labelFor={labelFor}
+          selected={selectedDefectIndex === i}
+          onSelect={() => onSelectDefect(selectedDefectIndex === i ? null : i)}
+        />
+      ))}
+    </div>
+  );
+}
+
 export default function GraphView({ graphId, incidentId }: { graphId: string; incidentId: number | null }) {
   const graphState = useAsync<GraphDetail>(() => api.getGraph(graphId), [graphId]);
   const incidentState = useAsync(
@@ -511,11 +597,18 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
   );
 
   const [selectedRunId, setSelectedRunId] = useState<string | null>(null);
+  const [selectedDefectIndex, setSelectedDefectIndex] = useState<number | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
   const [analyzeMsg, setAnalyzeMsg] = useState<string | null>(null);
 
   const graph = graphState.data;
   const report = incidentState.data?.latest_report ?? null;
+
+  // Legacy gate (§2.5): schema-2 evidence renders through the new defect-card
+  // path; schema-1 / absent evidence falls back to the existing BlameReportPanel.
+  const schemaTwo: SchemaTwoEvidence | null = report
+    ? toSchemaTwo(report.evidence)
+    : null;
 
   const nodeById = useMemo(() => {
     const map = new Map<string, RunNodeData>();
@@ -528,16 +621,35 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
     [nodeById],
   );
 
-  const culprits = useMemo(() => new Set(report?.culprit_run_ids ?? []), [report]);
-  const pathNodes = useMemo(() => new Set(report?.propagation_path ?? []), [report]);
+  // Canvas highlight: when a schema-2 defect card is selected, highlight THAT
+  // defect's origin + propagation path; otherwise fall back to the report-level
+  // culprits/path (the legacy fields are dual-written, so this works either way).
+  const highlight = useMemo(() => {
+    if (schemaTwo && selectedDefectIndex !== null) {
+      const defect = schemaTwo.defects[selectedDefectIndex];
+      if (defect) {
+        const originRun =
+          defect.origin.kind === "localized" ? [defect.origin.run_id] : [];
+        const path = [...originRun, ...defect.propagation];
+        return { culprits: originRun, path };
+      }
+    }
+    return {
+      culprits: report?.culprit_run_ids ?? [],
+      path: report?.propagation_path ?? [],
+    };
+  }, [schemaTwo, selectedDefectIndex, report]);
+
+  const culprits = useMemo(() => new Set(highlight.culprits), [highlight]);
+  const pathNodes = useMemo(() => new Set(highlight.path), [highlight]);
   const pathEdgeKeys = useMemo(() => {
     const keys = new Set<string>();
-    const path = report?.propagation_path ?? [];
+    const path = highlight.path;
     for (let i = 0; i + 1 < path.length; i++) {
       keys.add(`${path[i]}|${path[i + 1]}`);
     }
     return keys;
-  }, [report]);
+  }, [highlight]);
 
   const selectedNode = selectedRunId ? nodeById.get(selectedRunId) ?? null : null;
 
@@ -606,59 +718,94 @@ export default function GraphView({ graphId, incidentId }: { graphId: string; in
       {graphState.error && <ErrorState message={graphState.error} onRetry={graphState.reload} />}
 
       {graph && !graphState.loading && (
-        <div className="graph-layout">
-          <div className="graph-main">
-            <Legend graph={graph} report={report ?? null} />
-            {graph.nodes.length === 0 ? (
-              <EmptyState title="This graph has no runs yet" />
-            ) : (
-              <GraphCanvas
-                graph={graph}
-                culprits={culprits}
-                pathNodes={pathNodes}
-                pathEdgeKeys={pathEdgeKeys}
-                selectedRunId={selectedRunId}
-                onNodeSelect={setSelectedRunId}
+        <>
+          {/* Answer first (§9.2): the verdict + defect cards lead; the canvas is
+              demoted to a supporting visual below. Schema-2 only — legacy
+              reports keep the old BlameReportPanel in the aside. */}
+          {schemaTwo && report && (
+            <div className="verdict-region">
+              <VerdictBanner
+                reportType={report.report_type}
+                evidence={schemaTwo}
+                labelFor={labelFor}
               />
-            )}
-          </div>
+              <DefectCardsSection
+                evidence={schemaTwo}
+                labelFor={labelFor}
+                selectedDefectIndex={selectedDefectIndex}
+                onSelectDefect={setSelectedDefectIndex}
+              />
+              <FeedbackPanel graphId={graphId} reportType={report.report_type} />
+              <Disclosure summary="Raw evidence (schema-2 JSON)">
+                <pre className="payload-pre">{JSON.stringify(schemaTwo, null, 2)}</pre>
+              </Disclosure>
+            </div>
+          )}
 
-          <aside className="graph-side">
-            {selectedNode && <NodePanel node={selectedNode} graphId={graphId} />}
+          <div className="graph-layout">
+            <div className="graph-main">
+              <Legend graph={graph} report={report ?? null} />
+              {graph.nodes.length === 0 ? (
+                <EmptyState title="This graph has no runs yet" />
+              ) : (
+                <GraphCanvas
+                  graph={graph}
+                  culprits={culprits}
+                  pathNodes={pathNodes}
+                  pathEdgeKeys={pathEdgeKeys}
+                  selectedRunId={selectedRunId}
+                  onNodeSelect={setSelectedRunId}
+                />
+              )}
+            </div>
 
-            {incidentState.loading && <Loading label="Loading incident" />}
-            {incidentState.error && (
-              <ErrorState message={incidentState.error} onRetry={incidentState.reload} />
-            )}
-            {report ? (
-              <>
-                <BlameReportPanel report={report} labelFor={labelFor} onSelectRun={setSelectedRunId} />
-                {/* Feedback lives in the container, not BlameReportPanel —
-                    the report panel stays presentational. */}
-                <FeedbackPanel graphId={graphId} reportType={report.report_type} />
-              </>
-            ) : (
-              incidentId !== null &&
-              !incidentState.loading && (
-                <Panel title="Blame report">
+            <aside className="graph-side">
+              {selectedNode && <NodePanel node={selectedNode} graphId={graphId} />}
+
+              {incidentState.loading && <Loading label="Loading incident" />}
+              {incidentState.error && (
+                <ErrorState message={incidentState.error} onRetry={incidentState.reload} />
+              )}
+
+              {/* Legacy gate: schema-1 / absent evidence renders through the
+                  existing panel; schema-2 is handled by the cards above. */}
+              {report && !schemaTwo ? (
+                <>
+                  <BlameReportPanel
+                    report={report}
+                    labelFor={labelFor}
+                    onSelectRun={setSelectedRunId}
+                  />
+                  {/* Feedback lives in the container, not BlameReportPanel —
+                      the report panel stays presentational. */}
+                  <FeedbackPanel graphId={graphId} reportType={report.report_type} />
+                </>
+              ) : !report ? (
+                incidentId !== null &&
+                !incidentState.loading && (
+                  <Panel title="Blame report">
+                    <EmptyState
+                      title="No blame report"
+                      hint={`Incident #${incidentId} has no latest blame report yet. Confidence: ${formatConfidence(
+                        null,
+                      )}`}
+                    />
+                  </Panel>
+                )
+              ) : null}
+              {incidentId === null && !selectedNode && (
+                <Panel title="Details">
                   <EmptyState
-                    title="No blame report"
-                    hint={`Incident #${incidentId} has no latest blame report yet. Confidence: ${formatConfidence(
-                      null,
-                    )}`}
+                    title="Select a node"
+                    hint="Click any node to inspect its run and payloads."
                   />
                 </Panel>
-              )
-            )}
-            {incidentId === null && !selectedNode && (
-              <Panel title="Details">
-                <EmptyState title="Select a node" hint="Click any node to inspect its run and payloads." />
-              </Panel>
-            )}
-            <PolicyDecisionsPanel graphId={graphId} />
-            <VersionDiffPanel graphId={graphId} />
-          </aside>
-        </div>
+              )}
+              <PolicyDecisionsPanel graphId={graphId} />
+              <VersionDiffPanel graphId={graphId} />
+            </aside>
+          </div>
+        </>
       )}
     </div>
   );

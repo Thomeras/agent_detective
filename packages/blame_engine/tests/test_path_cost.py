@@ -17,6 +17,25 @@ def test_cost_counts_culprit_and_descendants_not_siblings(mk) -> None:
     assert downstream_cost(inp, []) == pytest.approx(0.0)
 
 
+def test_cost_unknown_when_no_affected_node_was_priced(mk) -> None:
+    """All-unknown costs must report None, never $0.
+
+    An instrumentation that never sets `gen_ai.usage.cost` (most of them) used
+    to get a confident "this defect cost $0.0000" — a measurement-shaped claim
+    about something nobody measured.
+    """
+    inp = mk(nodes=["s", "a", "b"], edges=[("s", "a"), ("a", "b")],
+             costs={"s": None, "a": None, "b": None})
+    assert downstream_cost(inp, ["a"]) is None
+
+
+def test_cost_partial_knowledge_sums_what_is_known(mk) -> None:
+    # b priced, a unknown: report the known floor rather than discarding it.
+    inp = mk(nodes=["s", "a", "b"], edges=[("s", "a"), ("a", "b")],
+             costs={"s": 10.0, "a": None, "b": 3.0})
+    assert downstream_cost(inp, ["a"]) == pytest.approx(3.0)
+
+
 def test_cost_multi_culprit_union_dedup(mk) -> None:
     inp = mk(
         nodes=["s1", "s2", "a", "c", "x"],

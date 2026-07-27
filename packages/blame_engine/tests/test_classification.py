@@ -4,6 +4,7 @@ root_cause_external (S18), healthy sampled graph (S19)."""
 import pytest
 
 from blame_engine import NodeScore, TerminalVerdict, find_blame
+from conftest import note_of
 
 BAD = TerminalVerdict(bad=True, score=0.1, reasoning="terminal output is wrong")
 
@@ -77,4 +78,6 @@ def test_healthy_sampled_graph_is_unclassified(mk) -> None:
     assert report.propagation_path == []
     assert report.confidence == 0.0
     assert report.downstream_cost_usd == 0.0
-    assert report.evidence.notes  # human-readable reason present
+    # The rationale is present AND typed: an "unclassified" verdict must say
+    # which precondition ruled every other verdict out.
+    assert [r["code"] for r in note_of(report, "unclassified")["reasons"]]

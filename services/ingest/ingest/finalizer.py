@@ -29,6 +29,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Callable, Iterable
 from uuid import UUID
 
+from .pipeline import TraceRemapper
 from .repository import Repo
 from .stream import StreamPublisher
 from .types import STREAM_GRAPHS_COMPLETED, FinalizeResult
@@ -49,12 +50,14 @@ class Finalizer:
         *,
         clock: Callable[[], datetime] = _utcnow,
         stream: str = STREAM_GRAPHS_COMPLETED,
+        remapper: "TraceRemapper | None" = None,
     ) -> None:
         self._repo = repo
         self._publisher = publisher
         self._quiescence = timedelta(seconds=quiescence_seconds)
         self._clock = clock
         self._stream = stream
+        self._remapper = remapper
         # graph_id -> last time a POST delivered spans for it (arrival time).
         self._last_seen: dict[UUID, datetime] = {}
 
@@ -77,12 +80,32 @@ class Finalizer:
             quiesced = last_seen is not None and now - last_seen >= self._quiescence
             if not (quiesced or activity.root_ended):
                 continue
+            if self._remapper is not None:
+                # Cross-batch structure (edges, late roots, trailing identity
+                # spans) is only derivable over the FULL span set — re-map
+                # before the run_count/total_cost freeze and the completed
+                # announcement, so tier1 loads the finished topology.
+                try:
+                    await self._remapper.remap(activity.graph_id)
+                except Exception:
+                    logger.exception(
+                        "re-map failed for graph %s; finalizing with per-batch mapping",
+                        activity.graph_id,
+                    )
             result = await self._repo.finalize_graph(activity.graph_id, now)
             if result is None:
                 # Already finalized elsewhere; drop our stale activity marker.
                 self._last_seen.pop(activity.graph_id, None)
                 continue
             self._last_seen.pop(activity.graph_id, None)
+            if result.run_count == 0:
+                # Graph rows are only ever created for batches that carried
+                # runs, so zero runs at finalize means the re-map re-homed
+                # them all (e.g. a correlation header arrived in a later
+                # batch). Finalize the empty shell silently — announcing it
+                # would trigger an analysis of nothing.
+                finalized.append(result)
+                continue
             await self._publisher.xadd_json(
                 self._stream,
                 {

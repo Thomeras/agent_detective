@@ -158,8 +158,14 @@ def test_one_file_can_raise_several_signals():
 
 def test_signal_shape_has_no_identity_stamp():
     # Identity (run_id/agent/provenance) is stamped by the caller at its level.
+    # The signal itself is the typed fact (name/severity/code/params) plus the
+    # two evidence strings rendered from it (worker/narrative.py).
     (sig,) = _fails(meta_attr(meta_entry("report.docx", detected_kind="text")))
-    assert set(sig) == {"name", "severity", "detail", "basis"}
+    assert set(sig) == {"name", "severity", "code", "params", "detail", "basis"}
+    assert sig["code"] == "artifact_kind_mismatch"
+    assert sig["params"] == {
+        "path": "report.docx", "ext": "docx", "detected": "text"
+    }
 
 
 # --- check_rules_fingerprint ------------------------------------------------

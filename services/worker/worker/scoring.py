@@ -21,11 +21,12 @@ from __future__ import annotations
 import asyncio
 import math
 import re
+from dataclasses import dataclass
 from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from blame_engine import NodeScore
+from blame_engine import NodeScore, is_planner, is_verifier
 
 from .behavioral import (
     duplicate_side_effect_signals,
@@ -42,10 +43,16 @@ from .checks_content import (
     unit_inconsistency_signals,
 )
 from .checks_security import injection_signature_signals, sensitive_data_signals
-from .graph_ops import _VERIFIER_HINTS
 from .judge_client import JudgeClient, judge_json_with_retries
 from .signals import artifact_integrity_signals
-from .types import AgentStat, CheckRule, OutputContract, RunRecord
+from .types import (
+    FLAG_UNINSPECTED_MEDIA,
+    AgentStat,
+    CheckRule,
+    OutputContract,
+    RunRecord,
+)
+from .narrative import render_opaque_artifact_note, render_uninspected_media_caveat
 
 _PROMPTS_DIR = Path(__file__).resolve().parent / "prompts"
 
@@ -61,29 +68,37 @@ _WORD_RE = re.compile(r"\S+")
 # from the agent name was left to the LLM, and role-blind verdicts kept making
 # planners come out as false origins ("provides a plan but not the requested
 # one-page overview" is a category error, not a finding).
-_PLANNER_HINTS = (
-    "think", "plan", "orchestrat", "rout", "coordinat", "supervis", "dispatch"
-)
-
-
 def node_role(agent_name: str | None, *, is_deliverable_producer: bool = False) -> str:
-    """Deterministic role classification, stated to the judge as ground truth."""
-    n = (agent_name or "").lower()
-    if any(h in n for h in _PLANNER_HINTS):
+    """Deterministic role classification, stated to the judge as ground truth.
+
+    VERIFIER is tested FIRST. When a name carries both hints the verifier word is
+    the job and the planner word only says what is being checked — a
+    ``quality_controller`` verifies, a ``plan_reviewer`` reviews. Judging either
+    by the planner rubric ("its correct output is a plan") is the role-blind
+    category error the rubric split exists to prevent.
+    """
+    if is_verifier(agent_name):
+        return "VERIFIER — its correct output is a verdict on another node's work"
+    if is_planner(agent_name):
         return (
             "PLANNER — its correct output is a plan/outline/routing decision; "
             "the deliverable's content is produced by later nodes"
         )
-    if any(h in n for h in _VERIFIER_HINTS):
-        return "VERIFIER — its correct output is a verdict on another node's work"
     if is_deliverable_producer:
         return (
             "DELIVERABLE PRODUCER — its output IS the artifact shipped to the "
             "user; deliverable-level requirements apply in full"
         )
+    # "judge it against what its input asked THIS step to produce" USED to stand
+    # here, and it was the bug: in a pipeline the input is mostly the previous
+    # step's OUTPUT, not a request. The judge duly read the handoff as a spec and
+    # penalised every node for not repeating its predecessor — `enrich` lost
+    # points for "does not include the requested financial data" (its input
+    # carried collect's financials) while its own empty result went unnoticed.
     return (
-        "INTERMEDIATE PRODUCER — its output feeds later steps; judge it "
-        "against what its input asked THIS step to produce"
+        "INTERMEDIATE PRODUCER — it adds ITS OWN contribution to a chain and "
+        "hands the result on; whatever reached it from the previous step is "
+        "material to work with, NOT a checklist its output must repeat"
     )
 
 
@@ -104,16 +119,11 @@ _CONTRACT_KEYS = frozenset(
         "locale",
     }
 )
-# A confirmed contract violation forces the node below any sane blame threshold,
-# so it surfaces as a cut_point culprit rather than hiding behind a fluent judge.
-_CONTRACT_VIOLATION_SCORE = 0.15
-
-# ANY fail-severity deterministic signal (artifact integrity, missing required
-# section, sum-invariant breach, language mismatch, duplicate side effect,
-# invalid tool args, ...) is a harder fact than a rewritten parameter — the
-# output is provably wrong — so the generalized ceiling sits below the contract
-# override (0.15).
-_DETERMINISTIC_FAIL_SCORE = 0.10
+# NOTE: the old localisation sentinels (_CONTRACT_VIOLATION_SCORE = 0.15,
+# _DETERMINISTIC_FAIL_SCORE = 0.10) are GONE. Flooring the judged score to a
+# constant below threshold multiplexed quality with localisation; deterministic
+# faults now travel as their own evidence stream (contract_violations /
+# deterministic_signals) and the blame engine localises on them independently.
 
 # Structured judge flags and the deterministic score ceiling each one enforces.
 # The point is calibration the judge cannot wriggle out of: once its reasoning
@@ -131,8 +141,31 @@ _JUDGE_FLAG_CAPS: dict[str, float] = {
 # the payload. A judge reading such a payload sees a claim ("wrote report.docx"),
 # not the work — scores built on it are built on sand. Text formats that are
 # usually echoed inline (md/html/txt/json) are deliberately excluded.
-_OPAQUE_ARTIFACT_RE = re.compile(
-    r"[\w./\\:-]+\.(?:docx|doc|pdf|pptx|ppt|xlsx|xls|zip|tar|gz|png|jpe?g|bin)\b",
+#
+# The extension list is SPLIT because one flat list could not tell two opposite
+# situations apart and silently resolved both the harsh way. A markdown dossier
+# — whose entire text WAS in the payload — illustrated itself with
+# `![North wall](photos/8c5300c9.jpg)`; the .jpg matched, the whole deliverable
+# was declared unverifiable and a perfectly good terminal verdict was thrown
+# away. Twice, on production runs.
+#
+# DOCUMENT/CONTAINER formats hold text or data the payload can only paraphrase.
+# A reference to one is opaque unconditionally: prose in the payload is exactly
+# what a summary OF that document looks like, so prose can never be evidence
+# that the document itself is present, and is not allowed to act as such.
+_DOC_ARTIFACT_RE = re.compile(
+    r"[\w./\\:-]+\.(?:docx|doc|pdf|pptx|ppt|xlsx|xls|zip|tar|gz|bin)\b",
+    re.IGNORECASE,
+)
+# MEDIA formats hold no text at all, so requiring an `artifact_text` block for
+# them is a requirement no honest exporter can ever meet — under the old rule an
+# illustrated document was permanently unverifiable. A media reference means one
+# of two things and only the surrounding payload can say which: the deliverable
+# IS the picture ("here is the logo: logo.png" — still nothing to grade), or the
+# deliverable is a text document that illustrates itself (checkable on its text,
+# pictures excepted).
+_MEDIA_ARTIFACT_RE = re.compile(
+    r"[\w./\\:-]+\.(?:png|jpe?g|gif|webp|svg)\b",
     re.IGNORECASE,
 )
 # STRUCTURAL markers for embedded artifact content: the block form the
@@ -143,18 +176,170 @@ _OPAQUE_ARTIFACT_RE = re.compile(
 # opacity detection.
 _ARTIFACT_TEXT_MARKERS = ("[artifact_text ", '"artifact_text"')
 
+# THE DISCRIMINATOR between "a document that illustrates itself" and "a report
+# about a picture" is whether the payload CONTAINS the image at a position in
+# its own body (an embed) or merely NAMES it (a path in a sentence).
+#
+# A word-count bar alone was tried and is not sufficient: it asks "is there a
+# lot of prose here", and a verbose announcement has plenty. An 87-prose-word
+# hand-off — "I have finished the logo. It uses a deep indigo ... The file is
+# saved to assets/logo.png." — cleared a 60-word bar and was graded 0.95 on
+# prose whose every sentence is a claim ABOUT a file nobody opened. That is the
+# document-axis sin ("prose is exactly what a summary looks like") relocated to
+# images, and it is the false-CERTAINTY direction, so the bar cannot stand on
+# its own. An embed is a structural fact about the payload, not a size proxy:
+# writing `![North wall detail](photos/x.jpg)` composes a document, writing
+# "the file is saved to assets/logo.png" files a report.
+#
+# Unrecognised embed spellings fail SAFE — an embed we cannot parse looks like a
+# bare mention, so the payload is treated as opaque and the verdict is withheld
+# rather than invented. The word bar is still required ON TOP of the embed (see
+# the gallery case below), never instead of it.
+_MARKDOWN_EMBED_RE = re.compile(r"!\[[^\]\n]*\]\(\s*<?([^)\s>]+)")
+_HTML_IMG_RE = re.compile(r"<img\b[^>]*?\bsrc\s*=\s*[\"']?([^\"'>\s]+)", re.IGNORECASE)
+# Whole-construct forms, used to strike embeds out of the body-prose count.
+_MARKDOWN_EMBED_FULL_RE = re.compile(r"!\[[^\]\n]*\]\([^)\n]*\)")
+_HTML_IMG_FULL_RE = re.compile(r"<img\b[^>]*>", re.IGNORECASE)
+
+# Words of the payload's OWN body (every artifact reference and every embed
+# removed first) below which there is no document to grade — the payload is an
+# announcement about a file, not the file. Measured in WORDS, not bytes, so that
+# a bare gallery listing of sixty image paths (kilobytes of text, zero body)
+# cannot buy its way past the bar. Calibrated on how the two cases actually
+# talk: a step whose deliverable IS a picture announces it in a sentence or two,
+# while a step that wrote a document ships paragraphs. This is a CALIBRATION
+# JUDGEMENT, not a measurement — it was never validated against a corpus of real
+# payloads. It is a second condition, never a sufficient one.
+_MIN_DELIVERABLE_PROSE_WORDS = 60
+_PROSE_WORD_RE = re.compile(r"[^\W\d_]{2,}")
+
+# The three states a payload's artifact evidence can be in. Two states could not
+# say the true thing about a multimodal deliverable: a dossier whose value is
+# partly in photographs is neither "verified" nor "unverifiable", it is verified
+# on its text with the image content never inspected. PARTIAL is that verdict,
+# and it carries the limit with it so a pass can never be read as a full one.
+ARTIFACT_VISIBLE = "visible"
+ARTIFACT_PARTIAL = "partial"
+ARTIFACT_OPAQUE = "opaque"
+
+
+@dataclass(frozen=True)
+class ArtifactVisibility:
+    """How much of the work a payload claims is actually IN the payload.
+
+    ``state`` is one of ``visible`` / ``partial`` / ``opaque``.
+    ``opaque_refs`` are the references that leave nothing to grade (set on
+    ``opaque`` only); ``uninspected_refs`` are media inside a payload we CAN
+    read but whose content nobody saw (set on ``partial`` only).
+    """
+
+    state: str
+    opaque_refs: tuple[str, ...] = ()
+    uninspected_refs: tuple[str, ...] = ()
+
+
+def _refs(pattern: re.Pattern[str], text: str) -> list[str]:
+    """Distinct matches in first-seen order."""
+    return list(dict.fromkeys(m.group(0) for m in pattern.finditer(text)))
+
+
+def _embedded_media_refs(text: str) -> list[str]:
+    """Media the payload EMBEDS rather than merely names.
+
+    Markdown `![alt](path)` and HTML `<img src=…>`. A path that appears only
+    inside running prose is NOT an embed: the payload is pointing somewhere
+    else, and pointing is exactly the situation the opacity rule withholds a
+    verdict for.
+    """
+    found: list[str] = []
+    for pattern in (_MARKDOWN_EMBED_RE, _HTML_IMG_RE):
+        for match in pattern.finditer(text):
+            src = match.group(1)
+            if _MEDIA_ARTIFACT_RE.fullmatch(src):
+                found.append(src)
+    return list(dict.fromkeys(found))
+
+
+def _body_prose_word_count(text: str) -> int:
+    """Words of the payload's OWN body: artifact references struck out, and
+    every image embed struck out WHOLE — alt text included.
+
+    Alt text is a caption of a picture nobody opened, i.e. a claim ABOUT the
+    artifact, so it can no more prove a readable deliverable is present than
+    prose about a .docx can prove the .docx is present. Counting it let a real
+    12-image markdown gallery — 72 words, every one of them a caption, zero
+    body — present itself as a gradeable document and be scored on its captions.
+    """
+    remainder = _HTML_IMG_FULL_RE.sub(" ", _MARKDOWN_EMBED_FULL_RE.sub(" ", text))
+    remainder = _MEDIA_ARTIFACT_RE.sub(" ", _DOC_ARTIFACT_RE.sub(" ", remainder))
+    return len(_PROSE_WORD_RE.findall(remainder))
+
+
+def classify_artifact_visibility(output_text: str | None) -> ArtifactVisibility:
+    """Decide how much of the claimed work this payload actually shows.
+
+    ``opaque`` — the payload is a POINTER: a document/container reference (always,
+    prose can never stand in for one), or media that is only named. Nothing the
+    judge reads is the work, so no verdict may be issued on it.
+
+    ``partial`` — the payload's own body IS a readable deliverable and it embeds
+    images inside itself. The text can be graded; the pictures were never
+    opened, and ``uninspected_refs`` records exactly which, so the grade is
+    reported as what it is rather than as full verification.
+
+    ``visible`` — no artifact reference at all, or the instrumentation embedded
+    the artifact's extracted text (``artifact_text``) and there are no images
+    beside it.
+    """
+    if not output_text:
+        return ArtifactVisibility(ARTIFACT_VISIBLE)
+    if any(m in output_text for m in _ARTIFACT_TEXT_MARKERS):
+        # The instrumentation embedded the artifact's extracted TEXT, so nothing
+        # is opaque. Images alongside it are still images: extraction produces no
+        # pixels, so a payload that ships a document's text and points at its
+        # figures is verified on the text and silent about the figures — the
+        # same partial verdict, reached by a different route.
+        media_refs = _refs(_MEDIA_ARTIFACT_RE, output_text)
+        if media_refs:
+            return ArtifactVisibility(ARTIFACT_PARTIAL, uninspected_refs=tuple(media_refs))
+        return ArtifactVisibility(ARTIFACT_VISIBLE)
+    doc_refs = _refs(_DOC_ARTIFACT_RE, output_text)
+    if doc_refs:
+        return ArtifactVisibility(ARTIFACT_OPAQUE, opaque_refs=tuple(doc_refs))
+    media_refs = _refs(_MEDIA_ARTIFACT_RE, output_text)
+    if not media_refs:
+        return ArtifactVisibility(ARTIFACT_VISIBLE)
+    # BOTH conditions, deliberately: the embed says the images live inside this
+    # payload, the body count says the payload has something of its own besides
+    # them. Either alone is defeated by a real artifact class — a bare mention
+    # in a long report, and a caption-only photo gallery, respectively.
+    if (
+        _embedded_media_refs(output_text)
+        and _body_prose_word_count(output_text) >= _MIN_DELIVERABLE_PROSE_WORDS
+    ):
+        return ArtifactVisibility(ARTIFACT_PARTIAL, uninspected_refs=tuple(media_refs))
+    return ArtifactVisibility(ARTIFACT_OPAQUE, opaque_refs=tuple(media_refs))
+
 
 def opaque_artifact_refs(output_text: str | None) -> list[str]:
-    """File-artifact references in the output whose content is not embedded.
+    """File-artifact references that leave the payload UNGRADEABLE.
 
-    Returns the matched references when the payload names a binary artifact but
-    carries no extracted content (no structural ``artifact_text`` marker) — the
-    signal that every judge downstream is grading a description, not the
-    artifact.
+    Thin view over :func:`classify_artifact_visibility` (kept because the CLI
+    doctor imports it): non-empty exactly when the payload is ``opaque``.
     """
-    if not output_text or any(m in output_text for m in _ARTIFACT_TEXT_MARKERS):
-        return []
-    return list(dict.fromkeys(m.group(0) for m in _OPAQUE_ARTIFACT_RE.finditer(output_text)))
+    return list(classify_artifact_visibility(output_text).opaque_refs)
+
+
+def uninspected_media_refs(output_text: str | None) -> list[str]:
+    """Media inside a gradeable payload that nobody opened.
+
+    Non-empty exactly when the payload is ``partial``. Empty when it is opaque:
+    there the whole verdict is withheld and a caveat would be noise. These
+    images do not block grading, but they are not free either — whatever they
+    show was never seen, so callers record them and the pass reads "verified on
+    the text" instead of the stronger claim "verified".
+    """
+    return list(classify_artifact_visibility(output_text).uninspected_refs)
 
 
 def _norm(value: object) -> str:
@@ -182,15 +367,33 @@ def _try_parse_json(text: str | None) -> object | None:
     return None
 
 
-def _collect_contract_params(obj: object, keys: frozenset[str]) -> dict[str, object]:
-    """Recursively collect the first scalar value seen for each contract key."""
-    found: dict[str, object] = {}
+def _collect_contract_params(
+    obj: object, keys: frozenset[str]
+) -> dict[str, list[object]]:
+    """Recursively collect every DISTINCT scalar value seen for each contract key.
+
+    Distinctness is by :func:`_norm` (the same tolerant comparison the violation
+    check uses) while the first spelling of each value is what is kept, so the
+    reported triple quotes the payload rather than a casefolded rewrite.
+
+    All values, not the first one, because a FAN-IN node's input carries one
+    value per incoming branch. Collapsing those to whichever the walk happened to
+    reach first invented a contract the node was never given: with branches
+    ``lang=cs`` and ``lang=en`` merging into a ``lang=cs`` output, "the first
+    scalar" is a coin flip that either hides a rewrite or manufactures one, and a
+    manufactured one makes the joiner look like the origin of a contract breach.
+    :func:`_unambiguous_contract_params` is where that is resolved — into
+    "unknown", never into a pick.
+    """
+    found: dict[str, list[object]] = {}
 
     def walk(node: object) -> None:
         if isinstance(node, dict):
             for k, v in node.items():
                 if isinstance(k, str) and k.lower() in keys and not isinstance(v, (dict, list)):
-                    found.setdefault(k.lower(), v)
+                    seen = found.setdefault(k.lower(), [])
+                    if all(_norm(v) != _norm(existing) for existing in seen):
+                        seen.append(v)
                 walk(v)
         elif isinstance(node, list):
             for el in node:
@@ -200,20 +403,72 @@ def _collect_contract_params(obj: object, keys: frozenset[str]) -> dict[str, obj
     return found
 
 
+def _unambiguous_contract_params(
+    collected: dict[str, list[object]]
+) -> dict[str, object]:
+    """Keep only the keys that carried exactly ONE distinct value.
+
+    A key that arrived with two conflicting values does not tell us what the
+    contract WAS, so nothing can be said about whether the node honoured it.
+    Dropping it leaves the fact unknown; keeping an arbitrary one of the two
+    would turn "we cannot tell" into a named violation with a named culprit —
+    the one failure mode this system exists to refuse.
+    """
+    return {k: v[0] for k, v in collected.items() if len(v) == 1}
+
+
+def _declared_contract_params(declared: str | None) -> dict[str, object]:
+    """Tolerant parse of the ``agent_detective.contract_params`` attribute.
+
+    A JSON object of scalar values ({"file_type": "pdf"}); anything else —
+    malformed JSON, non-object, nested/None values — is ignored, because a
+    broken declaration must neither invent nor suppress violations.
+    """
+    parsed = _try_parse_json(declared)
+    if not isinstance(parsed, dict):
+        return {}
+    return {
+        k.lower(): v
+        for k, v in parsed.items()
+        if isinstance(k, str) and k.strip() and v is not None and not isinstance(v, (dict, list))
+    }
+
+
 def contract_violations(
-    input_text: str | None, output_text: str | None, keys: frozenset[str] = _CONTRACT_KEYS
+    input_text: str | None,
+    output_text: str | None,
+    keys: frozenset[str] = _CONTRACT_KEYS,
+    declared: str | None = None,
 ) -> list[tuple[str, object, object]]:
     """Contract parameters present in BOTH input and output whose value changed.
 
     Returns ``(key, input_value, output_value)`` triples. Empty when input or
-    output is not JSON, or when every shared contract parameter was preserved.
+    output is not JSON, when every shared contract parameter was preserved, or
+    when a parameter arrived (or left) with conflicting values — a fan-in node
+    merging ``lang=cs`` and ``lang=en`` branches has no single contract to have
+    violated, and guessing one names a culprit on no evidence.
+
+    ``declared`` is the run's out-of-band ``agent_detective.contract_params``
+    attribute: the convention lane for pipelines whose input payloads are
+    prose/code and give the JSON walk nothing to parse (the measured foreign
+    wild-trace gap). Declared params are the input side of the contract for
+    their keys — set by instrumentation, so they override the forgeable
+    payload parse — and they widen the OUTPUT-side key search to themselves,
+    so a declared key outside the built-in list is still checked. The output
+    value must still be observable in the output payload; without it there is
+    no diff and no violation.
     """
+    declared_params = _declared_contract_params(declared)
     parsed_in = _try_parse_json(input_text)
     parsed_out = _try_parse_json(output_text)
-    if not isinstance(parsed_in, (dict, list)) or not isinstance(parsed_out, (dict, list)):
+    in_params: dict[str, object] = {}
+    if isinstance(parsed_in, (dict, list)):
+        in_params = _unambiguous_contract_params(_collect_contract_params(parsed_in, keys))
+    in_params.update(declared_params)
+    if not in_params or not isinstance(parsed_out, (dict, list)):
         return []
-    in_params = _collect_contract_params(parsed_in, keys)
-    out_params = _collect_contract_params(parsed_out, keys)
+    out_keys = keys | frozenset(declared_params)
+    out_params = _unambiguous_contract_params(_collect_contract_params(parsed_out, out_keys))
     violations: list[tuple[str, object, object]] = []
     for key, in_val in in_params.items():
         if key in out_params and _norm(in_val) != _norm(out_params[key]):
@@ -452,7 +707,23 @@ async def score_node(
     run_id = str(run.run_id)
     error_span_ids = error_span_ids or []
 
-    if output_text is None:
+    # An absent payload and an EMPTY one carry the same information: there is
+    # nothing to measure. Scoring "" produced a hard 0.0 (heuristics floors
+    # empty output, and the judge rates emptiness as worthless), i.e. the
+    # strongest possible claim — "demonstrably bad" — from the weakest possible
+    # evidence. That is the same error the engine refuses everywhere else
+    # (absent -> unknown, never assumed healthy *or* broken); it also fabricated
+    # a culprit out of orchestrator wrapper spans, which legitimately carry no
+    # output of their own and are the single most common shape in real
+    # framework traces. If an empty output IS the defect, that belongs to the
+    # deterministic channel (a signal, a failed status, a terminal verdict) —
+    # not to a quality scalar inferred from nothing.
+    #
+    # The observation is NOT dropped, it is re-routed: a non-root node landing
+    # here raises the `instrumentation_warning` note ("these nodes have no
+    # output payload — fix the exporter"), which says what is actually true
+    # ("we were blinded here") instead of accusing the agent.
+    if output_text is None or not output_text.strip():
         return NodeScore(
             run_id=run_id,
             score=None,
@@ -500,17 +771,27 @@ async def score_node(
         if isinstance(raw_flags, list):
             flags = [f for f in raw_flags if isinstance(f, str) and f.strip()][:8]
 
-    # Deterministic artifact-opacity check: the output claims a file artifact
-    # but its content is not in the payload. No judge saw the actual work, so
-    # "meets all requirements" would be an assertion about an unopened file.
-    opaque_refs = opaque_artifact_refs(output_text)
-    if opaque_refs and "unverifiable_artifact" not in flags:
+    # Deterministic artifact-visibility check: what fraction of the work this
+    # payload claims is actually IN the payload. One classification, three
+    # outcomes — a judge verdict on a pointer is an assertion about an unopened
+    # file, and a judge verdict on an illustrated document is true of its text
+    # and silent about its pictures.
+    visibility = classify_artifact_visibility(output_text)
+    if visibility.state == ARTIFACT_OPAQUE and "unverifiable_artifact" not in flags:
         flags.append("unverifiable_artifact")
-        opaque_note = (
-            "artifact content not in payload (unverifiable): "
-            + ", ".join(opaque_refs[:3])
-        )
+        opaque_note = render_opaque_artifact_note(list(visibility.opaque_refs))
         judge_note = f"{judge_note} | {opaque_note}" if judge_note else opaque_note
+    elif visibility.state == ARTIFACT_PARTIAL:
+        # PARTIAL: the node's own text was graded, so no cap — capping every
+        # illustrated document at 0.60 would penalise the format, and inventing
+        # a penalty out of "we did not look" is the mirror of inventing a pass.
+        # The limit is instead RECORDED, twice: in the note (for humans) and as
+        # a flag (for anything that reads the score downstream), so a good
+        # number can never be read as "the photographs checked out too".
+        media_note = render_uninspected_media_caveat(list(visibility.uninspected_refs))
+        judge_note = f"{judge_note} | {media_note}" if judge_note else media_note
+        if FLAG_UNINSPECTED_MEDIA not in flags:
+            flags.append(FLAG_UNINSPECTED_MEDIA)
 
     # Flags cap the judge component deterministically: a verdict that admits a
     # shortcoming cannot keep a "good"-band number (score-reasoning mismatch).
@@ -522,8 +803,10 @@ async def score_node(
 
     # Deterministic input-contract check: a silent rewrite of a carried-through
     # parameter (file_type, lang, format, ...) is a hard fault. Detected here
-    # from the input/output diff — no LLM, no threshold guessing.
-    violations = contract_violations(input_text, output_text)
+    # from the input/output diff — no LLM, no threshold guessing. Out-of-band
+    # declared params (migration 0011) stand in for the input side when the
+    # payload is prose/code.
+    violations = contract_violations(input_text, output_text, declared=run.contract_params)
 
     components: dict[str, float | None] = {
         "schema": schema_component,
@@ -531,20 +814,16 @@ async def score_node(
         "heuristics": heuristics_component,
     }
     score, unscored_reason = composite_score(components, weights, min_weight)
-    # The judged composite BEFORE any deterministic override: when an override
-    # fires, this is the "claimed" number the UI shows struck-through next to
-    # the effective one — a producer whose judge praised work that a
-    # reproducible check refuted must be as visible as a refuted verifier.
-    judged_composite = score
-
-    if violations:
-        # A confirmed violation is decisive: it dominates a fluent judge verdict
-        # and forces the node below threshold so blame localises here (cut_point).
-        # The violation travels as a separate deterministic evidence stream
-        # (contract_violations) — it is NOT glued into the LLM judge prose.
-        components["contract"] = 0.0
-        capped = _CONTRACT_VIOLATION_SCORE if score is None else min(score, _CONTRACT_VIOLATION_SCORE)
-        score, unscored_reason = capped, None
+    # CHANNEL DECOUPLING: the judged score is NEVER floored to a localisation
+    # sentinel. A deterministic fault (contract violation, fail-severity signal)
+    # is a SEPARATE evidence stream (contract_violations / deterministic_signals)
+    # that the blame engine reads as an independent candidacy channel — it must
+    # not be smuggled into the quality scalar. Flooring the score to 0.15/0.10
+    # multiplexed "how good is the output" with "a check failed here": it buried
+    # the judged number (a fluent verdict on genuinely broken work is the product,
+    # not noise) and made "score < threshold" a tautology the UI then re-sold as a
+    # measurement. The violation still travels below via `violations`; it just no
+    # longer overwrites the number.
 
     # Deterministic checks (docs/deterministic-signals.md). Every check emits
     # named signals; identity is stamped by the engine. Sources:
@@ -575,10 +854,17 @@ async def score_node(
     sum_rules = [r.spec for r in rules if r.kind == "sum_invariant"]
     tool_schemas = [r.spec for r in rules if r.kind == "tool_schema"]
     # Expected language: the carried contract param (what the INPUT asked for,
-    # falling back to the node's own declared value).
+    # falling back to the node's own declared value). Ambiguous keys are dropped
+    # first — a fan-in whose branches carried different languages has no single
+    # expected language, and picking one would report every node downstream of
+    # the merge as writing in the wrong one.
     lang_keys = frozenset({"lang", "language", "locale"})
-    in_params = _collect_contract_params(_try_parse_json(input_text), lang_keys)
-    out_params = _collect_contract_params(_try_parse_json(output_text), lang_keys)
+    in_params = _unambiguous_contract_params(
+        _collect_contract_params(_try_parse_json(input_text), lang_keys)
+    )
+    out_params = _unambiguous_contract_params(
+        _collect_contract_params(_try_parse_json(output_text), lang_keys)
+    )
     expected_lang = next(
         (str(v) for v in list(in_params.values()) + list(out_params.values()) if v),
         None,
@@ -591,8 +877,7 @@ async def score_node(
     # content checks on it manufactures false positives, the same reason fact
     # propagation skips verifier commentary. Integrity/security/behavioral
     # checks still apply to every node.
-    _name = (run.agent_name or "").lower()
-    is_verifier_node = any(h in _name for h in _VERIFIER_HINTS)
+    is_verifier_node = is_verifier(run.agent_name)
     content_signals: list[dict] = []
     if not is_verifier_node:
         content_signals = (
@@ -634,26 +919,9 @@ async def score_node(
     for name in fail_names + warn_names:
         if name not in flags:
             flags.append(name)
-    if fail_names:
-        for name in fail_names:
-            components[name] = 0.0
-        capped = (
-            _DETERMINISTIC_FAIL_SCORE
-            if score is None
-            else min(score, _DETERMINISTIC_FAIL_SCORE)
-        )
-        score, unscored_reason = capped, None
-
-    # Record the refuted "claimed" number whenever ANY override (contract or
-    # generalized deterministic fail) lowered the judged composite — the engine
-    # turns it into a score_override entry so the UI renders claimed→effective
-    # for producers exactly like it does for refuted verifiers.
-    if (
-        judged_composite is not None
-        and score is not None
-        and score < judged_composite
-    ):
-        components["pre_override_composite"] = judged_composite
+    # No score flooring here either (see CHANNEL DECOUPLING above): fail-severity
+    # signals ride out as flags + deterministic_signals and localise blame through
+    # the engine's deterministic channel, leaving the judged score untouched.
 
     return NodeScore(
         run_id=run_id,

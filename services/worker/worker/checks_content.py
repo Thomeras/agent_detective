@@ -26,6 +26,7 @@ from datetime import date, datetime
 
 from langdetect import DetectorFactory, detect_langs
 from langdetect.lang_detect_exception import LangDetectException
+from .narrative import signal
 
 # langdetect is probabilistic by default; a fixed seed makes it deterministic
 # (design contract: deterministic signals must be reproducible).
@@ -136,12 +137,16 @@ def required_section_signals(
         name = rule.get("name")
         name = name if isinstance(name, str) and name.strip() else pattern
         signals.append(
-            {
-                "name": SIGNAL_MISSING_REQUIRED_SECTION,
-                "severity": "fail",
-                "detail": f"required section '{name}' not found",
-                "basis": f"{match_kind} '{pattern}' not present in {subject}",
-            }
+            signal(
+                SIGNAL_MISSING_REQUIRED_SECTION, "fail",
+                "required_section_missing",
+                section=name, match_kind=match_kind, pattern=pattern,
+                subject=subject,
+            )
+            # The section's identity as a TOP-LEVEL field too: the engine keys
+            # the finding's fact_key on it so the deliverable-absent measurement
+            # reconciles against the producers-present one.
+            | {"section": name}
         )
     return signals
 
@@ -211,12 +216,13 @@ def sum_invariant_signals(output_text: str | None, rules: list[dict]) -> list[di
         total_sum = sum(values)
         if abs(total_sum - total) > tolerance:
             signals.append(
-                {
-                    "name": SIGNAL_NUMERIC_INVARIANT_BREACH,
-                    "severity": "fail",
-                    "detail": f"sum({items_path})={total_sum:g} != {total_path}={total:g}",
-                    "basis": f"registered invariant '{name}', tolerance {tolerance:g}",
-                }
+                signal(
+                    SIGNAL_NUMERIC_INVARIANT_BREACH, "fail",
+                    "sum_invariant_breach",
+                    items_path=items_path, total_sum=total_sum,
+                    total_path=total_path, total=total, rule_name=name,
+                    tolerance=tolerance,
+                )
             )
     return signals
 
@@ -274,15 +280,10 @@ def unit_inconsistency_signals(
         return []
     other_label = ", ".join(others)
     return [
-        {
-            "name": SIGNAL_UNIT_INCONSISTENCY,
-            "severity": "warn",
-            "detail": f"input amounts are in {input_family} but output uses {other_label}",
-            "basis": (
-                f"currency token match: input family {input_family}, "
-                f"output family {other_label}; {input_family} absent from output"
-            ),
-        }
+        signal(
+            SIGNAL_UNIT_INCONSISTENCY, "warn", "currency_family_mismatch",
+            input_family=input_family, output_families=other_label,
+        )
     ]
 
 
@@ -333,18 +334,13 @@ def temporal_invariant_signals(
     signals: list[dict] = []
     seen: set[tuple] = set()
 
-    def emit(detail: str, basis: str) -> None:
-        key = (detail, basis)
+    def emit(code: str, **params) -> None:
+        key = (code, tuple(sorted((k, str(v)) for k, v in params.items())))
         if key in seen:
             return
         seen.add(key)
         signals.append(
-            {
-                "name": SIGNAL_TEMPORAL_INVARIANT_BREACH,
-                "severity": "warn",
-                "detail": detail,
-                "basis": basis,
-            }
+            signal(SIGNAL_TEMPORAL_INVARIANT_BREACH, "warn", code, **params)
         )
 
     def walk(node: object) -> None:
@@ -373,10 +369,9 @@ def temporal_invariant_signals(
                 start_dt, end_dt = dated[start_key], dated[end_key]
                 if end_dt < start_dt:
                     emit(
-                        f"'{end_key}'={end_dt.isoformat()} is before "
-                        f"'{start_key}'={start_dt.isoformat()}",
-                        "ISO date comparison of sibling keys "
-                        f"'{start_key}'/'{end_key}'",
+                        "date_order_violated",
+                        start_key=start_key, start=start_dt.isoformat(),
+                        end_key=end_key, end=end_dt.isoformat(),
                     )
         if run_date is not None:
             for key, value_dt in dated.items():
@@ -385,8 +380,9 @@ def temporal_invariant_signals(
                     value_dt.date() < run_date
                 ):
                     emit(
-                        f"'{key}'={value_dt.date().isoformat()} deadline in the past",
-                        f"run started {run_date.isoformat()}",
+                        "deadline_in_past",
+                        key=key, date=value_dt.date().isoformat(),
+                        run_date=run_date.isoformat(),
                     )
         for value in node.values():
             walk(value)

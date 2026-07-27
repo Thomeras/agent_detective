@@ -1,0 +1,189 @@
+{
+  "label": "bad",
+  "defects": [
+    {
+      "kind": "contract",
+      "origin": {
+        "kind": "Localized",
+        "run_id": "e00913e0-45d2-5b0c-8b18-ff8e18f0fd04"
+      },
+      "channel": "deterministic",
+      "recovered": false,
+      "propagation": [
+        "d56e8c76-6b1e-518a-989f-5b19e09917e6"
+      ],
+      "base_assumed": false,
+      "finding_refs": [
+        {
+          "ref": 5,
+          "role": "supporting"
+        },
+        {
+          "ref": 7,
+          "role": "supporting"
+        }
+      ],
+      "unverified_in_channel": null,
+      "attribution_confidence": 0.95,
+      "observability_boundary": false,
+      "observation_confidence": 0.95
+    }
+  ],
+  "findings": [
+    {
+      "data": {
+        "agent": "think",
+        "score": 0.7818181818181816
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:e00913e0-45d2-5b0c-8b18-ff8e18f0fd04",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "act",
+        "score": 0.9272727272727272
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:5dfe4a5f-ee3f-5017-b8f9-b0aa8d9125f5",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "render",
+        "score": 1.0
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:d56e8c76-6b1e-518a-989f-5b19e09917e6",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "qa",
+        "score": 0.9272727272727272
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:52f700a1-8b42-519a-a173-0d69242b512f",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "eval",
+        "score": 1.0
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:4b40f66c-681e-513b-8158-8ba30f07833b",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "agent": "think",
+        "value": "docx"
+      },
+      "kind": "contract_breach",
+      "channel": "deterministic",
+      "subject": "run:e00913e0-45d2-5b0c-8b18-ff8e18f0fd04",
+      "fact_key": "contract:file_type",
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "input_contract:file_type",
+        "detail": "input/output diff on a carried parameter"
+      }
+    },
+    {
+      "data": {
+        "bad": false,
+        "score": 1.0,
+        "stale": false,
+        "checkable": true,
+        "reasoning": "The final output provides a comprehensive proposal for consulting services on optimizing business processes, covering all necessary sections such as objectives, methodology, service scope, timeline, cost estimation, team experience, and next steps, which aligns well with the initial input request."
+      },
+      "kind": "terminal_content",
+      "channel": "judged",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 0.8,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "tier1 terminal judge (content rubric)",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "basis": "artifact path 'output/proposal_20260723_204125.md' ends '.md'",
+        "deliverable_run_id": "d56e8c76-6b1e-518a-989f-5b19e09917e6"
+      },
+      "kind": "breach_propagated",
+      "channel": "deterministic",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "contract_propagation:file_type",
+        "detail": "artifact path 'output/proposal_20260723_204125.md' ends '.md'"
+      }
+    }
+  ],
+  "graph_id": "0a9f08e6-edf4-56c2-8219-8daf7b3f657c",
+  "report_id": 20,
+  "confidence": 0.95,
+  "report_type": "shipped_with_latent_defect",
+  "culprit_run_ids": [
+    "e00913e0-45d2-5b0c-8b18-ff8e18f0fd04"
+  ],
+  "environment": {
+    "judge_model": "openai/gpt-4o-mini",
+    "judge_endpoint": "https://openrouter.ai/api/v1",
+    "temperature": 0,
+    "judge_seed": null,
+    "tier2_check_rules_hash": "944ee758f3a5",
+    "recorded_at": "2026-07-24",
+    "note": "Byte-stable structured outputs (20/20 on graph A) are a property of THIS stack, not a guaranteed hosted-API behaviour — a broken exact assert against these cassettes means 'environment changed', not 'engine regression'. Compare cross-pass only under equal prompt hashes.",
+    "tier1_judge_prompt_hash": "9132f36109d7",
+    "tier1_rubric": "pre-split"
+  }
+}

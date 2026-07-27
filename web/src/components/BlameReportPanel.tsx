@@ -52,6 +52,10 @@ function culpritHeading(reportType: string | null, plural: boolean): string {
     // contract breach shipped — a silent failure in production, not a near-miss.
     case "shipped_with_latent_defect":
       return "Origin — silent defect shipped";
+    // Rubric split: the listed node is the CONTRACT fault's origin only; the
+    // content defect observed at the terminal has no localized origin.
+    case "terminal_defect_unlocalized":
+      return "Contract origin — terminal content defect not localized";
     case "unclassified":
       return plural ? "Possible suspects" : "Possible suspect";
     default:
@@ -70,6 +74,8 @@ const FALLBACK_NOTE: Record<string, string> = {
     "This node underperformed, but every downstream step and the terminal deliverable recovered — a near-miss the pipeline compensated for, not a live quality break. Surfaced as a fragile point to harden, not an outage.",
   shipped_with_latent_defect:
     "The pipeline recovered the content, but a VERIFIED contract breach shipped in the deliverable. The terminal judge verifies content, not carried contract parameters, so it could not catch this — a silent failure reached production, not a near-miss.",
+  terminal_defect_unlocalized:
+    "The terminal deliverable is bad on CONTENT, but no node qualifies as a content origin — the only localized fault is a contract breach whose node's content the judge scored healthy. The attribution shown is the contract fault's, NOT blame for the terminal content defect.",
 };
 
 const GAP_BASIS_LABEL: Record<string, string> = {
@@ -101,6 +107,11 @@ const NOTE_TITLES: Record<string, string> = {
   claims_vs_reality: "Healthy score contradicted by ground truth",
   cascade_participants: "Downstream success built on missing content",
   contract_vs_terminal: "Contract breach vs. ok terminal — the judge is blind to the contract",
+  terminal_defect_unlocalized:
+    "Terminal content defect observed — origin not localized",
+  form_defect_shipped: "Wrong form shipped — no verifier owns form/contract vision",
+  requirement_provenance:
+    "Contract reference is scaffold — it does not match the user's quoted requirement",
   escalation: "Verdict escalated — silent failure shipped to production",
   evidence_tension: "Evidence streams disagree (tension)",
   representation_divergence: "Terminal saw a different artifact than the verifiers",
@@ -137,6 +148,8 @@ const TYPE_WHY: Record<string, string> = {
   composition_failure:
     "No single node broke — the orchestration/task design is suspected.",
   root_cause_external: "The fault entered from outside the observed graph.",
+  terminal_defect_unlocalized:
+    "The terminal content is bad, but no node qualifies as a content origin — only a contract fault is localized. The content defect's source is unknown.",
   unclassified: "No failure was localised.",
 };
 

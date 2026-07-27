@@ -1,0 +1,35 @@
+# Alternate HOST-port publishing for running the detective stack alongside
+# another local stack that occupies the defaults (5432/6379/8080/9000/5173).
+# Container-internal networking is untouched; only host bindings move.
+# Usage: docker compose -f docker-compose.yml -f docker-compose.altports.yml up -d
+services:
+  clickhouse:
+    ports: !override
+      - "18123:8123"
+  postgres:
+    ports: !override
+      - "15432:5432"
+  redis:
+    ports: !override
+      - "16379:6379"
+  minio:
+    ports: !override
+      - "19000:9000"
+      - "19001:9001"
+  mock-llm:
+    ports: !override
+      - "18081:8080"
+  ingest:
+    ports: !override
+      - "18001:8001"
+  api:
+    environment:
+      WEB_ORIGIN: "http://localhost:15173"
+    ports: !override
+      - "18000:8000"
+  web:
+    build:
+      args:
+        VITE_API_BASE_URL: "http://localhost:18000"
+    ports: !override
+      - "15173:80"

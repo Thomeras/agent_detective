@@ -1,13 +1,21 @@
 [project]
-name = "agent-detective"
+# The workspace root, NOT the shipped distribution: the pip-installable
+# `agent-detective` is packages/detective_cli, which builds a wheel. Naming the
+# root differently keeps that name free for the thing users actually install.
+name = "agent-detective-workspace"
 version = "0.1.0"
-description = "OTEL-native observability with blame analysis for multi-agent systems"
+description = "Development workspace for Agent Detective (see packages/detective_cli for the distribution)"
 requires-python = ">=3.12"
 dependencies = [
     "blame-engine",
     "otel-mapper",
+    "detective-sdk",
+    "detective-ci",
+    "agent-detective",
     "ingest",
-    "worker",
+    # The deployed service wants the database/stream/object-store clients; the
+    # core alone is what the local-mode CLI installs.
+    "agent-detective-worker[server]",
     "api",
 ]
 
@@ -18,8 +26,11 @@ members = ["packages/*", "services/*"]
 [tool.uv.sources]
 blame-engine = { workspace = true }
 otel-mapper = { workspace = true }
+detective-sdk = { workspace = true }
+detective-ci = { workspace = true }
+agent-detective = { workspace = true }
 ingest = { workspace = true }
-worker = { workspace = true }
+agent-detective-worker = { workspace = true }
 api = { workspace = true }
 
 # importlib mode avoids test-module name collisions across workspace members

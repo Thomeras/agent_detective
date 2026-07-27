@@ -237,12 +237,52 @@ a bounded prefix.
 Messages are JSON with `schema_version: 1`. `XACK` happens only after the
 Postgres transaction commits; unique constraints make any redelivery a no-op.
 
+## Local mode (the `agent-detective` pip distribution)
+
+The same analysis runs two ways, and the difference is deliberately confined to
+four seams. `packages/detective_cli` imports `Tier1Processor` and
+`Tier2Processor` — it does not reimplement or approximate them — and hands them
+in-process implementations of everything they talk to:
+
+| Seam | Deployed | Local (`detective analyze`) |
+|---|---|---|
+| `Repo` | Postgres (`worker/pg.py::PgRepo`) | `worker/memory.py::InMemoryRepo` |
+| `ObjectStore` | MinIO | inline payloads (`InMemoryObjectStore`) |
+| `StreamPublisher` | Redis Streams | `CollectingPublisher` (records the handoff) |
+| `JudgeClient` | OpenAI-compatible endpoint | the same, or `NullJudge` |
+
+Consequences worth stating, because they are what make the two comparable:
+
+- `InMemoryRepo` reproduces the **idempotency semantics** the SQL provides
+  (job claim, `(graph_id, incident_key)` uniqueness, blame-report versioning,
+  the evidence hash chain via the shared `ledger_entry`) — it is production
+  code, and the worker's own test suite runs against it, so the fake cannot
+  drift into merely agreeing with itself.
+- The tier1→tier2 **handoff still goes through a published message**; local
+  mode reads what tier1 published instead of deciding for it. Only the
+  *sampling* input differs (`tier2_sample_pct` defaults to 100 locally —
+  analysing one file on purpose is not the same situation as a percentage of
+  production traffic). Every engine threshold keeps its deployed value.
+- `worker.repository` holds only the `Repo` protocol and the pure helpers, so
+  importing the pipeline pulls no database driver. The database, broker and
+  object-store clients live behind the distribution's `[server]` extra;
+  `redis`, `minio` and `httpx` are additionally imported lazily inside their
+  own constructors.
+
+What local mode cannot do is anything that needs the deployment's state: the
+registered rules/contracts registry is empty (so registered required-section
+and JSON-schema checks are inert), there are no cross-run agent baselines to
+compare against, and no incident history to supersede.
+
 ## Component map
 
 | Path | Component |
 |---|---|
 | `packages/blame_engine/` | pure, I/O-free blame analysis (networkx only) — **BSL 1.1** |
-| `packages/otel_mapper/` | OTLP/HTTP JSON span → run/edge mapping — **Apache-2.0** |
+| `packages/otel_mapper/` | OTLP/HTTP JSON span → run/edge mapping, plus the shared uuid5 run/graph id derivation (`ids.py`) — **Apache-2.0** |
+| `packages/detective_cli/` | the `agent-detective` pip distribution: `detective analyze`, the in-process tier1→tier2 run, terminal/Markdown/JSON renderers |
+| `packages/detective_sdk/` | zero-dependency instrumentation helpers (artifact meta, version/prompt hashes, opt-in halt hook) |
+| `packages/detective_ci/` | deterministic golden replay of a blame fixture + pytest plugin (CI gate on the stable surface) |
 | `services/ingest/` | OTLP/HTTP trace ingest, ClickHouse/Postgres/MinIO writes, finalizer |
 | `services/worker/` | tier1/tier2 pipeline over Redis Streams, judge client, alerter, DLQ reaper |
 | `services/api/` | FastAPI read API: graphs, incidents, blame reports, agent leaderboard, manual analyze |

@@ -162,7 +162,10 @@ class SqlRepository:
             return row._mapping if row else None
 
     async def leaderboard(self) -> list[Row]:
-        total_cost = sa.func.coalesce(sa.func.sum(agent_runs.c.cost_usd), 0).label("total_cost_usd")
+        # NULL, not 0, when nothing was priced (see finalize_graph): an agent
+        # whose cost was never instrumented is unknown-cost, not free. Ordering
+        # puts those last so a real spender always outranks an unmeasured one.
+        total_cost = sa.func.sum(agent_runs.c.cost_usd).label("total_cost_usd")
         run_count = sa.func.count().label("run_count")
         failure_rate = (
             sa.cast(sa.func.count().filter(agent_runs.c.status == "failed"), sa.Float) / sa.func.count()
@@ -171,7 +174,7 @@ class SqlRepository:
         stmt = (
             sa.select(agent_runs.c.agent_name, total_cost, run_count, failure_rate, avg_score)
             .group_by(agent_runs.c.agent_name)
-            .order_by(total_cost.desc(), agent_runs.c.agent_name)
+            .order_by(total_cost.desc().nullslast(), agent_runs.c.agent_name)
         )
         async with self._session_factory() as session:
             result = await session.execute(stmt)
@@ -179,7 +182,7 @@ class SqlRepository:
 
     async def leaderboard_by_version(self) -> list[Row]:
         """Leaderboard grouped by the full version identity tuple (roadmap 2.1)."""
-        total_cost = sa.func.coalesce(sa.func.sum(agent_runs.c.cost_usd), 0).label("total_cost_usd")
+        total_cost = sa.func.sum(agent_runs.c.cost_usd).label("total_cost_usd")
         run_count = sa.func.count().label("run_count")
         failure_rate = (
             sa.cast(sa.func.count().filter(agent_runs.c.status == "failed"), sa.Float) / sa.func.count()
@@ -194,7 +197,7 @@ class SqlRepository:
         stmt = (
             sa.select(*identity, total_cost, run_count, failure_rate, avg_score)
             .group_by(*identity)
-            .order_by(total_cost.desc(), *identity)
+            .order_by(total_cost.desc().nullslast(), *identity)
         )
         async with self._session_factory() as session:
             result = await session.execute(stmt)

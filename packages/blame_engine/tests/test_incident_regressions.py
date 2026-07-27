@@ -13,6 +13,7 @@ distinct failures at once:
 import pytest
 
 from blame_engine import NodeScore, TerminalVerdict, find_blame
+from conftest import candidacy_of, note_of, verdict_of
 
 BAD = TerminalVerdict(
     bad=True,
@@ -56,7 +57,7 @@ def test_cumulative_degradation_is_an_origin_not_composition_failure(mk):
     assert len(chains) == 1
     assert chains[0]["path"] == ["think", "act", "render"]
     assert chains[0]["cumulative_drop"] == pytest.approx(0.33)
-    assert any("cumulative" in n for n in report.evidence.notes)
+    assert note_of(report, "cut_point")["variant"] == "cumulative"
 
 
 def test_bad_terminal_with_passing_verifiers_flags_them_retroactively(mk):
@@ -91,8 +92,8 @@ def test_no_origin_and_passing_verifiers_becomes_verification_gap(mk):
     assert report.confidence <= 0.6
     # Culprits of a verification_gap report are the gap verifiers — candidacy
     # must say so, not fall through to a (numerically false) origin label.
-    assert "verification gap" in report.evidence.candidacy["qa"]
-    assert "verification gap" in report.evidence.candidacy["eval"]
+    assert verdict_of(report, "qa") == "gap_passed_bad_terminal"
+    assert verdict_of(report, "eval") == "gap_passed_bad_terminal"
 
 
 NOT_CHECKABLE = TerminalVerdict(
@@ -130,7 +131,7 @@ def test_not_checkable_terminal_does_not_manufacture_a_culprit(mk):
     assert report.report_type != "cut_point"           # no fabrication cascade
     assert "think" not in report.culprit_run_ids        # innocent, not pinned
     assert report.evidence.verification_gaps == []      # no phantom gap
-    assert any("terminal_not_checkable" in n for n in report.evidence.notes)
+    assert note_of(report, "terminal_not_checkable") is not None
     assert report.evidence.terminal_verdict["checkable"] is False
 
 
@@ -147,8 +148,11 @@ def test_terminal_verdict_evidence_is_cited(mk):
         "checkable": True,
         "stale": False,
     }
-    assert any("verdict_conflict" in n for n in report.evidence.notes)
-    assert any(BAD.reasoning in n for n in report.evidence.notes)
+    conflict = note_of(report, "verdict_conflict")
+    assert conflict is not None
+    # The note carries the terminal's OWN reasoning, so a report leaning on
+    # "terminal is bad" cannot be rendered without showing that evidence.
+    assert conflict["terminal_reasoning"] == BAD.reasoning
 
 
 def test_verifiers_passing_a_bad_artifact_are_gaps_even_beside_a_cut_point(mk):
@@ -187,6 +191,7 @@ def test_score_map_and_candidacy_follow_topo_order(mk):
     ]
     assert list(report.evidence.score_map) == report.evidence.topo_order
     assert list(report.evidence.candidacy) == report.evidence.topo_order
+    assert list(report.evidence.candidacy_records) == report.evidence.topo_order
     assert report.evidence.verifier_run_ids == ["qa", "eval"]
 
 
@@ -194,14 +199,16 @@ def test_candidacy_carries_the_numbers_behind_each_decision(mk):
     """The trace must be auditable: score vs threshold, drop vs reference,
     exclusion reason — not bare labels."""
     report = find_blame(_incident(mk))
-    c = report.evidence.candidacy
 
-    assert "structural root" in c["start"]
-    assert "0.89" in c["think"] and "degradation-path start" in c["think"]
-    assert c["act"].startswith("origin")
-    assert "0.33" in c["act"]
-    assert "degradation path" in c["render"] and "0.56" in c["render"]
-    assert "verification gap" in c["qa"] and "0.92" in c["qa"]
+    assert verdict_of(report, "start") == "structural_root"
+    assert verdict_of(report, "think") == "degradation_path_start"
+    assert candidacy_of(report, "think")["score"] == pytest.approx(0.89)
+    assert verdict_of(report, "act") == "origin_cumulative"
+    assert candidacy_of(report, "act")["drop"] == pytest.approx(0.33)
+    assert verdict_of(report, "render") == "degradation_path_member"
+    assert candidacy_of(report, "render")["score"] == pytest.approx(0.56)
+    assert verdict_of(report, "qa") == "gap_passed_bad_terminal"
+    assert candidacy_of(report, "qa")["score"] == pytest.approx(0.92)
 
 
 def test_small_drifts_still_classify_as_composition_failure(mk):
@@ -218,7 +225,7 @@ def test_small_drifts_still_classify_as_composition_failure(mk):
     assert report.evidence.degradation_paths == []
     # And the fallback suspect is labelled as a layer suspect, not "never a
     # culprit" — the old contradiction.
-    assert "suspect" in report.evidence.candidacy["o"]
+    assert verdict_of(report, "o") == "composition_suspect"
 
 
 def _flagged(rid, s, flags):
@@ -246,13 +253,13 @@ def test_fabrication_cascade_blames_the_honest_underdeliverer(mk):
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["think"]
     assert report.confidence == pytest.approx(0.65)
-    assert any("fabrication cascade" in n for n in report.evidence.notes)
-    assert "fabrication cascade" in report.evidence.candidacy["think"]
+    assert note_of(report, "cut_point")["variant"] == "fabrication"
+    assert verdict_of(report, "think") == "origin_fabrication"
     # Verifiers that passed the bad work stay flagged in evidence.
     assert {g["run_id"] for g in report.evidence.verification_gaps} == {"qa", "eval"}
     # The producer's healthy score is confronted, not left standing as fact.
-    assert any("claims_vs_reality" in n for n in report.evidence.notes)
-    assert "claims-vs-reality" in report.evidence.candidacy["render"]
+    assert note_of(report, "claims_vs_reality", agent="render") is not None
+    assert verdict_of(report, "render") == "claims_conflict"
 
 
 def test_engine_leaves_hypotheses_empty_settled_origin_by_default(mk):
@@ -283,33 +290,40 @@ def test_unclassified_explains_which_preconditions_failed(mk):
     """A negative conclusion needs a trace: say WHY nothing matched."""
     inp = mk(nodes=["a", "b"], edges=[("a", "b")], scores={"a": 0.9, "b": 0.95})
     report = find_blame(inp)
-    note = next(n for n in report.evidence.notes if n.startswith("unclassified"))
-    assert "no terminal verdict available" in note
+    reasons = [r["code"] for r in note_of(report, "unclassified")["reasons"]]
+    assert reasons == ["no_terminal_verdict"]
 
 
 def test_candidacy_never_misstates_a_comparison(mk):
     """Regression for the 'origin — score 0.93 < threshold 0.50' lie: every
     numeric claim in the candidacy trace must be true for its node."""
     report = find_blame(_incident(mk))
-    for run_id, text in report.evidence.candidacy.items():
-        if "< threshold" in text:
+    # Verdicts whose template asserts "score < threshold" may only be assigned
+    # to nodes for which that is TRUE. The claim is now a property of the
+    # verdict code, so it is checkable without reading a sentence.
+    below_threshold_verdicts = {
+        "origin_boundary", "inherited", "independent_low", "below_not_origin",
+        "gap_verdict_scored_incorrect",
+    }
+    for run_id, rec in report.evidence.candidacy_records.items():
+        if rec["verdict"] in below_threshold_verdicts:
             score = report.evidence.score_map[run_id]
-            assert score is not None and score < 0.5, (run_id, text)
+            assert score is not None and score < 0.5, (run_id, rec)
 
 
 def test_structural_root_labelled_by_design_no_warning(mk):
     """start has no payload BY DESIGN — candidacy says so, and there is no
     instrumentation warning for it. A non-root payload gap does warn."""
     report = find_blame(_incident(mk))
-    assert "structural root" in report.evidence.candidacy["start"]
-    assert not any("instrumentation_warning" in n for n in report.evidence.notes)
+    assert verdict_of(report, "start") == "structural_root"
+    assert note_of(report, "instrumentation_warning") is None
 
     broken = NodeScore(run_id="mid", score=None, components={}, input_flawed=None,
                        unscored_reason="payload_missing", judge_note=None)
     inp = mk(nodes=["a", "mid", "b"], edges=[("a", "mid"), ("mid", "b")],
              scores={"a": 0.9, "mid": broken, "b": 0.9})
     report2 = find_blame(inp)
-    assert any("instrumentation_warning" in n for n in report2.evidence.notes)
+    assert note_of(report2, "instrumentation_warning")["agents"] == ["mid"]
 
 
 def test_whistle_blowing_verifier_is_not_a_retroactive_gap(mk):
@@ -328,7 +342,7 @@ def test_whistle_blowing_verifier_is_not_a_retroactive_gap(mk):
 
     gaps = {g["run_id"]: g["basis"] for g in report.evidence.verification_gaps}
     assert gaps == {"qa": "passed_bad_terminal"}  # eval exonerated
-    assert "whistle-blower" in report.evidence.candidacy["eval"]
+    assert verdict_of(report, "eval") == "whistleblower"
 
 
 def test_cascade_participants_are_labelled_and_rubber_stamp_score_overridden(mk):
@@ -346,12 +360,11 @@ def test_cascade_participants_are_labelled_and_rubber_stamp_score_overridden(mk)
     report = find_blame(mk(nodes=nodes, edges=edges, scores=scores,
                            terminal_verdict=BAD))
 
-    c = report.evidence.candidacy
-    assert "fabrication-cascade participant" in c["act"]
+    assert verdict_of(report, "act") == "cascade_participant"
     # render is the manifestation producer, so the stronger claims-vs-reality
-    # label wins there — either way its score reads as an unverified claim.
-    assert "unverified claim" in c["render"]
-    assert any("cascade_participants" in n for n in report.evidence.notes)
+    # verdict wins there — either way its score reads as an unverified claim.
+    assert verdict_of(report, "render") == "claims_conflict"
+    assert note_of(report, "cascade_participants")["agents"] == ["act", "render"]
 
     overrides = {o["run_id"]: o for o in report.evidence.score_overrides}
     assert set(overrides) == {"qa"}  # eval blew the whistle — no override
@@ -410,8 +423,8 @@ def test_passing_verifiers_scored_low_but_terminal_ok_is_no_gap(mk):
     assert report.evidence.verification_gaps == []
     assert report.culprit_run_ids == []           # no incident-worthy culprit
     # And the report never claims the terminal is bad while it is ok.
-    assert not any("terminal output is bad" in n for n in report.evidence.notes)
-    assert not any("terminal is bad" in n for n in report.evidence.notes)
+    assert note_of(report, "verification_gap") is None
+    assert note_of(report, "verdict_conflict") is None
 
 
 def test_bad_terminal_passed_bad_terminal_route_still_fires(mk):
@@ -432,8 +445,11 @@ def test_bad_terminal_passed_bad_terminal_route_still_fires(mk):
     assert set(report.culprit_run_ids) == {"qa", "eval"}
     gaps = {g["run_id"]: g["basis"] for g in report.evidence.verification_gaps}
     assert gaps == {"qa": "passed_bad_terminal", "eval": "passed_bad_terminal"}
-    assert any("terminal output is bad" in n for n in report.evidence.notes)
-    assert any(BAD.reasoning in n for n in report.evidence.notes)
+    gap_note = note_of(report, "verification_gap")
+    assert {g["basis"] for g in gap_note["gaps"]} == {"passed_bad_terminal"}
+    # The bad terminal is cited as ground truth, with its own reasoning.
+    assert gap_note["terminal"] == "bad"
+    assert gap_note["terminal_reasoning"] == BAD.reasoning
 
 
 def test_verdict_scored_incorrect_wrong_pass_still_fires_with_bad_terminal(mk):
@@ -471,11 +487,15 @@ def test_wrong_fail_with_ok_terminal_surfaces_as_gap_with_honest_note(mk):
     assert report.culprit_run_ids == ["review"]
     gaps = {g["run_id"]: g["basis"] for g in report.evidence.verification_gaps}
     assert gaps == {"review": "verdict_scored_incorrect"}
-    # Honest note: false alarm confirmed by the ok terminal, NOT a bad terminal.
-    note = next(n for n in report.evidence.notes if n.startswith("verification_gap"))
-    assert "false alarm" in note
-    assert "terminal output is bad" not in note
-    assert "ok" in note
+    # Honest note: a wrong-FAIL confirmed by the OK terminal. The false-alarm
+    # wording is reachable only from (issued_fail=True, terminal="ok") — with a
+    # bad terminal the template could not render it.
+    gap_note = note_of(report, "verification_gap")
+    assert gap_note["terminal"] == "ok"
+    assert gap_note["gaps"] == [
+        {"agent": "review", "score": pytest.approx(0.27),
+         "basis": "verdict_scored_incorrect", "issued_fail": True}
+    ]
 
 
 def test_wrong_fail_with_bad_terminal_is_not_manufactured(mk):

@@ -1,0 +1,329 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "topology-corpus"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "detective_sdk.otel"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "orchestrator"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"goal\": \"Write a three-section product brief\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000009000000000",
+              "kind": 1,
+              "name": "orchestrator",
+              "parentSpanId": "",
+              "spanId": "0000000000000001",
+              "startTimeUnixNano": "1752000000000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "write_intro"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"section\": \"intro\", \"source\": \"datasheet:intro\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"section\": \"intro\", \"text\": \"## Introduction\\n\\nThe unit ships in two trims and one carry case.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002000000000",
+              "kind": 1,
+              "name": "write_intro",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000002",
+              "startTimeUnixNano": "1752000001000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "write_specs"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"section\": \"specs\", \"source\": \"datasheet:specs\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"html\", \"section\": \"specs\", \"text\": \"<h2>Specs</h2><p>Mass 1.2 kg, runtime 14 hours, two ports.</p>\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002200000000",
+              "kind": 1,
+              "name": "write_specs",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000003",
+              "startTimeUnixNano": "1752000001000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "write_pricing"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"section\": \"pricing\", \"source\": \"datasheet:pricing\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"section\": \"pricing\", \"text\": \"## Pricing\\n\\nA standard tier and an extended-support tier.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002400000000",
+              "kind": 1,
+              "name": "write_pricing",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000004",
+              "startTimeUnixNano": "1752000001000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "merge"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"sections\": [{\"section\": \"intro\", \"text\": \"## Introduction\\n\\nThe unit ships in two trims and one carry case.\"}, {\"section\": \"specs\", \"text\": \"<h2>Specs</h2><p>Mass 1.2 kg, runtime 14 hours, two ports.</p>\"}, {\"section\": \"pricing\", \"text\": \"## Pricing\\n\\nA standard tier and an extended-support tier.\"}]}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"document\": \"## Introduction\\n\\nThe unit ships in two trims and one carry case.\\n\\n<h2>Specs</h2><p>Mass 1.2 kg, runtime 14 hours, two ports.</p>\\n\\n## Pricing\\n\\nA standard tier and an extended-support tier.\", \"format\": \"html\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000004000000000",
+              "kind": 1,
+              "name": "merge",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000005",
+              "startTimeUnixNano": "1752000003000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "collect_write_intro"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "write_intro"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"target\": \"write_intro\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003150000000",
+              "kind": 1,
+              "name": "collect_write_intro",
+              "parentSpanId": "0000000000000005",
+              "spanId": "0000000000000006",
+              "startTimeUnixNano": "1752000003100000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "collect_write_specs"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "write_specs"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"target\": \"write_specs\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003250000000",
+              "kind": 1,
+              "name": "collect_write_specs",
+              "parentSpanId": "0000000000000005",
+              "spanId": "0000000000000007",
+              "startTimeUnixNano": "1752000003200000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "collect_write_pricing"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "write_pricing"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"target\": \"write_pricing\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003350000000",
+              "kind": 1,
+              "name": "collect_write_pricing",
+              "parentSpanId": "0000000000000005",
+              "spanId": "0000000000000008",
+              "startTimeUnixNano": "1752000003300000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

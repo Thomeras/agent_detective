@@ -68,6 +68,7 @@ agent_runs = Table(
     Column("tool_schema_hash", Text),
     Column("artifact_meta", Text),
     Column("tool_calls", Text),
+    Column("contract_params", Text),
     Column("parent_run_id", Uuid),
     Column("trace_id", Text),
     Column("status", Text, nullable=False),
@@ -101,7 +102,19 @@ edges = Table(
 class Repo(Protocol):
     """Persistence seam; faked by an in-memory implementation in tests."""
 
-    async def upsert_batch(self, batch: IngestBatch) -> None: ...
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
+        """Idempotent write of one mapped batch.
+
+        With ``refresh_runs`` the batch is authoritative for run DATA: run rows
+        are updated in place instead of first-write-wins. Only the finalization
+        re-map sets it — that batch is mapped from the graph's full span set,
+        so it is at least as informed as any per-request row.
+        """
+        ...
+
+    async def trace_ids_for_graph(self, graph_id: UUID) -> list[str]:
+        """Distinct trace ids of the graph's runs (re-map span lookup)."""
+        ...
 
     async def list_active_graph_activity(self) -> list[GraphActivity]: ...
 
@@ -123,11 +136,12 @@ class PgRepo:
     def __init__(self, engine: "object") -> None:
         self._engine = engine
 
-    async def upsert_batch(self, batch: IngestBatch) -> None:
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
         async with self._engine.begin() as conn:
             for graph in batch.graphs:
                 stmt = pg_insert(execution_graphs).values(
                     graph_id=graph.graph_id,
+                    graph_type=graph.graph_type,
                     status="active",
                     started_at=graph.started_at,
                     ended_at=graph.ended_at,
@@ -143,6 +157,11 @@ class PgRepo:
                         ),
                         "ended_at": func.greatest(
                             execution_graphs.c.ended_at, stmt.excluded.ended_at
+                        ),
+                        # Keep the first-known cohort key: a later batch missing
+                        # service.name must not clobber it back to NULL.
+                        "graph_type": func.coalesce(
+                            execution_graphs.c.graph_type, stmt.excluded.graph_type
                         ),
                     },
                 )
@@ -161,6 +180,7 @@ class PgRepo:
                         tool_schema_hash=run.tool_schema_hash,
                         artifact_meta=run.artifact_meta,
                         tool_calls=run.tool_calls,
+                        contract_params=run.contract_params,
                         trace_id=run.trace_id,
                         status=run.status,
                         input_inline=run.input_inline,
@@ -177,8 +197,31 @@ class PgRepo:
                         started_at=run.started_at,
                         ended_at=run.ended_at,
                     )
-                    .on_conflict_do_nothing()
                 )
+                if refresh_runs:
+                    # Full-span-set re-map: refresh every ingest-owned data
+                    # column. Scoring columns belong to the worker and are not
+                    # in this statement, so they survive untouched.
+                    stmt = stmt.on_conflict_do_update(
+                        index_elements=["run_id"],
+                        set_={
+                            c: getattr(stmt.excluded, c)
+                            for c in (
+                                "graph_id", "agent_name", "agent_version",
+                                "model_name", "prompt_hash", "tool_schema_hash",
+                                "artifact_meta", "tool_calls", "contract_params",
+                                "trace_id",
+                                "status", "input_inline", "input_overflow_ref",
+                                "input_bytes", "output_inline",
+                                "output_overflow_ref", "output_bytes",
+                                "input_summary", "output_summary", "cost_usd",
+                                "tokens_in", "tokens_out", "started_at",
+                                "ended_at",
+                            )
+                        },
+                    )
+                else:
+                    stmt = stmt.on_conflict_do_nothing()
                 await conn.execute(stmt)
 
             for edge in batch.edges:
@@ -208,6 +251,16 @@ class PgRepo:
                     .where(execution_graphs.c.graph_id == graph_id)
                     .values(run_count=count)
                 )
+
+    async def trace_ids_for_graph(self, graph_id: UUID) -> list[str]:
+        stmt = (
+            select(agent_runs.c.trace_id)
+            .where(agent_runs.c.graph_id == graph_id)
+            .distinct()
+        )
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(stmt)).all()
+        return sorted(row.trace_id for row in rows if row.trace_id)
 
     async def list_active_graph_activity(self) -> list[GraphActivity]:
         activity_stmt = (
@@ -265,8 +318,12 @@ class PgRepo:
             .where(agent_runs.c.graph_id == execution_graphs.c.graph_id)
             .scalar_subquery()
         )
+        # No coalesce: SUM over all-NULL costs must stay NULL. Folding it to 0
+        # made every uninstrumented graph report a confident "$0" — the UI has
+        # no way to tell that apart from a graph that genuinely cost nothing,
+        # and "we did not measure" is not a measurement of zero.
         total_cost = (
-            select(func.coalesce(func.sum(agent_runs.c.cost_usd), 0))
+            select(func.sum(agent_runs.c.cost_usd))
             .where(agent_runs.c.graph_id == execution_graphs.c.graph_id)
             .scalar_subquery()
         )

@@ -1,0 +1,329 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "topology-corpus"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "detective_sdk.otel"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "retriever"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"goal\": \"Localize the release notes\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"docs\": [\"datasheet.md\", \"faq.md\", \"changelog.md\"], \"format\": \"markdown\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001000000000",
+              "kind": 1,
+              "name": "retriever",
+              "parentSpanId": "",
+              "spanId": "0000000000000001",
+              "startTimeUnixNano": "1752000000000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "analyst"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"docs\": [\"datasheet.md\", \"faq.md\", \"changelog.md\"], \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"analysis\": \"## Findings\\n\\nThe changelog and the datasheet agree on the runtime.\", \"format\": \"markdown\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002000000000",
+              "kind": 1,
+              "name": "analyst",
+              "parentSpanId": "",
+              "spanId": "0000000000000002",
+              "startTimeUnixNano": "1752000001200000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "a2a.task_id",
+                  "value": {
+                    "stringValue": "t-001"
+                  }
+                },
+                {
+                  "key": "a2a.peer_agent",
+                  "value": {
+                    "stringValue": "retriever"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "POST"
+                  }
+                },
+                {
+                  "key": "url.full",
+                  "value": {
+                    "stringValue": "https://peers.local/retriever/tasks/t-001"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001300000000",
+              "kind": 3,
+              "name": "a2a.send",
+              "parentSpanId": "0000000000000002",
+              "spanId": "0000000000000003",
+              "startTimeUnixNano": "1752000001250000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "translator"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"docs\": [\"datasheet.md\", \"faq.md\", \"changelog.md\"], \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"html\", \"translation\": \"<h2>Zjištění</h2><p>Changelog a datasheet se shodují.</p>\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002200000000",
+              "kind": 1,
+              "name": "translator",
+              "parentSpanId": "",
+              "spanId": "0000000000000004",
+              "startTimeUnixNano": "1752000001200000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "a2a.task_id",
+                  "value": {
+                    "stringValue": "t-002"
+                  }
+                },
+                {
+                  "key": "a2a.peer_agent",
+                  "value": {
+                    "stringValue": "retriever"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "POST"
+                  }
+                },
+                {
+                  "key": "url.full",
+                  "value": {
+                    "stringValue": "https://peers.local/retriever/tasks/t-002"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001300000000",
+              "kind": 3,
+              "name": "a2a.send",
+              "parentSpanId": "0000000000000004",
+              "spanId": "0000000000000005",
+              "startTimeUnixNano": "1752000001250000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "editor"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"inputs\": [{\"analysis\": \"## Findings\\n\\nThe changelog and the datasheet agree on the runtime.\", \"format\": \"markdown\"}, {\"format\": \"html\", \"translation\": \"<h2>Zjištění</h2><p>Changelog a datasheet se shodují.</p>\"}]}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"document\": \"## Findings\\n\\nThe changelog and the datasheet agree on the runtime.\\n\\n<h2>Zjištění</h2><p>Changelog a datasheet se shodují.</p>\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003000000000",
+              "kind": 1,
+              "name": "editor",
+              "parentSpanId": "",
+              "spanId": "0000000000000006",
+              "startTimeUnixNano": "1752000002400000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "a2a.task_id",
+                  "value": {
+                    "stringValue": "t-003"
+                  }
+                },
+                {
+                  "key": "a2a.peer_agent",
+                  "value": {
+                    "stringValue": "analyst"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "POST"
+                  }
+                },
+                {
+                  "key": "url.full",
+                  "value": {
+                    "stringValue": "https://peers.local/analyst/tasks/t-003"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002500000000",
+              "kind": 3,
+              "name": "a2a.send",
+              "parentSpanId": "0000000000000006",
+              "spanId": "0000000000000007",
+              "startTimeUnixNano": "1752000002450000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "a2a.task_id",
+                  "value": {
+                    "stringValue": "t-004"
+                  }
+                },
+                {
+                  "key": "a2a.peer_agent",
+                  "value": {
+                    "stringValue": "translator"
+                  }
+                },
+                {
+                  "key": "http.request.method",
+                  "value": {
+                    "stringValue": "POST"
+                  }
+                },
+                {
+                  "key": "url.full",
+                  "value": {
+                    "stringValue": "https://peers.local/translator/tasks/t-004"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002600000000",
+              "kind": 3,
+              "name": "a2a.send",
+              "parentSpanId": "0000000000000006",
+              "spanId": "0000000000000008",
+              "startTimeUnixNano": "1752000002550000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1c1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+from .narrative import signal
 
 SIGNAL_ARTIFACT_INTEGRITY_FAIL = "artifact_integrity_fail"
 
@@ -124,13 +125,11 @@ def _declared_ext(path: str, meta: dict) -> str | None:
     return name.rsplit(".", 1)[-1].strip().lower() or None
 
 
-def _fail(detail: str, basis: str) -> dict:
-    return {
-        "name": SIGNAL_ARTIFACT_INTEGRITY_FAIL,
-        "severity": "fail",
-        "detail": detail,
-        "basis": basis,
-    }
+def _fail(code: str, **params) -> dict:
+    """One artifact-integrity failure, by CODE. The two evidence strings
+    (detail + basis) are rendered from these params in one place, so a basis can
+    never state an observation the detail contradicts."""
+    return signal(SIGNAL_ARTIFACT_INTEGRITY_FAIL, "fail", code, **params)
 
 
 def artifact_integrity_signals(
@@ -158,12 +157,7 @@ def artifact_integrity_signals(
         detected = detected if isinstance(detected, str) else None
 
         if detected == "missing":
-            signals.append(
-                _fail(
-                    f"declared artifact {path} does not exist",
-                    "file missing at flush",
-                )
-            )
+            signals.append(_fail("artifact_missing", path=path))
         elif (
             ext is not None
             and ext in _EXT_KIND
@@ -172,19 +166,12 @@ def artifact_integrity_signals(
         ):
             signals.append(
                 _fail(
-                    f"declared .{ext} but content is {detected}",
-                    f"magic bytes: detected_kind={detected} for {path}",
+                    "artifact_kind_mismatch", path=path, ext=ext, detected=detected
                 )
             )
 
         if meta.get("parse_ok") is False:
-            declared = f".{ext}" if ext else "artifact"
-            signals.append(
-                _fail(
-                    f"{path} does not parse as a valid {declared} file",
-                    "parse check",
-                )
-            )
+            signals.append(_fail("artifact_parse_failed", path=path, ext=ext))
 
         size = meta.get("size")
         size_val = size if isinstance(size, int) and not isinstance(size, bool) else None
@@ -192,17 +179,12 @@ def artifact_integrity_signals(
         # observation (a "size=5000 < min 64" claim on a nonempty=false file
         # with 5000 allocated bytes would be a false statement in the evidence).
         if meta.get("nonempty") is False:
-            signals.append(
-                _fail(
-                    f"{path} has no content",
-                    f"content check (nonempty=false, size={size_val if size_val is not None else 'unknown'})",
-                )
-            )
+            signals.append(_fail("artifact_empty", path=path, size=size_val))
         elif size_val is not None and size_val < min_bytes:
             signals.append(
                 _fail(
-                    f"{path} is below the minimum plausible size",
-                    f"size check (size={size_val} < min {min_bytes})",
+                    "artifact_too_small", path=path, size=size_val,
+                    min_bytes=min_bytes,
                 )
             )
     return signals

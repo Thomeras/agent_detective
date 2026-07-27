@@ -10,7 +10,14 @@ from __future__ import annotations
 
 from datetime import datetime
 
-from blame_engine import BlameConfig, BlameInput, LoopBaseline, NodeScore, TerminalVerdict
+from blame_engine import (
+    BlameConfig,
+    BlameInput,
+    LoopBaseline,
+    NodeScore,
+    TerminalVerdict,
+    is_verifier,
+)
 
 from .types import AgentStat, GraphBundle, RunRecord
 
@@ -47,16 +54,13 @@ def terminal_run(bundle: GraphBundle) -> RunRecord | None:
     return runs[0] if runs else None
 
 
-# Verifier/gate node name hints (mirrors blame_engine._VERIFIER_HINTS): a node
-# whose job is to PASS/FAIL work. Its OUTPUT is a verdict, not the deliverable.
-_VERIFIER_HINTS = (
-    "qa", "eval", "review", "verif", "validat", "check", "critic", "audit", "gate"
-)
-
-
-def _is_verifier(name: str | None) -> bool:
-    n = (name or "").lower()
-    return any(h in n for h in _VERIFIER_HINTS)
+# Verifier/gate node detection: a node whose job is to PASS/FAIL work — its
+# OUTPUT is a verdict, not the deliverable. Imported from blame_engine.roles,
+# the single home; this module used to keep its own literal copy alongside two
+# more (blame.py, tier2.py), and a divergence between any two of them is a
+# wrong verdict: which run gets graded as the deliverable, which node can open a
+# verification gap, and which rubric the judge sees all read from these hints.
+_is_verifier = is_verifier
 
 
 def _has_output(run: RunRecord) -> bool:
@@ -155,7 +159,10 @@ def _loop_baselines(baselines: dict[str, AgentStat]) -> dict[str, LoopBaseline]:
 def _common_fields(bundle: GraphBundle) -> dict[str, object]:
     nodes = [str(r.run_id) for r in bundle.runs]
     edges = [(str(e.from_run_id), str(e.to_run_id)) for e in bundle.edges]
-    node_costs = {str(r.run_id): (r.cost_usd or 0.0) for r in bundle.runs}
+    # `or 0.0` here silently turned "nobody instrumented cost" into "this run
+    # was free" — the one claim the engine is never allowed to invent. Keep the
+    # None; downstream_cost() distinguishes the two.
+    node_costs = {str(r.run_id): r.cost_usd for r in bundle.runs}
     node_end_times = {str(r.run_id): to_epoch(r.ended_at) for r in bundle.runs}
     agent_names = {str(r.run_id): (r.agent_name or str(r.run_id)) for r in bundle.runs}
     error_span_ids = {str(r.run_id): [] for r in bundle.runs}

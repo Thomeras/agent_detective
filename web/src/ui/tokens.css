@@ -1,0 +1,359 @@
+/* Design tokens + primitive styles for the verdict rebuild (Track B, §9.3).
+ *
+ * ADDITIVE and self-contained: this file is imported ONLY by the new primitives
+ * in web/src/ui/primitives.tsx and does not touch styles.css. Everything is
+ * namespaced under `--ad-*` custom properties and `.ad-*` classes so it can
+ * never collide with the existing app styling.
+ *
+ * Theme-aware: values default to the app's dark-first palette (the same hexes
+ * as styles.css :root, so the two systems read identically in the shipped app),
+ * with a light override under both `prefers-color-scheme: light` and an explicit
+ * `:root[data-theme="light"]` opt-in. A `[data-theme="dark"]` opt-in wins back
+ * dark in a light-preferring OS.
+ */
+
+:root {
+  /* Spacing scale (4px base) */
+  --ad-sp-1: 4px;
+  --ad-sp-2: 8px;
+  --ad-sp-3: 12px;
+  --ad-sp-4: 16px;
+  --ad-sp-5: 24px;
+  --ad-sp-6: 32px;
+
+  /* Radii */
+  --ad-radius-sm: 4px;
+  --ad-radius: 6px;
+  --ad-radius-lg: 8px;
+  --ad-radius-pill: 999px;
+
+  /* Surfaces + text (dark default, mirrors styles.css) */
+  --ad-bg: #0d1117;
+  --ad-surface: #161b22;
+  --ad-surface-2: #1c2230;
+  --ad-border: #30363d;
+  --ad-border-soft: #21262d;
+  --ad-text: #e6edf3;
+  --ad-text-dim: #9da7b3;
+  --ad-text-faint: #6b7280;
+
+  /* Tone palette — ok | warn | fail | unknown. Each tone gets a foreground,
+   * a translucent fill, and a matching border so badges/cards/chips/meters all
+   * speak the same colour language. */
+  --ad-ok-fg: #3fb950;
+  --ad-ok-bg: rgba(63, 185, 80, 0.12);
+  --ad-ok-border: rgba(63, 185, 80, 0.4);
+
+  --ad-warn-fg: #d29922;
+  --ad-warn-bg: rgba(210, 153, 34, 0.12);
+  --ad-warn-border: rgba(210, 153, 34, 0.4);
+
+  --ad-fail-fg: #f85149;
+  --ad-fail-bg: rgba(248, 81, 73, 0.12);
+  --ad-fail-border: rgba(248, 81, 73, 0.4);
+
+  --ad-unknown-fg: #9da7b3;
+  --ad-unknown-bg: rgba(157, 167, 179, 0.1);
+  --ad-unknown-border: rgba(157, 167, 179, 0.35);
+
+  /* Channel accent — deterministic (ground truth) vs judged (assessment).
+   * §2.4: the two channels must be visually distinguishable everywhere. */
+  --ad-deterministic-fg: #58a6ff;
+  --ad-deterministic-bg: rgba(88, 166, 255, 0.12);
+  --ad-deterministic-border: rgba(88, 166, 255, 0.4);
+
+  --ad-judged-fg: #bc8cff;
+  --ad-judged-bg: rgba(188, 140, 255, 0.12);
+  --ad-judged-border: rgba(188, 140, 255, 0.4);
+
+  --ad-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+}
+
+/* Light theme: OS preference, unless the root explicitly asks for dark. */
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --ad-bg: #ffffff;
+    --ad-surface: #f6f8fa;
+    --ad-surface-2: #eef1f5;
+    --ad-border: #d0d7de;
+    --ad-border-soft: #e4e8ee;
+    --ad-text: #1f2328;
+    --ad-text-dim: #57606a;
+    --ad-text-faint: #818b98;
+
+    --ad-ok-fg: #1a7f37;
+    --ad-ok-bg: rgba(26, 127, 55, 0.1);
+    --ad-ok-border: rgba(26, 127, 55, 0.35);
+
+    --ad-warn-fg: #9a6700;
+    --ad-warn-bg: rgba(154, 103, 0, 0.1);
+    --ad-warn-border: rgba(154, 103, 0, 0.35);
+
+    --ad-fail-fg: #cf222e;
+    --ad-fail-bg: rgba(207, 34, 46, 0.1);
+    --ad-fail-border: rgba(207, 34, 46, 0.35);
+
+    --ad-unknown-fg: #57606a;
+    --ad-unknown-bg: rgba(87, 96, 106, 0.08);
+    --ad-unknown-border: rgba(87, 96, 106, 0.3);
+
+    --ad-deterministic-fg: #0969da;
+    --ad-deterministic-bg: rgba(9, 105, 218, 0.1);
+    --ad-deterministic-border: rgba(9, 105, 218, 0.35);
+
+    --ad-judged-fg: #8250df;
+    --ad-judged-bg: rgba(130, 80, 223, 0.1);
+    --ad-judged-border: rgba(130, 80, 223, 0.35);
+  }
+}
+
+/* Explicit light opt-in, regardless of OS preference. */
+:root[data-theme="light"] {
+  --ad-bg: #ffffff;
+  --ad-surface: #f6f8fa;
+  --ad-surface-2: #eef1f5;
+  --ad-border: #d0d7de;
+  --ad-border-soft: #e4e8ee;
+  --ad-text: #1f2328;
+  --ad-text-dim: #57606a;
+  --ad-text-faint: #818b98;
+
+  --ad-ok-fg: #1a7f37;
+  --ad-ok-bg: rgba(26, 127, 55, 0.1);
+  --ad-ok-border: rgba(26, 127, 55, 0.35);
+  --ad-warn-fg: #9a6700;
+  --ad-warn-bg: rgba(154, 103, 0, 0.1);
+  --ad-warn-border: rgba(154, 103, 0, 0.35);
+  --ad-fail-fg: #cf222e;
+  --ad-fail-bg: rgba(207, 34, 46, 0.1);
+  --ad-fail-border: rgba(207, 34, 46, 0.35);
+  --ad-unknown-fg: #57606a;
+  --ad-unknown-bg: rgba(87, 96, 106, 0.08);
+  --ad-unknown-border: rgba(87, 96, 106, 0.3);
+  --ad-deterministic-fg: #0969da;
+  --ad-deterministic-bg: rgba(9, 105, 218, 0.1);
+  --ad-deterministic-border: rgba(9, 105, 218, 0.35);
+  --ad-judged-fg: #8250df;
+  --ad-judged-bg: rgba(130, 80, 223, 0.1);
+  --ad-judged-border: rgba(130, 80, 223, 0.35);
+}
+
+/* ---- Tone helpers: one class per tone maps to its three vars. ---- */
+.ad-tone-ok {
+  --ad-tone-fg: var(--ad-ok-fg);
+  --ad-tone-bg: var(--ad-ok-bg);
+  --ad-tone-border: var(--ad-ok-border);
+}
+.ad-tone-warn {
+  --ad-tone-fg: var(--ad-warn-fg);
+  --ad-tone-bg: var(--ad-warn-bg);
+  --ad-tone-border: var(--ad-warn-border);
+}
+.ad-tone-fail {
+  --ad-tone-fg: var(--ad-fail-fg);
+  --ad-tone-bg: var(--ad-fail-bg);
+  --ad-tone-border: var(--ad-fail-border);
+}
+.ad-tone-unknown {
+  --ad-tone-fg: var(--ad-unknown-fg);
+  --ad-tone-bg: var(--ad-unknown-bg);
+  --ad-tone-border: var(--ad-unknown-border);
+}
+
+/* ---- Channel helpers ---- */
+.ad-channel-deterministic {
+  --ad-tone-fg: var(--ad-deterministic-fg);
+  --ad-tone-bg: var(--ad-deterministic-bg);
+  --ad-tone-border: var(--ad-deterministic-border);
+}
+.ad-channel-judged {
+  --ad-tone-fg: var(--ad-judged-fg);
+  --ad-tone-bg: var(--ad-judged-bg);
+  --ad-tone-border: var(--ad-judged-border);
+}
+
+/* ---- Badge ---- */
+.ad-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-sp-1);
+  padding: 2px var(--ad-sp-2);
+  border-radius: var(--ad-radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--ad-tone-fg, var(--ad-text-dim));
+  background: var(--ad-tone-bg, var(--ad-surface-2));
+  border: 1px solid var(--ad-tone-border, var(--ad-border));
+  white-space: nowrap;
+}
+
+/* ---- Chip: a small labelled caveat/metadata pill (§2.4 render rules). ---- */
+.ad-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--ad-sp-1);
+  padding: 1px var(--ad-sp-2);
+  border-radius: var(--ad-radius-sm);
+  font-size: 11px;
+  font-family: var(--ad-mono);
+  color: var(--ad-tone-fg, var(--ad-text-dim));
+  background: var(--ad-tone-bg, var(--ad-surface-2));
+  border: 1px solid var(--ad-tone-border, var(--ad-border));
+  /* Caveat chips are exempt from clipping — they wrap, never truncate. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.ad-chip[title] {
+  cursor: help;
+}
+
+/* ---- Card ---- */
+.ad-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-sp-3);
+  padding: var(--ad-sp-4);
+  background: var(--ad-surface);
+  border: 1px solid var(--ad-border);
+  border-radius: var(--ad-radius-lg);
+  color: var(--ad-text);
+  min-width: 0;
+}
+/* Toned card: a left accent rail in the tone colour, fill stays neutral so
+ * dense text remains legible. */
+.ad-card.ad-toned {
+  border-left: 3px solid var(--ad-tone-border, var(--ad-border));
+}
+.ad-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--ad-sp-3);
+}
+.ad-card-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 600;
+}
+.ad-card-body {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-sp-3);
+  min-width: 0;
+}
+
+/* ---- Meter: an observation/attribution confidence pair (§2.4). ---- */
+.ad-meter {
+  display: flex;
+  flex-direction: column;
+  gap: var(--ad-sp-2);
+}
+.ad-meter-row {
+  display: grid;
+  grid-template-columns: 96px 1fr 44px;
+  align-items: center;
+  gap: var(--ad-sp-2);
+}
+.ad-meter-label {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--ad-text-faint);
+}
+.ad-meter-track {
+  height: 6px;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-surface-2);
+  overflow: hidden;
+}
+.ad-meter-fill {
+  display: block;
+  height: 100%;
+  border-radius: var(--ad-radius-pill);
+  background: var(--ad-tone-fg, var(--ad-deterministic-fg));
+}
+.ad-meter-value {
+  font-family: var(--ad-mono);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  color: var(--ad-text);
+}
+.ad-meter-value.ad-na {
+  color: var(--ad-text-faint);
+}
+
+/* ---- Table ---- */
+.ad-table-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--ad-border);
+  border-radius: var(--ad-radius-lg);
+}
+.ad-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: var(--ad-text);
+}
+.ad-table th,
+.ad-table td {
+  text-align: left;
+  padding: var(--ad-sp-3) var(--ad-sp-4);
+  border-bottom: 1px solid var(--ad-border-soft);
+  white-space: nowrap;
+}
+.ad-table thead th {
+  background: var(--ad-surface);
+  color: var(--ad-text-dim);
+  font-weight: 600;
+}
+.ad-table tbody tr:hover {
+  background: var(--ad-surface);
+}
+.ad-table tbody tr.ad-row-link {
+  cursor: pointer;
+}
+.ad-table tbody tr:last-child td {
+  border-bottom: none;
+}
+.ad-table td.ad-col-num,
+.ad-table th.ad-col-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- Disclosure ---- */
+.ad-disclosure {
+  border: 1px solid var(--ad-border);
+  border-radius: var(--ad-radius);
+  background: var(--ad-surface-2);
+}
+.ad-disclosure-summary {
+  cursor: pointer;
+  padding: 7px var(--ad-sp-3);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ad-text);
+  list-style: none;
+  display: flex;
+  align-items: center;
+  gap: var(--ad-sp-2);
+}
+.ad-disclosure-summary::-webkit-details-marker {
+  display: none;
+}
+.ad-disclosure-summary::before {
+  content: "▸";
+  color: var(--ad-text-dim);
+}
+.ad-disclosure[open] > .ad-disclosure-summary::before {
+  content: "▾";
+}
+.ad-disclosure-body {
+  padding: 0 var(--ad-sp-3) var(--ad-sp-3);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ad-text);
+  overflow-wrap: anywhere;
+}

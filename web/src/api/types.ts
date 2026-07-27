@@ -26,6 +26,7 @@ export type ReportType =
   | "verification_gap"
   | "degraded_recovered"
   | "shipped_with_latent_defect"
+  | "terminal_defect_unlocalized"
   | "unclassified";
 
 // GET /graphs -> { graphs: GraphSummary[], limit, offset }
@@ -224,6 +225,19 @@ export interface DegradationPath {
   cumulative_drop: number;
 }
 
+// Typed classification rationale (verdict refactor §2.4). Prose is generated
+// from these by the engine's narrative templates and stored alongside for
+// grep/export; it is never parsed back.
+export interface NoteRecord {
+  slug: string;
+  data: Record<string, unknown>;
+}
+
+export interface CandidacyRecord {
+  verdict: string;
+  data: Record<string, unknown>;
+}
+
 export interface Evidence {
   score_map: Record<string, number | null>;
   drops: Record<string, number>;
@@ -233,6 +247,11 @@ export interface Evidence {
   unknown_ancestors: string[];
   fact_propagation: FactPropagationEntry[] | null;
   notes: string[];
+  // The TYPED originals of `notes` (schema 2). `slug` is the note's stable
+  // identity and `data` the payload its sentence was rendered from. Branch on
+  // these — NEVER on a note's prefix or wording: the sentence is a render
+  // artifact and rewording it must not be able to break a consumer.
+  note_records?: NoteRecord[];
   // Where the failure surfaced — the terminal artifact/output (verifier sinks
   // are mapped back to the producer whose work they judged).
   manifestation_run_ids?: string[];
@@ -240,6 +259,9 @@ export interface Evidence {
   verification_gaps?: VerificationGap[];
   // Per-node audit trail: why it was or wasn't blamed, with the numbers.
   candidacy?: Record<string, string>;
+  // The TYPED originals of `candidacy` (schema 2): run_id -> verdict code +
+  // the numbers the decision rested on. Same rule as note_records.
+  candidacy_records?: Record<string, CandidacyRecord>;
   terminal_verdict?: TerminalVerdictEvidence | null;
   degradation_paths?: DegradationPath[];
   // Deterministic topological order — JSONB scrambles object key order, so
@@ -265,6 +287,9 @@ export interface Evidence {
   hypotheses?: {
     origin: string | null;
     agent?: string | null;
+    // Stable code for WHY this origin is live ("reported_origin",
+    // "later_producer", "unresolved"); `basis` is its one rendering.
+    basis_code?: string;
     basis: string;
     weight: number;
   }[];
@@ -301,6 +326,11 @@ export interface Evidence {
     run_id: string;
     agent: string;
     severity: string;
+    // `code` + `params` are the typed fact; `detail`/`basis` are the two
+    // sentences rendered from that one payload (so they cannot disagree).
+    // Branch on `code`, display `detail`/`basis`. Absent on older reports.
+    code?: string;
+    params?: Record<string, unknown>;
     detail: string;
     basis: string;
     provenance: string;

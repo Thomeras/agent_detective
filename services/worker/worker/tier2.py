@@ -19,9 +19,44 @@ import unicodedata
 from dataclasses import asdict
 from uuid import UUID
 
-from blame_engine import BlameReport, NodeScore, TerminalVerdict, find_blame
+from blame_engine import (
+    DIVERGENCE_KINDS,
+    BlameReport,
+    Finding,
+    HarnessState,
+    NodeScore,
+    PROV_CONTRACT_PROPAGATION,
+    PROV_REQUIRED_SECTION_CHECK,
+    NoteRecord,
+    RuleFingerprint,
+    TerminalVerdict,
+    derive_escalation,
+    derive_incident,
+    find_blame,
+    has_note,
+    is_verifier,
+    serialize_note,
+)
 
 from .config import Settings
+from .narrative import (
+    HYPOTHESIS_LATER_PRODUCER,
+    HYPOTHESIS_REPORTED,
+    HYPOTHESIS_UNRESOLVED,
+    STALE_CAUSE_PAYLOAD_DIVERGED,
+    STALE_CAUSE_RULES_CHANGED,
+    STALE_CAUSE_UNSTAMPED,
+    render_breaker_reason,
+    render_conformance,
+    render_corrected_caveat,
+    render_note,
+    render_notes,
+    render_hypothesis_basis,
+    render_shipped_caveat,
+    render_stale_cause,
+    render_superseded_reason,
+    signal,
+)
 from .graph_ops import build_blame_input, build_config, deliverable_run
 from .judge_client import JudgeClient, judge_json_with_retries
 from .policy import (
@@ -37,13 +72,14 @@ from .scoring import (
     _collect_contract_params,
     _norm,
     _try_parse_json,
+    _unambiguous_contract_params,
     load_prompt,
     render_prompt,
     score_node,
     truncate_for_judge,
 )
 from .store import ObjectStore, resolve_payload
-from .streams import StreamConsumer, StreamPublisher
+from .streams import StreamConsumer, StreamPublisher, reclaim_pending_messages
 from .types import (
     FLAG_ARTIFACT_INTEGRITY,
     FLAG_REQUIRED_SECTION,
@@ -59,14 +95,6 @@ from .types import (
 
 logger = logging.getLogger(__name__)
 
-_QUALITY_REPORTS = {
-    "cut_point",
-    "multi_culprit",
-    "composition_failure",
-    "root_cause_external",
-    "verification_gap",
-    "degraded_recovered",
-}
 _WORD_RE = re.compile(r"\w+")
 
 
@@ -75,38 +103,18 @@ def classify_incident(
 ) -> tuple[str | None, str | None]:
     """Map a blame report + tier1 flags to an ``(incident_key, trigger)``.
 
-    Blame classification wins for quality issues (so the flagship silent
-    hallucination becomes a ``degraded_quality`` incident, not a terminal
-    failure). Returns ``(None, None)`` when there is nothing to open an
-    incident for (unclassified report with healthy scores).
+    Thin delegate to the engine's ``derive_incident`` — the single home of the
+    mapping (verdict refactor §2.3). Kept as a worker-local name so existing
+    call sites and tests are unchanged; the logic (and its fixture-lock) lives
+    in ``blame_engine.derive``.
     """
-    if report_type == "loop_detected" or "loop_anomaly" in flags:
-        return "loop_detected", "loop_detected"
-    if report_type == "shipped_with_latent_defect":
-        # A VERIFIED contract breach in the shipped deliverable: a silent failure
-        # reached production behind an ok terminal. Its own high-severity trigger
-        # — alerting must be able to tell it apart from ordinary degraded quality
-        # (and from the low-priority degraded_recovered near-miss).
-        return "latent_defect", "latent_defect"
-    if report_type in _QUALITY_REPORTS:
-        return "degraded_quality", "degraded_quality"
-    if "failed_runs" in flags:
-        return "terminal_failure", "terminal_failure"
-    if "cost_overrun" in flags:
-        return "cost_overrun", "cost_overrun"
-    if terminal_bad:
-        return "terminal_failure", "terminal_failure"
-    return None, None
+    return derive_incident(report_type, flags, terminal_bad)
 
 
-_VERIFIER_HINTS = ("qa", "eval", "review", "verif", "validat", "check", "critic", "audit", "gate")
-
-
-def _is_verifier(name: str | None) -> bool:
-    """Verifier/gate node whose job is to PASS/FAIL work — scored on verdict
-    correctness (role-aware), not on the reviewed artifact's quality."""
-    n = (name or "").lower()
-    return any(h in n for h in _VERIFIER_HINTS)
+# Verifier/gate node whose job is to PASS/FAIL work — scored on verdict
+# correctness (role-aware), not on the reviewed artifact's quality. One home:
+# blame_engine.roles (this was the third independent literal copy).
+_is_verifier = is_verifier
 
 
 def _norm_text(value: str) -> str:
@@ -139,6 +147,118 @@ def serialize_evidence(report: BlameReport, fact_propagation: list[dict] | None)
     evidence = asdict(report.evidence)
     evidence["fact_propagation"] = fact_propagation
     return evidence
+
+
+def required_section_findings(
+    check_rules: list,
+    bundle: GraphBundle,
+    payloads: dict[UUID, tuple[str | None, str | None]],
+    deliverable_output: str | None,
+) -> list[Finding]:
+    """§2.4 required-section facts, one Finding per checkable REPRESENTATION.
+
+    Each registered required_section is measured in TWO representations: the
+    producers' span payloads and the shipped DELIVERABLE. The engine cannot see
+    this (it holds no payloads); the worker does. The side findings go into
+    ``find_blame(extra_findings=...)`` so the ENGINE's mandatory reconcile pass
+    emits any divergence with refs into the report's real findings[] — the old
+    worker-local reconcile shipped a divergence whose finding_refs indexed a
+    throwaway list (they pointed at unrelated engine findings) and whose
+    "present in deliverable" side existed nowhere in the report.
+    """
+    rules = [r for r in (check_rules or []) if r.kind == "required_section"]
+    if not rules:
+        return []
+    producers = [
+        r
+        for r in bundle.runs
+        if not _is_verifier(r.agent_name)
+        and (r.output_inline or r.output_overflow_ref)
+    ]
+    findings: list[Finding] = []
+    for rule in rules:
+        if rule.graph_type not in (None, bundle.graph_type):
+            continue
+        spec = rule.spec
+        name = spec.get("name") or spec.get("pattern")
+        fact_key = f"required_section:{name}"
+        # Producer-payload representation: present if ANY producer's payload has
+        # the section (a checkable measurement; unknown payloads are skipped).
+        producer_present: bool | None = None
+        for run in producers:
+            if rule.agent_name not in (None, run.agent_name):
+                continue
+            _in_text, out_text = payloads.get(run.run_id, (None, None))
+            if out_text is None:
+                continue
+            present = section_present(out_text, spec)
+            if present is None:
+                continue
+            producer_present = bool(producer_present) or present
+        # Deliverable representation: present in the shipped artifact?
+        deliverable_present = (
+            section_present(deliverable_output, spec)
+            if deliverable_output is not None
+            else None
+        )
+        for subject, value in (
+            ("producers", producer_present),
+            ("deliverable", deliverable_present),
+        ):
+            if value is None:
+                continue  # not checkable in this representation — no claim
+            findings.append(
+                Finding(
+                    kind="required_section",
+                    channel="deterministic",
+                    subject=subject,
+                    data={"value": "present" if value else "absent", "section": name},
+                    provenance=HarnessState(detail=PROV_REQUIRED_SECTION_CHECK),
+                    certainty=1.0,
+                    fact_key=fact_key,
+                )
+            )
+    return findings
+
+
+def contract_propagation_findings(
+    contract_results: list[dict], deliverable_run_id: str | None
+) -> list[Finding]:
+    """Typed Findings for VERIFIED contract propagation (§2.1 breach_propagated /
+    breach_corrected). Passed to ``find_blame(extra_findings=...)`` BEFORE defect
+    emission so the contract defect can cite the evidence for its own "shipped"
+    claim (and the engine can derive the escalation in the single pass). An
+    'unverified' result emits nothing — absence is what keeps the defect's
+    ``unverified_in_channel`` caveat honest."""
+    findings: list[Finding] = []
+    for r in contract_results:
+        status = r.get("status")
+        if status not in ("propagated", "corrected"):
+            continue
+        findings.append(
+            Finding(
+                kind="breach_propagated" if status == "propagated" else "breach_corrected",
+                channel="deterministic",
+                subject="terminal",
+                data={
+                    "key": r.get("key"),
+                    "from": r.get("from"),
+                    "to": r.get("to"),
+                    "basis": r.get("basis"),
+                    **(
+                        {"deliverable_run_id": deliverable_run_id}
+                        if deliverable_run_id
+                        else {}
+                    ),
+                },
+                provenance=RuleFingerprint(
+                    rule=f"contract_propagation:{r.get('key')}",
+                    detail=PROV_CONTRACT_PROPAGATION,
+                ),
+                certainty=1.0,
+            )
+        )
+    return findings
 
 
 # File-format contract keys for which an artifact PATH's extension is admissible
@@ -180,6 +300,8 @@ def contract_propagation_check(
     deliverable_run_id: str | None,
     deliverable_agent: str,
     deliverable_output_text: str | None,
+    *,
+    content_measured: bool = True,
 ) -> list[dict]:
     """Deterministic check: did each contract breach PROPAGATE into the final
     deliverable?
@@ -202,40 +324,43 @@ def contract_propagation_check(
     """
     parsed = _try_parse_json(deliverable_output_text) if deliverable_run_id else None
     structured = parsed if isinstance(parsed, (dict, list)) else None
-    params = _collect_contract_params(structured, _CONTRACT_KEYS) if structured else {}
+    # Only the keys the deliverable declares UNAMBIGUOUSLY settle propagation. A
+    # payload carrying `file_type` twice with different values does not observe
+    # either outcome — that is "unverified", the status this function already has
+    # for "nothing observable", and it must not be resolved by whichever value
+    # the walk reached first.
+    params = (
+        _unambiguous_contract_params(
+            _collect_contract_params(structured, _CONTRACT_KEYS)
+        )
+        if structured
+        else {}
+    )
     paths = _path_values(structured) if structured else []
 
     results: list[dict] = []
-    seen_notes: set[str] = set()
+    seen: set[tuple] = set()
     for violation in contract_violations:
         key = str(violation.get("key", "")).lower()
         from_val = violation.get("from")
         to_val = violation.get("to")
         status: str | None = None
         basis: str | None = None
-        note: str | None = None
+        # The rendering payload: WHICH observation settled the status. The note
+        # is derived from it (worker/narrative.py), never written here — a
+        # status and a sentence that disagree is then unrepresentable.
+        detail: dict | None = None
 
         if key in params:
             observed = params[key]
             if _norm(observed) == _norm(to_val):
                 status, basis = "propagated", "contract param match"
-                note = (
-                    f"contract_propagation: rewritten {key}={to_val!r} observed in "
-                    f"the deliverable producer '{deliverable_agent}' payload "
-                    f"(basis: contract param match) — the breach PROPAGATED into "
-                    f"the shipped artifact (verified); the run is recovered in "
-                    f"content but shipped with a violated contract (latent defect)."
-                )
+                detail = {"basis_kind": "param"}
             elif _norm(observed) == _norm(from_val):
                 status, basis = "corrected", "contract param match"
-                note = (
-                    f"contract_propagation: the deliverable producer "
-                    f"'{deliverable_agent}' payload carries the ORIGINAL "
-                    f"{key}={from_val!r} (basis: contract param match) — the "
-                    f"breach was corrected downstream; contract restored (verified)."
-                )
+                detail = {"basis_kind": "param"}
 
-        if note is None and key in _FILE_FORMAT_KEYS:
+        if detail is None and key in _FILE_FORMAT_KEYS:
             for path in paths:
                 ext = _path_ext(path)
                 if ext is None:
@@ -243,39 +368,41 @@ def contract_propagation_check(
                 if ext == str(to_val).strip().lower():
                     status = "propagated"
                     basis = f"artifact path {path!r} ends '.{ext}'"
-                    note = (
-                        f"contract_propagation: rewritten {key}={to_val!r} "
-                        f"observed in the deliverable producer "
-                        f"'{deliverable_agent}' payload (basis: artifact path "
-                        f"{path!r} ends '.{ext}') — the breach PROPAGATED into "
-                        f"the shipped artifact (verified); the run is recovered "
-                        f"in content but shipped with a violated contract "
-                        f"(latent defect)."
-                    )
+                    detail = {"basis_kind": "path", "path": path, "ext": ext}
                     break
                 if ext == str(from_val).strip().lower():
                     status = "corrected"
                     basis = f"artifact path {path!r} ends '.{ext}'"
-                    note = (
-                        f"contract_propagation: the deliverable producer "
-                        f"'{deliverable_agent}' payload carries the ORIGINAL "
-                        f"{key}={from_val!r} (basis: artifact path {path!r} ends "
-                        f"'.{ext}') — the breach was corrected downstream; "
-                        f"contract restored (verified)."
-                    )
+                    detail = {"basis_kind": "path", "path": path, "ext": ext}
                     break
 
-        if note is None:
+        if detail is None:
             status, basis = "unverified", "nothing observable"
-            note = (
-                f"contract_propagation: the rewritten {key} is not observable in "
-                f"the deliverable payload (basis: nothing observable — no "
-                f"matching contract param or artifact path) — propagation "
-                f"UNVERIFIED; verify the final artifact's format/contract out of "
-                f"band."
-            )
-        if note not in seen_notes:
-            seen_notes.add(note)
+            detail = {"basis_kind": "none"}
+
+        record = NoteRecord(
+            "contract_propagation",
+            {
+                "key": key,
+                "from": from_val,
+                "to": to_val,
+                "agent": deliverable_agent,
+                "status": status,
+                # Whether the CONTENT channel produced anything at all on this
+                # run. A propagated breach used to be narrated as "the run is
+                # recovered in content but shipped with a violated contract" —
+                # true only when content was measured and came back clean. On a
+                # --no-judge run nothing measured it, and asserting recovery
+                # from silence is the one thing this product must never do.
+                "content_measured": content_measured,
+                **detail,
+            },
+        )
+        # Dedup on the RECORD, not on its rendered sentence — deduping by prose
+        # made the identity of a fact depend on its wording.
+        fingerprint = tuple(sorted((k, repr(v)) for k, v in record.data.items()))
+        if fingerprint not in seen:
+            seen.add(fingerprint)
             results.append(
                 {
                     "key": key,
@@ -283,28 +410,11 @@ def contract_propagation_check(
                     "to": to_val,
                     "status": status,
                     "basis": basis,
-                    "note": note,
+                    "record": serialize_note(record),
+                    "note": render_note(record),
                 }
             )
     return results
-
-
-def contract_propagation_notes(
-    contract_violations: list[dict],
-    deliverable_run_id: str | None,
-    deliverable_agent: str,
-    deliverable_output_text: str | None,
-) -> list[str]:
-    """Prose notes for the propagation check (see contract_propagation_check)."""
-    return [
-        r["note"]
-        for r in contract_propagation_check(
-            contract_violations,
-            deliverable_run_id,
-            deliverable_agent,
-            deliverable_output_text,
-        )
-    ]
 
 
 # When the independent evidence streams disagree on WHERE the fault started, the
@@ -323,9 +433,9 @@ def reconcile_evidence(
     fact_propagation: list[dict] | None,
     agent_names: dict[str, str],
     tier1_flags: list[str],
-) -> tuple[float, list[str], list[dict]]:
-    """Cross-check independent evidence streams; return (confidence, notes,
-    hypotheses).
+) -> tuple[float, list[NoteRecord], list[dict]]:
+    """Cross-check independent evidence streams; return (confidence, note
+    records, hypotheses).
 
     A report whose evidence streams contradict each other cannot keep the
     confidence either stream would support alone, and — worse — must not present
@@ -348,7 +458,7 @@ def reconcile_evidence(
     share. Reporting one origin at full confidence over two live hypotheses is
     the anti-pattern the divergence guard is here to prevent.
     """
-    notes: list[str] = []
+    notes: list[NoteRecord] = []
     hypotheses: list[dict] = []
     confidence = report.confidence
 
@@ -361,7 +471,13 @@ def reconcile_evidence(
     last_producer = producers[-1] if producers else None
 
     tension = False
-    fabrication = any("fabrication cascade" in n for n in report.evidence.notes)
+    # Typed read of the engine's rationale stream: the fabrication-cascade row is
+    # a cut_point VARIANT, asked for by slug + variant. Grepping the rendered
+    # sentence ("fabrication cascade" in n) made this branch a hostage of the
+    # engine's wording — a reworded template would have silently disabled it.
+    fabrication = has_note(
+        report.evidence.note_records, "cut_point", variant="fabrication"
+    )
     if (
         fabrication
         and fact_propagation
@@ -369,25 +485,13 @@ def reconcile_evidence(
         and any(last_producer in (f.get("found_in") or []) for f in fact_propagation)
     ):
         tension = True
-        notes.append(
-            "evidence_tension: claims from the origin were found in the final "
-            "producer's payload although the verdict says required content went "
-            "missing — the evidence streams disagree on where the content was "
-            "lost, so the origin is not settled"
-        )
+        notes.append(NoteRecord("evidence_tension"))
 
     divergence = "degenerate_output" in tier1_flags and any(
         _is_verifier(agent_names.get(r)) for r in report.evidence.judge_notes
     )
     if divergence:
-        notes.append(
-            "representation_divergence: the terminal output is empty/degenerate "
-            "while verifiers reviewed a non-empty artifact — they saw a "
-            "different representation than the terminal judge; the content was "
-            "likely lost between the last producer and the terminal output "
-            "(check the render/export step), and the true origin may be later "
-            "than reported"
-        )
+        notes.append(NoteRecord("representation_divergence"))
 
     # Both signals nominate a LATER producer (the render/export step) as an
     # alternative origin the engine has not disproved. Only build the breakdown
@@ -409,43 +513,62 @@ def reconcile_evidence(
                                ("representation_divergence", divergence))
             if present
         ]
+        # basis_code is the fact; basis is its one rendering (§2.4).
         hypotheses = [
             {
                 "origin": reported_origin,
                 "agent": agent_names.get(reported_origin, "unknown"),
-                "basis": "reported origin — where the score gap / content flag "
-                "localised the fault",
+                "basis_code": HYPOTHESIS_REPORTED,
+                "basis": render_hypothesis_basis(HYPOTHESIS_REPORTED),
                 "weight": origin_weight,
             },
             {
                 "origin": last_producer,
                 "agent": agent_names.get(last_producer, "unknown"),
-                "basis": "later origin (" + " + ".join(bases) + ") — the same "
-                "content survived to this producer, so the loss may be at the "
-                "render/export step, later than reported",
+                "basis_code": HYPOTHESIS_LATER_PRODUCER,
+                "signals": bases,
+                "basis": render_hypothesis_basis(
+                    HYPOTHESIS_LATER_PRODUCER, {"signals": bases}
+                ),
                 "weight": alt_weight,
             },
             {
                 "origin": None,
                 "agent": None,
-                "basis": "unresolved — the evidence streams do not localise a "
-                "single origin",
+                "basis_code": HYPOTHESIS_UNRESOLVED,
+                "basis": render_hypothesis_basis(HYPOTHESIS_UNRESOLVED),
                 "weight": unresolved,
             },
         ]
         confidence = origin_weight
         notes.append(
-            "competing_origins: the origin is NOT settled — confidence is split "
-            f"across '{agent_names.get(reported_origin, reported_origin)}' "
-            f"(weight {origin_weight}) and the later producer "
-            f"'{agent_names.get(last_producer, last_producer)}' "
-            f"(weight {alt_weight}), with {unresolved} unresolved; the headline "
-            f"confidence is lowered to the dominant hypothesis's share "
-            f"({confidence}) rather than asserting one origin over two live "
-            "hypotheses"
+            NoteRecord(
+                "competing_origins",
+                {
+                    "origin_agent": agent_names.get(reported_origin, reported_origin),
+                    "origin_weight": origin_weight,
+                    "alt_agent": agent_names.get(last_producer, last_producer),
+                    "alt_weight": alt_weight,
+                    "unresolved": unresolved,
+                },
+            )
         )
 
     return confidence, notes, hypotheses
+
+
+def escalate_shipped_latent_defect(
+    report_type: str, contract_results: list[dict]
+) -> tuple[str, list[str]]:
+    """degraded_recovered + a contract breach VERIFIED (status 'propagated') in
+    the shipped deliverable escalates to shipped_with_latent_defect.
+
+    Thin delegate to the engine's ``derive_escalation`` — the single home of the
+    escalation rule (verdict refactor §2.3). Worker-local name kept so existing
+    call sites and tests are unchanged; logic + fixture-lock live in
+    ``blame_engine.derive``.
+    """
+    return derive_escalation(report_type, contract_results)
 
 
 class Tier2Processor:
@@ -829,45 +952,39 @@ class Tier2Processor:
                                 min_artifact_bytes=self._settings.min_artifact_bytes,
                             )
                             if tier1.check_rules_hash is None:
-                                stale_cause = (
-                                    "cause unknown — the tier1 verdict predates "
-                                    "rule-set stamping (no fingerprint stored); "
-                                    "cannot distinguish a rule change from "
-                                    "artifact/payload divergence. Staleness is a "
-                                    "property of the stored ANALYSIS, not a new "
-                                    "fault of the agent's run"
-                                )
+                                stale_cause_code = STALE_CAUSE_UNSTAMPED
                             elif tier1.check_rules_hash != current_fp:
-                                stale_cause = (
-                                    "the registered rule set CHANGED since tier1 "
-                                    f"ran (fingerprint {tier1.check_rules_hash} -> "
-                                    f"{current_fp}) — the old verdict was computed "
-                                    "under different rules; not an artifact "
-                                    "divergence. This is an ANALYSIS/rule-lifecycle "
-                                    "matter on the operator side — the agent's run "
-                                    "did not change and is not newly at fault"
-                                )
+                                stale_cause_code = STALE_CAUSE_RULES_CHANGED
                             else:
-                                stale_cause = (
-                                    "the rule set is UNCHANGED (fingerprint "
-                                    f"{current_fp}) yet the payload no longer fails "
-                                    "the check — the artifact/payload itself "
-                                    "diverged between analysis passes "
-                                    "(representation divergence); investigate the "
-                                    "instrumentation/export path on the AGENT "
-                                    "integration side"
-                                )
+                                stale_cause_code = STALE_CAUSE_PAYLOAD_DIVERGED
+                            stale_cause = render_stale_cause(
+                                stale_cause_code,
+                                {
+                                    "stored": tier1.check_rules_hash,
+                                    "current": current_fp,
+                                },
+                            )
+                    # Rubric split: bad/score/reasoning are the CONTENT
+                    # dimension; the FORM dimension rides alongside so a
+                    # format-only miss can never flip terminal_bad.
+                    _tf = tier1.terminal_form or {}
                     terminal_verdict = TerminalVerdict(
                         bad=tier1.terminal_judge_verdict == "bad",
                         score=tier1.terminal_judge_score,
                         reasoning=tier1.terminal_judge_reasoning,
                         checkable=not stale,
                         stale=stale,
+                        form_bad=_tf.get("verdict") == "bad",
+                        form_requirement=_tf.get("requirement"),
+                        form_observed=_tf.get("observed"),
+                        form_reasoning=_tf.get("reasoning"),
                     )
                 elif tier1.terminal_judge_verdict == "not_checkable":
                     # The judge never saw the deliverable — record the verdict so
                     # the report can explain the gap, but mark it NOT trustworthy
                     # ground truth so it drives neither a culprit nor an incident.
+                    # No form dimension either: tier1 already drops the form
+                    # verdict when the deliverable is invisible (same guess).
                     terminal_verdict = TerminalVerdict(
                         bad=False,
                         score=tier1.terminal_judge_score,
@@ -887,7 +1004,43 @@ class Tier2Processor:
             blame_input = build_blame_input(
                 bundle, scores, terminal_verdict, baselines, config
             )
-            report = find_blame(blame_input)
+            # Worker-side facts the engine cannot compute (it holds no payloads)
+            # are emitted BEFORE derivation (§F2.2) so defects can cite them and
+            # the engine's reconcile pass sees them: required-section
+            # representations and the deterministic contract-propagation
+            # verification (breach_propagated is the evidence behind a
+            # shipped_with_latent_defect headline).
+            deliverable = deliverable_run(bundle)
+            deliverable_output = None
+            if deliverable is not None:
+                _d_in, deliverable_output = payloads.get(
+                    deliverable.run_id, (None, None)
+                )
+            contract_results: list[dict] = []
+            _violations = [
+                {"key": k, "from": a, "to": b}
+                for ns in scores.values()
+                for (k, a, b) in (ns.contract_violations or ())
+            ]
+            if _violations:
+                contract_results = contract_propagation_check(
+                    _violations,
+                    str(deliverable.run_id) if deliverable is not None else None,
+                    (deliverable.agent_name or "unknown")
+                    if deliverable is not None
+                    else "unknown",
+                    deliverable_output,
+                    content_measured=any(
+                        ns.score is not None for ns in scores.values()
+                    ),
+                )
+            extra_findings = contract_propagation_findings(
+                contract_results,
+                str(deliverable.run_id) if deliverable is not None else None,
+            ) + required_section_findings(
+                check_rules, bundle, payloads, deliverable_output
+            )
+            report = find_blame(blame_input, extra_findings=extra_findings or None)
 
             agent_names = {str(r.run_id): (r.agent_name or "unknown") for r in bundle.runs}
             fact_propagation = await self._fact_propagation(report, payloads, agent_names)
@@ -904,27 +1057,9 @@ class Tier2Processor:
                 and terminal_verdict.bad
                 and terminal_verdict.checkable
             )
-            # Deterministic contract-propagation verification runs BEFORE
-            # classification: a breach VERIFIED in the shipped deliverable must
-            # escalate the verdict (and its alerting trigger), not just annotate
-            # it. The blame engine has no payloads, but tier2 does — check the
-            # deliverable producer's output and record what was actually observed.
-            contract_results: list[dict] = []
-            if report.evidence.contract_violations:
-                deliverable = deliverable_run(bundle)
-                deliverable_output = None
-                if deliverable is not None:
-                    _d_in, deliverable_output = payloads.get(
-                        deliverable.run_id, (None, None)
-                    )
-                contract_results = contract_propagation_check(
-                    list(report.evidence.contract_violations),
-                    str(deliverable.run_id) if deliverable is not None else None,
-                    (deliverable.agent_name or "unknown")
-                    if deliverable is not None
-                    else "unknown",
-                    deliverable_output,
-                )
+            # Deterministic contract-propagation verification already ran BEFORE
+            # find_blame (its findings joined the engine derivation); the
+            # structured results still feed the notes + evidence stream below.
             contract_notes = [r["note"] for r in contract_results]
             shipped = [r for r in contract_results if r["status"] == "propagated"]
             corrected = [r for r in contract_results if r["status"] == "corrected"]
@@ -933,24 +1068,11 @@ class Tier2Processor:
             # coexist — the terminal is ok only because its judge is blind to
             # carried contract parameters. The customer still got a
             # contract-nonconformant artifact, so this run is a silent failure
-            # in production, not a near-miss.
-            effective_report_type = report.report_type
-            escalation_notes: list[str] = []
-            if shipped and report.report_type == "degraded_recovered":
-                effective_report_type = "shipped_with_latent_defect"
-                detail = "; ".join(
-                    f"{r['key']}: {r['from']!r}->{r['to']!r} ({r['basis']})"
-                    for r in shipped
-                )
-                escalation_notes.append(
-                    "escalation: verdict upgraded from degraded_recovered to "
-                    f"shipped_with_latent_defect — the contract breach ({detail}) "
-                    "was VERIFIED in the shipped artifact (see "
-                    "contract_propagation). The pipeline recovered the CONTENT, "
-                    "but a contract-nonconformant deliverable reached production "
-                    "behind an ok terminal verdict: a silent failure, not a "
-                    "near-miss"
-                )
+            # in production, not a near-miss. Decided by the deterministic
+            # propagation check alone (see escalate_shipped_latent_defect).
+            effective_report_type, escalation_notes = escalate_shipped_latent_defect(
+                report.report_type, contract_results
+            )
 
             incident_key, incident_trigger = classify_incident(
                 effective_report_type, flags, terminal_bad
@@ -962,6 +1084,17 @@ class Tier2Processor:
                     report, fact_propagation, agent_names, flags
                 )
                 evidence = serialize_evidence(report, fact_propagation)
+                # §2.4: divergences were emitted by the ENGINE's reconcile pass
+                # (the worker-side representations went in as extra_findings, so
+                # the refs index the report's real findings[]). Mirror them into
+                # the dedicated list the UI reads.
+                divergences = [
+                    f
+                    for f in (evidence.get("findings") or [])
+                    if f.get("kind") in DIVERGENCE_KINDS
+                ]
+                if divergences:
+                    evidence["reconcile_divergences"] = divergences
                 # Graph-level artifact integrity (docs/deterministic-signals.md):
                 # the engine already assembled NODE-level signals from
                 # NodeScore.deterministic_signals; recompute the same checks over
@@ -1013,19 +1146,11 @@ class Tier2Processor:
                                 or not entry.get("checked")
                             ):
                                 continue
-                            stamped = {
-                                "name": "structured_field_drop",
-                                "severity": "warn",
-                                "detail": (
-                                    f"field value {entry['claim']!r} from the "
-                                    "origin's output appears in no downstream "
-                                    "payload"
-                                ),
-                                "basis": (
-                                    f"exact normalized match over "
-                                    f"{entry['checked']} checkable downstream "
-                                    "payload(s)"
-                                ),
+                            stamped = signal(
+                                "structured_field_drop", "warn",
+                                "structured_field_drop",
+                                claim=entry["claim"], checked=entry["checked"],
+                            ) | {
                                 "run_id": fact_src,
                                 "agent": agent_names.get(fact_src, "unknown"),
                                 "provenance": "deterministic",
@@ -1037,8 +1162,15 @@ class Tier2Processor:
                                 node_level.append(stamped)
                         evidence["deterministic_signals"] = node_level
                 evidence["notes"] = (
-                    list(evidence["notes"]) + extra_notes + contract_notes
-                    + escalation_notes
+                    list(evidence["notes"]) + render_notes(extra_notes)
+                    + contract_notes + escalation_notes
+                )
+                # Typed originals alongside (§2.4): the engine's records plus the
+                # worker's own, so a consumer never has to parse the sentences.
+                evidence["note_records"] = (
+                    list(evidence.get("note_records") or [])
+                    + [serialize_note(n) for n in extra_notes]
+                    + [r["record"] for r in contract_results]
                 )
                 # The terminal section is the loudest element of the report.
                 # It answers TWO independent questions — CONTENT (what the
@@ -1054,9 +1186,15 @@ class Tier2Processor:
                     # by the stored rule-set fingerprint (migration 0008).
                     if tv_ev.get("stale") and stale_cause:
                         tv_ev["stale_cause"] = stale_cause
+                        _cause = NoteRecord(
+                            "terminal_stale_cause", {"cause": stale_cause}
+                        )
                         evidence["notes"] = list(evidence["notes"]) + [
-                            f"terminal_stale_cause: {stale_cause}"
+                            render_note(_cause)
                         ]
+                        evidence["note_records"] = list(
+                            evidence.get("note_records") or []
+                        ) + [serialize_note(_cause)]
                     # Provenance of the terminal decision: the deterministic
                     # deliverable checks (tier0) skip the LLM judge entirely.
                     tv_ev["decided_by"] = (
@@ -1068,90 +1206,44 @@ class Tier2Processor:
                         else "llm_judge"
                     )
                     if shipped:
-                        detail = "; ".join(
-                            f"{r['key']} {r['to']!r} shipped, {r['from']!r} required"
-                            for r in shipped
+                        tv_ev["contract_conformance"] = render_conformance(shipped)
+                        # The content axis decides WHICH caveat is true — a
+                        # template written for one axis must never be pasted
+                        # onto the other, so the axis state picks it.
+                        tv_ev["caveat"] = render_shipped_caveat(
+                            shipped,
+                            content=(
+                                "stale"
+                                if tv_ev.get("stale")
+                                else "bad"
+                                if terminal_bad
+                                else "ok"
+                            ),
                         )
-                        tv_ev["contract_conformance"] = (
-                            f"nonconformant (verified): {detail}"
-                        )
-                        if tv_ev.get("stale"):
-                            # The CONTENT axis is discarded (not reproducible)
-                            # — it is neither ok nor bad. Only the contract
-                            # axis stands; "ok in CONTENT only" here would
-                            # assert a content verdict we just threw away.
-                            tv_ev["caveat"] = (
-                                f"content verdict is STALE (not reproducible — "
-                                f"see the cause above); the contract axis "
-                                f"stands on its own evidence: "
-                                f"contract-nonconformant deliverable VERIFIED "
-                                f"— {detail} (see contract_propagation)"
-                            )
-                        elif terminal_bad:
-                            tv_ev["caveat"] = (
-                                f"TWO independent faults: content is bad (see "
-                                f"reasoning) AND the deliverable is "
-                                f"contract-nonconformant — {detail} (verified, "
-                                "see contract_propagation)"
-                            )
-                        else:
-                            tv_ev["caveat"] = (
-                                f"ok in CONTENT only — contract-nonconformant "
-                                f"deliverable VERIFIED: {detail} (see "
-                                "contract_propagation)"
-                            )
                     elif corrected and not any(
                         r["status"] == "unverified" for r in contract_results
                     ):
                         tv_ev["contract_conformance"] = "restored downstream (verified)"
                         if not terminal_bad:
-                            tv_ev["caveat"] = (
-                                "ok — the mid-pipeline contract breach was "
-                                "corrected downstream (verified); the deliverable "
-                                "conforms to the carried contract"
-                            )
+                            tv_ev["caveat"] = render_corrected_caveat()
                     elif contract_results:
                         tv_ev["contract_conformance"] = "unverified"
-                # Escalation must rewrite the NARRATIVE, not just the verdict
-                # type: the engine generated candidacy for degraded_recovered
-                # ("a near-miss, not the origin of a live failure") BEFORE the
-                # propagation check proved the breach shipped. Leaving that text
-                # standing next to "silent defect shipped" is a literal
-                # self-negation in one document. Rebuilt from data, not patched.
+                # The engine escalated in its own single pass and wrote the
+                # escalated candidacy there (candidacy verdict
+                # ``origin_escalated``) — the worker no longer touches either.
+                # What remains here is the AUDIT record: the near-miss framing
+                # was REFUTED, not merely outranked, so it is marked superseded
+                # with the same structured mechanism used against LLM judge
+                # assessments (score_overrides). A tool that flags superseded
+                # claims of its judges but not its own holds a double standard.
                 if effective_report_type == "shipped_with_latent_defect" and shipped:
-                    detail = "; ".join(
-                        f"{r['key']}: {r['from']!r}->{r['to']!r} ({r['basis']})"
-                        for r in shipped
-                    )
-                    # The engine's near-miss finding is REFUTED, not merely
-                    # outranked — mark it superseded with the same structured
-                    # mechanism used against LLM judge assessments
-                    # (score_overrides), so the UI applies one visual language
-                    # to both. A tool that flags superseded claims of its
-                    # judges but not its own holds a double standard.
                     evidence["superseded_notes"] = [
                         {
                             "slug": "degraded_recovered",
                             "superseded_by": "escalation",
-                            "reason": (
-                                "the near-miss framing was refuted: the "
-                                f"contract breach ({detail}) was VERIFIED in "
-                                "the shipped artifact — verdict escalated to "
-                                "shipped_with_latent_defect"
-                            ),
+                            "reason": render_superseded_reason(shipped),
                         }
                     ]
-                    for _culprit_id in report.culprit_run_ids:
-                        _cscore = (evidence.get("score_map") or {}).get(_culprit_id)
-                        evidence.setdefault("candidacy", {})[_culprit_id] = (
-                            f"origin (escalated) — degraded here "
-                            + (f"(score {_cscore:.2f}) " if _cscore is not None else "")
-                            + "and the contract breach was VERIFIED in the "
-                            f"shipped artifact ({detail}). Content recovered "
-                            "downstream and the terminal is ok on CONTENT, but a "
-                            "contract-nonconformant deliverable reached "
-                            "production — a silent failure, no longer a near-miss"
-                        )
 
                 # When the streams disagree on the origin the breakdown replaces
                 # the engine's empty default (which asserts a settled origin).
@@ -1261,10 +1353,8 @@ class Tier2Processor:
             for name in culprit_agents:
                 n = await self._repo.count_open_incidents_for_agent(name)
                 if n >= self._settings.breaker_open_incidents:
-                    reason = (
-                        f"{n} open incidents (threshold "
-                        f"{self._settings.breaker_open_incidents}); "
-                        f"latest trigger {incident_trigger}"
+                    reason = render_breaker_reason(
+                        n, self._settings.breaker_open_incidents, incident_trigger
                     )
                     await self._repo.upsert_breaker("agent_name", name, "open", reason)
                     await self._publisher.xadd_json(
@@ -1309,6 +1399,17 @@ async def run_tier2(
     """Consumer loop for ``ad.graphs.tier2`` (group ``tier2``)."""
     await consumer.ensure_group(STREAM_GRAPHS_TIER2, GROUP_TIER2)
     while stop is None or not stop.is_set():
+        # Reclaim orphaned pending entries (worker killed mid-tier2 before XACK)
+        # and reprocess them with new messages; the tier2 job claim keeps replay
+        # idempotent, so a stalled analysis resumes without a manual XADD.
+        reclaimed = await reclaim_pending_messages(
+            consumer,
+            STREAM_GRAPHS_TIER2,
+            GROUP_TIER2,
+            settings.consumer_name,
+            settings.reaper_idle_ms,
+            settings.max_deliveries,
+        )
         messages = await consumer.read(
             STREAM_GRAPHS_TIER2,
             GROUP_TIER2,
@@ -1316,7 +1417,7 @@ async def run_tier2(
             settings.stream_batch_size,
             settings.stream_block_ms,
         )
-        for message in messages:
+        for message in reclaimed + messages:
             parsed = parse_tier2_message(message.data)
             try:
                 if parsed is not None:

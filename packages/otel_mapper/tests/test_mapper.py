@@ -332,6 +332,28 @@ def test_artifact_meta_on_member_span_does_not_leak_to_the_run() -> None:
     assert map_spans([_agent_span(), child]).runs[0].artifact_meta is None
 
 
+CONTRACT_PARAMS = '{"file_type": "pdf", "lang": "cs"}'
+
+
+def test_contract_params_extracted_verbatim_from_opener_span() -> None:
+    span = _agent_span()
+    span["attributes"]["agent_detective.contract_params"] = CONTRACT_PARAMS
+    assert map_spans([span]).runs[0].contract_params == CONTRACT_PARAMS
+
+
+def test_contract_params_absent_is_none() -> None:
+    assert map_spans([_agent_span()]).runs[0].contract_params is None
+
+
+def test_contract_params_has_no_resource_fallback() -> None:
+    # Per-run data, like artifact_meta: a resource-level value would bind
+    # every run under the resource to one node's contract.
+    span = _agent_span(
+        resource_attributes={"agent_detective.contract_params": CONTRACT_PARAMS}
+    )
+    assert map_spans([span]).runs[0].contract_params is None
+
+
 def _tool_span(span_id: str, *, name: str, start: str, attrs: dict, status="ok") -> dict:
     return {
         "trace_id": "t1",
@@ -411,3 +433,16 @@ def test_output_is_deterministic_for_same_input() -> None:
                                 "gen_ai.agent.name": "worker"}),
     ]
     assert map_spans(spans) == map_spans(list(reversed(spans)))
+
+
+def test_graph_type_is_resource_service_name() -> None:
+    # service.name is the cohort key ingest stores as graph_type.
+    span = _agent_span(resource_attributes={"service.name": "generative-simon"})
+    result = map_spans([span])
+    assert result.graph_types == {"t1": "generative-simon"}
+
+
+def test_graph_type_is_none_without_service_name() -> None:
+    # No resource service.name -> None, never invented; every graph still keyed.
+    result = map_spans([_agent_span()])
+    assert result.graph_types == {"t1": None}

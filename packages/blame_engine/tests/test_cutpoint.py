@@ -3,6 +3,7 @@
 import pytest
 
 from blame_engine import find_blame
+from conftest import note_of
 
 
 def test_source_below_threshold_is_cut_point(mk) -> None:
@@ -17,11 +18,11 @@ def test_source_below_threshold_is_cut_point(mk) -> None:
     # against a fiction). The assumption still informs confidence and is declared
     # in the notes/candidacy instead.
     assert report.evidence.drops == {}
-    assert "ASSUMED" in " ".join(report.evidence.notes)
+    assert note_of(report, "cut_point")["variant"] == "base_assumed"
     # Raw formula would give 0.76, but the origin sits at the OBSERVABILITY
     # BOUNDARY (assumed baseline, no contract evidence) -> hard cap 0.6.
     assert report.confidence == pytest.approx(0.6)
-    assert any("attribution_capped" in n for n in report.evidence.notes)
+    assert note_of(report, "attribution_capped") is not None
     assert report.propagation_path == ["s", "t"]
     assert report.downstream_cost_usd == pytest.approx(2.0)
 

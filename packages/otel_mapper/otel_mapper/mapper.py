@@ -284,7 +284,18 @@ def map_spans(
     runs_sorted = sorted(candidates.values(), key=lambda c: (c.start_time or _MIN_TIME, c.run_key))
     edges_sorted = sorted(edges.values(), key=lambda e: (e.from_run_key, e.to_run_key, e.type.value))
     graph_ids = {c.graph_id for c in runs_sorted}
-    return MappingResult(runs=runs_sorted, edges=edges_sorted, graph_ids=graph_ids)
+    # Cohort key per graph: the resource-level service.name (e.g.
+    # "generative-simon") of the runs exported under it. Every graph gets a key
+    # (None when no run carried a service.name); the first non-empty value in
+    # deterministic run order wins so redelivery is stable.
+    graph_types: dict[str, str | None] = {}
+    for c in runs_sorted:
+        service_name = _first_str(accs[c.run_key].opener.resource_attrs.get("service.name"))
+        if graph_types.get(c.graph_id) is None:
+            graph_types[c.graph_id] = service_name
+    return MappingResult(
+        runs=runs_sorted, edges=edges_sorted, graph_ids=graph_ids, graph_types=graph_types
+    )
 
 
 def flatten_export_request(payload: dict[str, Any]) -> list[dict[str, Any]]:
@@ -470,6 +481,57 @@ def _normalize_span(raw: Any, index: int) -> _Span | None:
     )
 
 
+
+# --- Edge detection methods: one rule code, one phrasing -----------------
+# ``detection_method`` is the provenance stored on every derived edge and shown
+# in the UI. It was assembled inline per rule, which made the RULE identity a
+# substring of a sentence — the same free-prose-on-a-typed-record problem the
+# verdict path collapsed away. The rule code is the identity; the table below
+# is the one place it becomes English. The wire format (``rule=<code>: …``) is
+# unchanged, so stored edges and their consumers are unaffected.
+
+_DETECTION_PHRASES: dict[str, str] = {
+    "spawn": (
+        "openinference.span.kind=AGENT with parent span owned by a different "
+        "agent run"
+    ),
+    "tool_delegation": (
+        "gen_ai.tool.target_agent={target!r} on TOOL span; edge points "
+        "target -> caller (direction of data flow)"
+    ),
+    "crewai_sequential": (
+        "sibling CrewAI task spans under one Crew.kickoff; Process.sequential "
+        "passes task N output as task N+1 context (chain by start time)"
+    ),
+    "a2a_task_id": "a2a.task_id attribute present",
+    "a2a_agent_card": (
+        "HTTP client span on /.well-known/agent.json (A2A agent card fetch)"
+    ),
+}
+
+# a2a rules share one wire code — the two bases are variants of one rule.
+_DETECTION_WIRE_CODE = {"a2a_task_id": "a2a_message", "a2a_agent_card": "a2a_message"}
+
+
+# Qualifiers a rule can append. Kept in the table for the same reason the
+# phrases are: a caveat about what the edge does NOT prove is exactly the kind
+# of clause that must not be assembled ad hoc at a call site.
+_DETECTION_QUALIFIERS: dict[str, str] = {
+    "unnamed": " (agent name unknown; structural parentage only)",
+}
+
+
+def detection_method(rule: str, *, named: bool = True, **params: object) -> str:
+    """Provenance string for a derived edge: ``rule=<code>: <phrase>``.
+
+    ``named=False`` appends the structural-parentage qualifier — the edge was
+    derived from span nesting alone, which does not prove an agent handoff.
+    """
+    phrase = _DETECTION_PHRASES.get(rule, rule).format(**params)
+    qualifier = "" if named else _DETECTION_QUALIFIERS["unnamed"]
+    return f"rule={_DETECTION_WIRE_CODE.get(rule, rule)}: {phrase}{qualifier}"
+
+
 def _kind_label(span: _Span) -> str:
     return str(span.attrs.get("openinference.span.kind") or "").strip().upper()
 
@@ -568,11 +630,59 @@ def _tool_calls_digest(acc: _RunAcc) -> str | None:
     return json.dumps(digest, separators=(",", ":"))
 
 
+# --- CrewAI framework profile (measured on the foreign corpus cell) --------
+#
+# Vanilla OpenInference CrewAI emits AGENT task spans named
+# ``"<Agent Role>.<task_name>._execute_core"`` with NO gen_ai.agent.name, and
+# wraps the task's input/output in a metadata JSON (agent config + description;
+# the produced text nested under "raw"). Without these fallbacks a CrewAI trace
+# maps to anonymous nodes judging config blobs (night_run.md foreign cell 1).
+# Every fallback is GATED on the span-name signature so generic traces are
+# never touched.
+
+_CREWAI_TASK_SUFFIX = "._execute_core"
+
+
+def _crewai_task_parts(span_name: str | None) -> tuple[str, str] | None:
+    """``(role, task_name)`` for a CrewAI task span name, else None."""
+    if not span_name or not span_name.endswith(_CREWAI_TASK_SUFFIX):
+        return None
+    base = span_name[: -len(_CREWAI_TASK_SUFFIX)]
+    if "." not in base:
+        return None
+    role, task = base.rsplit(".", 1)
+    role, task = role.strip(), task.strip()
+    if not role or not task:
+        return None
+    return role, task
+
+
+def _crewai_unwrap(value: Any, *keys: str) -> str | None:
+    """First non-empty string under ``keys`` in a JSON-object payload."""
+    if not isinstance(value, str):
+        return None
+    try:
+        parsed = json.loads(value)
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(parsed, dict):
+        return None
+    for k in keys:
+        v = parsed.get(k)
+        if isinstance(v, str) and v.strip():
+            return v
+    return None
+
+
 def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     opener = acc.opener
     name = _first_str(
         opener.attrs.get("gen_ai.agent.name"), opener.resource_attrs.get("gen_ai.agent.name")
     )
+    crewai_parts = _crewai_task_parts(opener.name)
+    if name is None and crewai_parts is not None:
+        # CrewAI profile: agent identity lives only in the span name.
+        name = crewai_parts[0]
     version = _first_str(
         opener.attrs.get("gen_ai.agent.version"),
         opener.resource_attrs.get("gen_ai.agent.version"),
@@ -596,6 +706,7 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     # per-run data, and a resource-level value would smear one node's
     # artifact metadata onto every run under that resource. Never invented.
     artifact_meta = _first_str(opener.attrs.get("agent_detective.artifact_meta"))
+    contract_params = _first_str(opener.attrs.get("agent_detective.contract_params"))
     prompt_hash = _first_str(
         opener.attrs.get("agent_detective.prompt_hash"),
         opener.resource_attrs.get("agent_detective.prompt_hash"),
@@ -627,12 +738,23 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
         prompt_hash=prompt_hash,
         tool_schema_hash=tool_schema_hash,
         artifact_meta=artifact_meta,
+        contract_params=contract_params,
         tool_calls=_tool_calls_digest(acc),
         tokens_in=tokens_in if tokens_in is None else int(tokens_in),
         tokens_out=tokens_out if tokens_out is None else int(tokens_out),
         cost_usd=cost if cost is None else float(cost),
-        input=_text(opener.attrs.get("input.value")),
-        output=_text(opener.attrs.get("output.value")),
+        input=(
+            _crewai_unwrap(opener.attrs.get("input.value"), "description")
+            if crewai_parts is not None
+            else None
+        )
+        or _text(opener.attrs.get("input.value")),
+        output=(
+            _crewai_unwrap(opener.attrs.get("output.value"), "raw")
+            if crewai_parts is not None
+            else None
+        )
+        or _text(opener.attrs.get("output.value")),
         start_time=start,
         end_time=end,
         status=status,
@@ -713,14 +835,14 @@ def _detect_edges(
         child_name = candidates[child_key].agent_name
         if parent_name and child_name and parent_name == child_name:
             continue
-        note = "" if parent_name and child_name else " (agent name unknown; structural parentage only)"
         emit(
             EdgeCandidate(
                 from_run_key=parent_key,
                 to_run_key=child_key,
                 type=EdgeType.SPAWN,
-                detection_method="rule=spawn: openinference.span.kind=AGENT with parent span "
-                "owned by a different agent run" + note,
+                detection_method=detection_method(
+                    "spawn", named=bool(parent_name and child_name)
+                ),
             )
         )
 
@@ -744,10 +866,41 @@ def _detect_edges(
                 from_run_key=target_run.run_key,
                 to_run_key=owner_key,
                 type=EdgeType.TOOL_DELEGATION,
-                detection_method=f"rule=tool_delegation: gen_ai.tool.target_agent='{target.strip()}' "
-                "on TOOL span; edge points target -> caller (direction of data flow)",
+                detection_method=detection_method(
+                    "tool_delegation", target=target.strip()
+                ),
             )
         )
+
+    # Rule 4: CrewAI sequential handoff (framework profile). Task spans share
+    # the Crew.kickoff parent — the task→task DATA FLOW is never emitted as
+    # spans, but ``Process.sequential`` GUARANTEES task N's output feeds task
+    # N+1's context, so the chain (start-time order per kickoff) is a
+    # convention-backed derivation, not a guess. Gated on the CrewAI span-name
+    # signature on BOTH ends; a generic trace never gets invented edges.
+    # NOTE the parent (kickoff) span itself is NOT required to be present:
+    # it is the trace ROOT, so it ends last and ships in a LATER OTLP batch
+    # than its task children — per-batch mapping would never see it. The
+    # shared parent_span_id + the task-name signature on every member is the
+    # gate.
+    crewai_by_kickoff: dict[tuple[str, str], list[_Span]] = {}
+    for s in norm:
+        if (s.trace_id, s.span_id) not in opener_run or not s.parent_span_id:
+            continue
+        if _crewai_task_parts(s.name) is None:
+            continue
+        crewai_by_kickoff.setdefault((s.trace_id, s.parent_span_id), []).append(s)
+    for members in crewai_by_kickoff.values():
+        members.sort(key=lambda m: (m.start or _MIN_TIME, m.span_id))
+        for prev, nxt in zip(members, members[1:]):
+            emit(
+                EdgeCandidate(
+                    from_run_key=opener_run[(prev.trace_id, prev.span_id)],
+                    to_run_key=opener_run[(nxt.trace_id, nxt.span_id)],
+                    type=EdgeType.A2A_MESSAGE,
+                    detection_method=detection_method("crewai_sequential"),
+                )
+            )
 
     # Rule 3: A2A_MESSAGE — feature-flagged (build spec: A2A_DETECTION=false).
     if a2a_detection:
@@ -772,13 +925,9 @@ def _detect_edges(
                 from_key, to_key = owner_key, peer_run.run_key
             else:
                 from_key, to_key = peer_run.run_key, owner_key
-            if has_task_id:
-                method = "rule=a2a_message: a2a.task_id attribute present"
-            else:
-                method = (
-                    "rule=a2a_message: HTTP client span on /.well-known/agent.json "
-                    "(A2A agent card fetch)"
-                )
+            method = detection_method(
+                "a2a_task_id" if has_task_id else "a2a_agent_card"
+            )
             emit(EdgeCandidate(from_key, to_key, EdgeType.A2A_MESSAGE, method))
 
     return edges

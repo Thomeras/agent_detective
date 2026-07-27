@@ -166,9 +166,10 @@ def test_deliverable_integrity_signals_land_in_evidence_deduped():
     msg = Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key=str(uid(1)))
     asyncio.run(processor.process(msg))
 
-    # The corrupt-artifact node is capped below threshold deterministically.
-    assert repo.node_scores[uid(2)].quality_score == 0.10
-    assert repo.node_scores[uid(2)].score_components["artifact_integrity_fail"] == 0.0
+    # R4: the judged score is NOT floored — the integrity fault is carried as a
+    # deterministic signal (evidence stream), not smuggled into the quality scalar.
+    assert repo.node_scores[uid(2)].quality_score > 0.5
+    assert "artifact_integrity_fail" not in repo.node_scores[uid(2)].score_components
 
     report = repo.blame_reports[0]
     sigs = report["evidence"]["deterministic_signals"]
@@ -251,7 +252,10 @@ def _divergence_report(confidence: float = 0.65):
         score_map={"t": 0.67, "a": 0.9, "q": 0.95},
         drops={}, judge_notes={"q": "correctly passed"}, error_span_ids={},
         loop_anomalies=[], unknown_ancestors=[], fact_propagation=None,
-        notes=["cut_point (fabrication cascade): ..."],
+        notes=[],
+        # The fabrication-cascade row as the TYPED record the reconciler reads;
+        # the rendered sentence is irrelevant to it (and must stay that way).
+        note_records=[{"slug": "cut_point", "data": {"variant": "fabrication"}}],
         topo_order=["t", "a", "q"],
     )
     report = BlameReport(
@@ -274,8 +278,7 @@ def test_reconcile_evidence_flags_tension_and_divergence():
     confidence, notes, _hyp = reconcile_evidence(
         report, fact_prop, names, ["degenerate_output"]
     )
-    assert any("evidence_tension" in n for n in notes)
-    assert any("representation_divergence" in n for n in notes)
+    assert {"evidence_tension", "representation_divergence"} <= {n.slug for n in notes}
 
     # No tension when claims only matched outside the last producer; no
     # divergence without the degenerate-output flag: nothing contests the origin,
@@ -304,7 +307,9 @@ def test_reconcile_evidence_splits_confidence_across_competing_origins():
     # a flat 0.65 over two live hypotheses.
     assert confidence == round(0.65 * 0.6, 4)  # 0.39
     assert confidence < 0.65
-    assert any("competing_origins" in n for n in notes)
+    split = next(n for n in notes if n.slug == "competing_origins")
+    assert split.data["origin_agent"] == "think"
+    assert split.data["alt_agent"] == "act"
 
     # Explicit breakdown: reported origin 'think', later origin 'act' (the last
     # producer), and an unresolved remainder — weights sum to exactly 1.0.
@@ -331,15 +336,21 @@ def test_reconcile_evidence_divergence_alone_splits_without_tension():
         report, None, names, ["degenerate_output"]
     )
 
-    assert not any("evidence_tension" in n for n in notes)
-    assert any("representation_divergence" in n for n in notes)
+    slugs = {n.slug for n in notes}
+    assert "evidence_tension" not in slugs
+    assert "representation_divergence" in slugs
     assert confidence == round(0.65 * 0.6, 4)
     assert [h["origin"] for h in hypotheses] == ["t", "a", None]
     assert "representation_divergence" in hypotheses[1]["basis"]
 
 
-# --- contract_propagation_notes: deterministic verification that a contract ---
+# --- contract_propagation_check: deterministic verification that a contract ---
 # --- breach did (or did not) propagate into the final deliverable          ---
+#
+# Asserted on the STRUCTURED result (status + basis + the record's typed payload),
+# never on the rendered sentence. The status is what drives the escalation, so it
+# is the thing a regression must be caught on; the prose is a render artifact and
+# is covered once, in test_narrative.py.
 
 _VIOLATION = {
     "run_id": "r-think",
@@ -350,38 +361,58 @@ _VIOLATION = {
 }
 
 
-def test_contract_propagation_param_match_propagated():
-    from worker.tier2 import contract_propagation_notes
+def _propagation(payload, deliverable_run_id="r-act", agent="act"):
+    from worker.tier2 import contract_propagation_check
 
-    notes = contract_propagation_notes(
-        [dict(_VIOLATION)],
-        "r-act",
-        "act",
-        '{"file_type": "md", "artifact_text": "hello"}',
+    return contract_propagation_check(
+        [dict(_VIOLATION)], deliverable_run_id, agent, payload
     )
 
-    assert len(notes) == 1
-    assert "PROPAGATED" in notes[0]
-    assert "latent defect" in notes[0]
-    assert "contract param match" in notes[0]  # basis is stated
-    assert "'act'" in notes[0]
+
+def test_contract_propagation_param_match_propagated():
+    results = _propagation('{"file_type": "md", "artifact_text": "hello"}')
+
+    assert len(results) == 1
+    assert results[0]["status"] == "propagated"
+    assert results[0]["basis"] == "contract param match"
+    assert results[0]["record"]["data"]["basis_kind"] == "param"
+    assert results[0]["record"]["data"]["agent"] == "act"
 
 
 def test_contract_propagation_param_match_corrected():
-    from worker.tier2 import contract_propagation_notes
+    results = _propagation('{"file_type": "docx", "artifact_text": "hello"}')
 
-    notes = contract_propagation_notes(
-        [dict(_VIOLATION)],
-        "r-act",
-        "act",
-        '{"file_type": "docx", "artifact_text": "hello"}',
+    assert len(results) == 1
+    assert results[0]["status"] == "corrected"
+    assert results[0]["basis"] == "contract param match"
+
+
+def test_propagated_breach_claims_no_content_recovery_when_content_was_unmeasured():
+    """A --no-judge run must not be told its content recovered.
+
+    The propagated-breach note read "the run is recovered in content but shipped
+    with a violated contract". That is a claim ABOUT CONTENT, and on a run where
+    every node is unscored (no judge, no contracts) nothing measured it. Observed
+    on the real CLI over testdata/topologies/fanout_join_echoes_breach.json.
+    The propagation itself stays verified — it is read off the deliverable
+    payload — but the aftermath must say UNKNOWN, not recovered.
+    """
+    from worker.tier2 import contract_propagation_check
+
+    payload = '{"file_type": "md", "artifact_text": "hello"}'
+    unmeasured = contract_propagation_check(
+        [dict(_VIOLATION)], "r-act", "act", payload, content_measured=False
     )
+    assert unmeasured[0]["status"] == "propagated"     # the breach still shipped
+    assert "recovered in content" not in unmeasured[0]["note"]
+    assert "never measured" in unmeasured[0]["note"]
+    assert "UNKNOWN" in unmeasured[0]["note"]
 
-    assert len(notes) == 1
-    assert "ORIGINAL" in notes[0]
-    assert "corrected downstream" in notes[0]
-    assert "contract param match" in notes[0]
-    assert "PROPAGATED" not in notes[0]
+    # When content DID run, the recovery reading is earned and stays.
+    measured = contract_propagation_check(
+        [dict(_VIOLATION)], "r-act", "act", payload, content_measured=True
+    )
+    assert "recovered in content" in measured[0]["note"]
 
 
 def test_contract_propagation_path_extension_propagated_prose_does_not_flip():
@@ -389,79 +420,73 @@ def test_contract_propagation_path_extension_propagated_prose_does_not_flip():
     '.md' proves the rewritten format shipped. The prose mentioning '.docx'
     (the ORIGINAL value) must NOT flip the verdict to corrected — only
     structured path values count, never free-text substring search."""
-    from worker.tier2 import contract_propagation_notes
-
-    notes = contract_propagation_notes(
-        [dict(_VIOLATION)],
-        "r-act",
-        "act",
-        '{"artifact_path": "output/x.md", "artifact_text": "mentions .docx in prose"}',
+    results = _propagation(
+        '{"artifact_path": "output/x.md", "artifact_text": "mentions .docx in prose"}'
     )
 
-    assert len(notes) == 1
-    assert "PROPAGATED" in notes[0]
-    assert "artifact path" in notes[0]  # basis: path extension, not param
-    assert "'.md'" in notes[0]
-    assert "corrected" not in notes[0]
+    assert len(results) == 1
+    assert results[0]["status"] == "propagated"
+    # Basis: the structured path extension, not a contract param.
+    assert results[0]["record"]["data"] == {
+        "key": "file_type", "from": "docx", "to": "md", "agent": "act",
+        "status": "propagated", "basis_kind": "path",
+        "path": "output/x.md", "ext": "md",
+        # Whether the content channel measured anything on this run — the note's
+        # aftermath clause turns on it (see the unmeasured-content test below).
+        "content_measured": True,
+    }
 
 
 def test_contract_propagation_path_extension_corrected():
-    from worker.tier2 import contract_propagation_notes
+    results = _propagation('{"artifact_path": "output/x.docx"}')
 
-    notes = contract_propagation_notes(
-        [dict(_VIOLATION)],
-        "r-act",
-        "act",
-        '{"artifact_path": "output/x.docx"}',
-    )
-
-    assert len(notes) == 1
-    assert "corrected downstream" in notes[0]
-    assert "artifact path" in notes[0]
-    assert "'.docx'" in notes[0]
+    assert len(results) == 1
+    assert results[0]["status"] == "corrected"
+    assert results[0]["record"]["data"]["basis_kind"] == "path"
+    assert results[0]["record"]["data"]["ext"] == "docx"
 
 
 def test_contract_propagation_unverified_when_payload_missing_or_unparseable():
-    from worker.tier2 import contract_propagation_notes
-
     for payload in (None, "not json at all", '{"other_key": true}'):
-        notes = contract_propagation_notes([dict(_VIOLATION)], "r-act", "act", payload)
-        assert len(notes) == 1
-        assert "UNVERIFIED" in notes[0]
-        assert "nothing observable" in notes[0]
-        assert "out of band" in notes[0]
+        results = _propagation(payload)
+        assert len(results) == 1
+        assert results[0]["status"] == "unverified"
+        assert results[0]["basis"] == "nothing observable"
+        assert results[0]["record"]["data"]["basis_kind"] == "none"
 
     # No deliverable run at all -> unverified even with a plausible payload.
-    notes = contract_propagation_notes(
-        [dict(_VIOLATION)], None, "unknown", '{"file_type": "md"}'
+    results = _propagation(
+        '{"file_type": "md"}', deliverable_run_id=None, agent="unknown"
     )
-    assert len(notes) == 1
-    assert "UNVERIFIED" in notes[0]
+    assert len(results) == 1
+    assert results[0]["status"] == "unverified"
 
 
 def test_contract_propagation_non_format_key_gets_no_path_evidence():
     """A 'lang' rewrite cannot be verified by a file extension — with the param
     absent the verdict must stay UNVERIFIED even if a path is present."""
-    from worker.tier2 import contract_propagation_notes
+    from worker.tier2 import contract_propagation_check
 
     violation = {"run_id": "r", "agent": "think", "key": "lang", "from": "cs", "to": "en"}
-    notes = contract_propagation_notes(
+    results = contract_propagation_check(
         [violation], "r-act", "act", '{"artifact_path": "output/x.en"}'
     )
-    assert len(notes) == 1
-    assert "UNVERIFIED" in notes[0]
+    assert len(results) == 1
+    assert results[0]["status"] == "unverified"
 
 
 def test_contract_propagation_dedupes_identical_violations():
-    from worker.tier2 import contract_propagation_notes
+    """Dedup keys off the typed record, not its rendered sentence — two identical
+    violations are ONE fact however the template happens to word it."""
+    from worker.tier2 import contract_propagation_check
 
-    notes = contract_propagation_notes(
+    results = contract_propagation_check(
         [dict(_VIOLATION), dict(_VIOLATION)],
         "r-act",
         "act",
         '{"file_type": "md"}',
     )
-    assert len(notes) == 1
+    assert len(results) == 1
 
 
 def test_contract_propagation_check_returns_structured_statuses():
@@ -481,8 +506,7 @@ def test_contract_propagation_check_returns_structured_statuses():
     assert r["status"] == "propagated"
     assert r["key"] == "file_type"
     assert r["from"] == "docx" and r["to"] == "md"
-    assert "artifact path" in r["basis"]
-    assert "PROPAGATED" in r["note"]
+    assert r["record"]["data"]["basis_kind"] == "path"
 
 
 def test_contract_propagation_check_corrected_and_unverified_statuses():
@@ -512,6 +536,77 @@ def test_classify_incident_escalates_shipped_latent_defect():
         "degraded_quality",
         "degraded_quality",
     )
+
+
+def test_contract_recovery_from_propagation_not_successor_scores():
+    """Lock (GREEN): the degraded_recovered -> shipped_with_latent_defect
+    escalation is decided by the DETERMINISTIC contract_propagation check alone —
+    never successor scores, never a judge.
+
+    This guards the flagship deterministic verdict as the channel decoupling
+    proceeds: contract "recovery" is defined as "the breach did NOT reach the
+    shipped artifact" (a propagation fact), so a corrected/unverified breach must
+    NOT escalate, and a non-recovered report type is left untouched. Fed by the
+    real check so the whole chain (check -> escalation) is exercised."""
+    from worker.tier2 import (
+        contract_propagation_check,
+        escalate_shipped_latent_defect,
+    )
+
+    # Breach VERIFIED in the shipped deliverable (file_type md shipped, docx asked).
+    propagated = contract_propagation_check(
+        [dict(_VIOLATION)], "r-render", "render", '{"artifact_path": "output/x.md"}'
+    )
+    assert propagated[0]["status"] == "propagated"
+    effective, notes = escalate_shipped_latent_defect("degraded_recovered", propagated)
+    assert effective == "shipped_with_latent_defect"
+    assert notes and "VERIFIED in the shipped artifact" in notes[0]
+
+    # Breach corrected before shipping -> the deliverable is conformant -> no escalation.
+    corrected = contract_propagation_check(
+        [dict(_VIOLATION)], "r-render", "render", '{"artifact_path": "output/x.docx"}'
+    )
+    assert corrected[0]["status"] == "corrected"
+    assert escalate_shipped_latent_defect("degraded_recovered", corrected) == (
+        "degraded_recovered",
+        [],
+    )
+
+    # A non-recovered report type is never rewritten by this escalation, even
+    # when the breach propagated — escalation only upgrades the near-miss verdict.
+    assert escalate_shipped_latent_defect("cut_point", propagated) == ("cut_point", [])
+
+
+def test_reanalysis_under_new_key_supersedes_prior_incident_end_to_end():
+    """C2 through the full processor: analysing a graph opens incident K1; a
+    re-analysis that reclassifies it (K2) supersedes the now-stale K1 instead of
+    leaving both open — driven by tier2.process's own supersede_others=True."""
+    from dataclasses import replace
+
+    repo = _diamond_repo()
+    processor, _streams = _make_processor(repo, judge=_diamond_judge())
+
+    # First analysis: the fabrication cascade → degraded_quality incident (K1).
+    asyncio.run(
+        processor.process(
+            Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key="k1")
+        )
+    )
+    assert repo.incidents[(uid(1), "degraded_quality")]["status"] == "open"
+
+    # Re-analysis reclassifies the SAME graph (a loop anomaly now flags it) →
+    # loop_detected incident (K2, a different key). New dedup_key so the job
+    # claim does not short-circuit the second run.
+    repo.tier1[uid(1)] = replace(repo.tier1[uid(1)], flags=["loop_anomaly"])
+    asyncio.run(
+        processor.process(
+            Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key="k2")
+        )
+    )
+
+    # K1 is superseded, K2 is the sole open incident for the graph.
+    assert repo.incidents[(uid(1), "degraded_quality")]["status"] == "superseded"
+    assert repo.incidents[(uid(1), "loop_detected")]["status"] == "open"
 
 
 def test_reclassified_analysis_supersedes_stale_incident():
@@ -605,6 +700,83 @@ def test_graph_not_found_path_does_not_supersede():
             blame=None, supersede_others=True,
         )
         assert repo.incidents[(gid, "degraded_quality")]["status"] == "resolved"
+
+    asyncio.run(run())
+
+
+def test_reprocess_back_to_prior_key_reopens_superseded_incident():
+    """A graph near a judge boundary can oscillate K1 -> K2 -> K1 across
+    reprocesses. The third analysis reuses K1's incident row (is_new=False) —
+    it must REOPEN it, not write a fresh authoritative report version onto a
+    superseded incident nobody sees in the open list."""
+    from dataclasses import replace
+
+    repo = _diamond_repo()
+    processor, _streams = _make_processor(repo, judge=_diamond_judge())
+
+    # K1: the fabrication cascade -> degraded_quality.
+    asyncio.run(
+        processor.process(
+            Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key="k1")
+        )
+    )
+    original_flags = repo.tier1[uid(1)].flags
+    assert repo.incidents[(uid(1), "degraded_quality")]["status"] == "open"
+
+    # K2: a loop anomaly reclassifies the graph -> K1 superseded.
+    repo.tier1[uid(1)] = replace(repo.tier1[uid(1)], flags=["loop_anomaly"])
+    asyncio.run(
+        processor.process(
+            Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key="k2")
+        )
+    )
+    assert repo.incidents[(uid(1), "degraded_quality")]["status"] == "superseded"
+
+    # Back to K1: the flag clears and a reprocess lands on the original key.
+    repo.tier1[uid(1)] = replace(repo.tier1[uid(1)], flags=original_flags)
+    asyncio.run(
+        processor.process(
+            Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key="k3")
+        )
+    )
+    assert repo.incidents[(uid(1), "degraded_quality")]["status"] == "open"
+    assert repo.incidents[(uid(1), "loop_detected")]["status"] == "superseded"
+
+
+def test_reused_incident_reopens_resolved_but_keeps_acknowledged():
+    """Reuse of the SAME key reopens a resolved incident (a new authoritative
+    analysis says the problem is live again), but never resets acknowledged —
+    a human owns that state."""
+    import asyncio
+    from uuid import uuid4
+
+    from conftest import FakeRepo
+
+    repo = FakeRepo()
+    gid = uuid4()
+
+    async def run() -> None:
+        await repo.persist_tier2_result(
+            dedup_key="k1", node_scores=[], graph_id=gid,
+            incident_key="degraded_quality", incident_trigger="degraded_quality",
+            blame=None, supersede_others=True,
+        )
+        repo.incidents[(gid, "degraded_quality")]["status"] = "resolved"
+        outcome = await repo.persist_tier2_result(
+            dedup_key="k2", node_scores=[], graph_id=gid,
+            incident_key="degraded_quality", incident_trigger="degraded_quality",
+            blame=None, supersede_others=True,
+        )
+        assert outcome.is_new is False
+        assert repo.incidents[(gid, "degraded_quality")]["status"] == "open"
+
+        repo.incidents[(gid, "degraded_quality")]["status"] = "acknowledged"
+        await repo.persist_tier2_result(
+            dedup_key="k3", node_scores=[], graph_id=gid,
+            incident_key="degraded_quality", incident_trigger="degraded_quality",
+            blame=None, supersede_others=True,
+        )
+        assert repo.incidents[(gid, "degraded_quality")]["status"] == "acknowledged"
 
     asyncio.run(run())
 
@@ -758,13 +930,14 @@ def test_two_independent_faults_terminal_axes_and_required_checklist():
     assert fp[0]["source"] == "required"
     assert fp[0]["found_in"] == []          # rozpoč* nowhere in producers
     assert fp[0]["checked"] >= 1
-    # (4) producer claimed→effective: think refuted by the contract override
-    think_override = next(
-        o for o in ev["score_overrides"] if o["run_id"] == str(uid(2))
-    )
-    assert think_override["original"] > 0.5
-    assert think_override["effective"] <= 0.15
-    assert "contract_violation" in think_override["reason"]
+    # (4) R4 / channel decoupling: producers get NO claimed→effective override.
+    # think's judged score is untouched; the contract breach travels as its own
+    # deterministic evidence stream (making think a deterministic culprit), not a
+    # struck-through sentinel. The override vehicle is verifier-only now.
+    assert not any(o["run_id"] == str(uid(2)) for o in ev["score_overrides"])
+    assert repo.node_scores[uid(2)].quality_score > 0.5
+    contract_keys = {(c["run_id"], c["key"]) for c in ev["contract_violations"]}
+    assert (str(uid(2)), "file_type") in contract_keys
 
 
 def test_stale_deterministic_terminal_is_not_ground_truth():
@@ -1065,13 +1238,15 @@ def test_escalation_rewrites_candidacy_narrative():
     assert "origin (escalated)" in think_candidacy
     assert "silent failure" in think_candidacy
     assert "near-miss (fragile node), not the origin" not in think_candidacy
-    # #3: per-defect attribution — contract near-certain (both sides observed);
-    # content here has a MEASURED predecessor (orchestrator scored 1.0), so it
-    # keeps its real value uncapped — the boundary cap is only for assumed
-    # baselines (covered by the engine tests with a structural-root start).
+    # P4 / channel decoupling: think scored 0.9 (>= threshold 0.5) — it has NO
+    # content degradation. The old 60% content_degradation row was a SENTINEL
+    # ARTIFACT: the floor dropped think to 0.10, faking a drop from orchestrator
+    # 1.0. With the floor gone the honest inventory is exactly ONE defect — the
+    # deterministically observed contract breach (via="deterministic").
     breakdown = {d["defect"]: d["attribution"] for d in ev["attribution_breakdown"]}
     assert breakdown["contract_violation"] == 0.95
-    assert breakdown["content_degradation"] > 0.8  # measured, honest, uncapped
+    assert "content_degradation" not in breakdown
+    assert list(breakdown) == ["contract_violation"]
     # Headline attribution = the verdict-carrying defect's attribution. The
     # verdict (shipped_with_latent_defect) is carried by the contract breach,
     # so the headline matches the contract entry — never a blended ceiling.
@@ -1153,3 +1328,126 @@ def test_blame_report_is_stamped_with_judge_prompt_hash():
     stamped = repo.blame_reports[0]["judge_prompt_hash"]
     assert stamped == judge_prompts_fingerprint()
     assert re.fullmatch(r"[0-9a-f]{12}", stamped)
+
+
+# ---- Terminal rubric split (content vs form) -----------------------------------
+
+
+def test_classify_incident_terminal_defect_unlocalized_is_quality():
+    assert classify_incident("terminal_defect_unlocalized", [], True) == (
+        "degraded_quality",
+        "degraded_quality",
+    )
+
+
+def test_terminal_form_dimension_flows_into_report_evidence():
+    """A content-ok terminal with a bad FORM dimension: the split must reach
+    the report — evidence.terminal_verdict carries the form dict and the
+    engine emits the design-level form_defect_shipped note (no verification
+    gap is manufactured, the content is fine)."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(2, "writer", output_inline="markdown report", end_time=2.0),
+            ],
+            [(1, 2)],
+        )
+    )
+    repo.tier1[uid(1)] = Tier1Verdict(
+        graph_id=uid(1),
+        terminal_judge_verdict="ok",
+        terminal_judge_score=1.0,
+        terminal_judge_reasoning="content complete",
+        terminal_form={
+            "verdict": "bad",
+            "requirement": "jako PDF",
+            "observed": "markdown text",
+            "reasoning": "markdown shipped where PDF was requested",
+        },
+        flags=["terminal_form_breach"],
+        flagged=True,
+        sampled=False,
+    )
+    processor, _ = _make_processor(repo)
+    msg = Tier2Message(graph_id=str(uid(1)), trigger="tier1", dedup_key=str(uid(1)))
+    asyncio.run(processor.process(msg))
+
+    report = repo.blame_reports[0]
+    tv = report["evidence"]["terminal_verdict"]
+    assert tv["bad"] is False  # content dimension untouched by the form miss
+    assert tv["form"]["bad"] is True
+    assert tv["form"]["requirement"] == "jako PDF"
+    notes = report["evidence"]["notes"]
+    assert any(n.startswith("form_defect_shipped:") for n in notes)
+    assert not any(n.startswith("verification_gap:") for n in notes)
+
+
+# ---- §2.4 reconcile: required-section representation divergence -----------------
+
+
+def test_required_fact_divergence_producer_has_section_deliverable_missing():
+    """The report-#1 class: a required section present in a producer's payload
+    but ABSENT from the shipped deliverable must surface a
+    representation_divergence with refs into the REAL findings list. The worker
+    only emits the per-representation side findings; the ENGINE's reconcile
+    produces the divergence — a worker-local reconcile used to ship a
+    divergence whose finding_refs indexed a throwaway list."""
+    from blame_engine import reconcile
+    from worker.types import CheckRule
+    from worker.tier2 import required_section_findings
+
+    rule = CheckRule(
+        id=1, agent_name=None, graph_type=None, kind="required_section",
+        spec={"name": "budget table", "match": "word_prefix", "pattern": "rozpoč"},
+    )
+    bundle = make_bundle(
+        [
+            make_run(1, "orchestrator", end_time=1.0),
+            make_run(2, "act", output_inline="obsah: rozpočet 125 000", end_time=2.0),
+            make_run(3, "render", output_inline="no budget section here", end_time=3.0),
+        ],
+        [(1, 2), (2, 3)],
+    )
+    payloads = {
+        uid(2): (None, "obsah: rozpočet 125 000"),  # producer HAS the section
+        uid(3): (None, "no budget section here"),    # deliverable does NOT
+    }
+    sides = required_section_findings([rule], bundle, payloads, "no budget section here")
+
+    assert [f.subject for f in sides] == ["producers", "deliverable"]
+    assert [f.data["value"] for f in sides] == ["present", "absent"]
+    assert all(f.fact_key == "required_section:budget table" for f in sides)
+
+    divergences = reconcile(sides)
+    assert len(divergences) == 1
+    d = divergences[0]
+    assert d.kind == "representation_divergence"
+    assert d.fact_key == "required_section:budget table"
+    assert set(d.data["values"]) == {"present", "absent"}
+    # The refs point at the actual side findings, and both sides EXIST.
+    assert d.data["finding_refs"] == [0, 1]
+
+
+def test_required_fact_no_divergence_when_both_agree():
+    """Present in producer AND deliverable → both sides emitted, no divergence."""
+    from blame_engine import reconcile
+    from worker.types import CheckRule
+    from worker.tier2 import required_section_findings
+
+    rule = CheckRule(
+        id=1, agent_name=None, graph_type=None, kind="required_section",
+        spec={"name": "budget table", "match": "word_prefix", "pattern": "rozpoč"},
+    )
+    bundle = make_bundle(
+        [
+            make_run(1, "orchestrator", end_time=1.0),
+            make_run(2, "render", output_inline="rozpočet 125 000", end_time=2.0),
+        ],
+        [(1, 2)],
+    )
+    payloads = {uid(2): (None, "rozpočet 125 000")}
+    sides = required_section_findings([rule], bundle, payloads, "rozpočet 125 000")
+    assert [f.data["value"] for f in sides] == ["present", "present"]
+    assert reconcile(sides) == []

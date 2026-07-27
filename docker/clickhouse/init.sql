@@ -11,7 +11,8 @@ CREATE TABLE IF NOT EXISTS otel_spans
     start_time     DateTime64(9),
     end_time       DateTime64(9),
     attributes     String,  -- raw JSON attributes payload
-    status_code    String
+    status_code    String,
+    resource_attributes String DEFAULT '{}'  -- flattened OTLP resource attrs (JSON object)
 )
 ENGINE = MergeTree
 ORDER BY (trace_id, start_time);

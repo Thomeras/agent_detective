@@ -43,6 +43,32 @@ async def test_leaderboard_ordered_by_cost_desc(client, repo, run_factory):
     assert names == ["pricey-agent", "cheap-agent"]
 
 
+async def test_leaderboard_cost_unknown_when_never_instrumented(client, repo, run_factory):
+    """An agent nobody priced reports null cost, not $0.
+
+    Most instrumentations never set `gen_ai.usage.cost`; folding that to zero
+    rendered a confident "$0" in the UI, indistinguishable from an agent that
+    genuinely spent nothing.
+    """
+    repo.runs = [
+        run_factory(uuid.uuid4(), agent_name="unpriced-agent", cost_usd=None),
+        run_factory(uuid.uuid4(), agent_name="unpriced-agent", cost_usd=None),
+    ]
+    response = await client.get("/agents/leaderboard")
+    assert response.json()["agents"][0]["total_cost_usd"] is None
+
+
+async def test_leaderboard_unpriced_agent_ordered_last(client, repo, run_factory):
+    # NULLS LAST: a measured spender must outrank an unmeasured one.
+    repo.runs = [
+        run_factory(uuid.uuid4(), agent_name="unpriced-agent", cost_usd=None),
+        run_factory(uuid.uuid4(), agent_name="cheap-agent", cost_usd=Decimal("0.01")),
+    ]
+    response = await client.get("/agents/leaderboard")
+    names = [a["agent_name"] for a in response.json()["agents"]]
+    assert names == ["cheap-agent", "unpriced-agent"]
+
+
 async def test_leaderboard_all_unscored(client, repo, run_factory):
     repo.runs = [run_factory(uuid.uuid4(), agent_name="unscored-agent", quality_score=None)]
     response = await client.get("/agents/leaderboard")

@@ -1,38 +1,57 @@
 """find_blame() orchestration and the first-match-wins classification table
 (spec 3.7)."""
 
+from collections.abc import Sequence
 from dataclasses import replace
 
 import networkx as nx
 
 from .condense import _chron_key, condense
+from .assemble import (
+    add_extra_findings,
+    add_verifier_findings,
+    build_findings,
+    ensure_content_drop_finding,
+    emit_composition,
+    emit_cut_point,
+    emit_degraded_recovered,
+    emit_external,
+    emit_form,
+    emit_loop,
+    emit_multi,
+    emit_terminal_unlocalized,
+    emit_verification,
+    finalize_schema2,
+)
+from .derive import derive_escalation_records, derive_report_type
 from .confidence import (
+    BOUNDARY_ATTRIBUTION_CAP as _BOUNDARY_ATTRIBUTION_CAP,
+    CORROBORATED_FLAG,
+    REPORT_TYPE_CAP as _CONFIDENCE_CAP,
     _DETERMINISTIC_OBSERVATION,
     compute_confidence,
     compute_observation_confidence,
+    report_type_cap,
 )
 from .cost import downstream_cost
 from .cutpoint import Candidate, _analyze
+from .finding import Finding
 from .loops import _detect_anomalies
+from .narrative import (
+    CandidacyRecord,
+    NoteRecord,
+    render_attribution_basis,
+    render_candidacy,
+    render_notes,
+    render_score_override_reason,
+    render_terminal_caveat,
+    serialize_candidacy,
+    serialize_note,
+)
 from .path import propagation_path
+from .roles import is_verifier as _is_verifier
 from .topology import classify_topology
 from .types import BlameInput, BlameReport, Evidence
-
-
-# Per-report-type confidence ceilings (spec: an honest detective never claims
-# certainty it does not have). ``composition_failure`` is a fallback verdict —
-# "we could not localise the fault, so we point at the orchestrator" — and must
-# never be sold as a sure thing. Only ``cut_point`` (backed by a real score gap)
-# and ``loop_detected`` (a deterministic limit breach) keep full confidence.
-_CONFIDENCE_CAP: dict[str, float] = {
-    "composition_failure": 0.4,
-    "root_cause_external": 0.5,
-    "multi_culprit": 0.8,
-    "verification_gap": 0.6,
-}
-
-# Agent-name hints for verifier/gate nodes whose job is to catch bad work.
-_VERIFIER_HINTS = ("qa", "eval", "review", "verif", "validat", "check", "critic", "audit", "gate")
 
 # Structured scoring flags that assert a CONTENT defect (the judge admitted the
 # node under-delivered). With a bad terminal corroborating them, the earliest
@@ -43,18 +62,19 @@ _CONTENT_FLAGS = frozenset(
 )
 
 
-def _is_verifier(name: str | None) -> bool:
-    n = (name or "").lower()
-    return any(h in n for h in _VERIFIER_HINTS)
-
-
-def _drill_into_loop(cond, inp, super_id, exit_node):
+def _drill_into_loop(cond, inp, super_id, exit_node, preferred=None):
     """When the culprit super-node is a loop (multi-member SCC), the blame belongs
-    to the worst-scoring MEMBER — where quality actually broke inside the loop —
-    not the exit node that merely flows downstream. Returns (culprit_run_id,
-    members, real_drop) where real_drop is the member's drop from its own raw
-    (in-graph) predecessors, so it reflects the true break (e.g. act 0.93 ->
-    render 0.27) rather than the loop's exit drop."""
+    to the MEMBER where quality actually broke — not the exit node that merely
+    flows downstream. Returns (culprit_run_id, members, real_drop) where real_drop
+    is the member's drop from its own raw (in-graph) predecessors, so it reflects
+    the true break (e.g. act 0.93 -> render 0.27) rather than the loop's exit drop.
+
+    ``preferred`` is the member the intra-SCC localizer qualified
+    (``Candidate.scc_member``). It wins over "worst-scoring", because the worst
+    member may be the VICTIM of another member rather than the node that broke —
+    and because a member picked purely by score can end up with no supporting
+    evidence at all (its score above threshold, no measurable drop), which the
+    §2.4 defect validator rightly refuses to build a defect from."""
     members = list(cond.super_nodes[super_id].members)
     scored = [
         (m, inp.scores[m].score)
@@ -63,7 +83,10 @@ def _drill_into_loop(cond, inp, super_id, exit_node):
     ]
     if len(members) <= 1 or not scored:
         return exit_node, members, None
-    culprit = min(scored, key=lambda ms: ms[1])[0]
+    if preferred is not None and any(m == preferred for m, _ in scored):
+        culprit = preferred
+    else:
+        culprit = min(scored, key=lambda ms: ms[1])[0]
     pred_scores = [
         inp.scores[p].score
         for p in cond.graph.predecessors(culprit)
@@ -80,6 +103,15 @@ def _node_score(inp: BlameInput, run_id: str) -> float | None:
     return ns.score if ns is not None else None
 
 
+def _violations(inp: BlameInput, run_id: str) -> list[dict]:
+    """A node's contract violations as the typed payload the narrative renders
+    from — never a pre-formatted detail string handed to a template."""
+    ns = inp.scores.get(run_id)
+    if ns is None or not ns.contract_violations:
+        return []
+    return [{"key": k, "from": a, "to": b} for k, a, b in ns.contract_violations]
+
+
 def _has_deterministic_defect(inp: BlameInput, run_id: str) -> bool:
     """A hard, reproducible signal that this node's output is defective — a
     contract violation or an admitted content flag — as opposed to a graded judge
@@ -90,14 +122,13 @@ def _has_deterministic_defect(inp: BlameInput, run_id: str) -> bool:
     return bool(ns.contract_violations) or bool(_CONTENT_FLAGS.intersection(ns.flags))
 
 
-# Attribution ceiling for a CONTENT defect at the OBSERVABILITY BOUNDARY (its
-# baseline is assumed, not measured). "The fault originated here" cannot be
-# near-certain about a node whose predecessor was never scored — such a node is
-# the origin partly because it is the first thing we could see. The cap is
-# specific to the content defect: a contract violation is exempt entirely,
-# because its input/output diff OBSERVED the carried parameter arriving intact
-# and leaving rewritten — origination is observed, not inferred.
-_BOUNDARY_ATTRIBUTION_CAP = 0.6
+# The attribution ceiling for a CONTENT defect at the OBSERVABILITY BOUNDARY
+# (baseline assumed, not measured) is BOUNDARY_ATTRIBUTION_CAP, read from the
+# confidence rules table (imported above as _BOUNDARY_ATTRIBUTION_CAP). "The
+# fault originated here" cannot be near-certain about a node whose predecessor
+# was never scored. The cap is specific to the content defect: a contract
+# violation is exempt entirely, because its input/output diff OBSERVED the
+# carried parameter arriving intact and leaving rewritten.
 
 
 def _attribution_breakdown(
@@ -116,40 +147,54 @@ def _attribution_breakdown(
     ns = inp.scores.get(run_id)
     breakdown: list[dict] = []
     if ns is not None and ns.contract_violations:
-        detail = "; ".join(f"{k}: {a!r}->{b!r}" for k, a, b in ns.contract_violations)
+        # 0.95 is the OBSERVED-origination convention: the check saw the value
+        # arrive intact and leave rewritten. When the candidate was reached only
+        # because the upstream node that first put this value in circulation is
+        # invisible to this channel, origination was NOT observed and the same
+        # cap the headline uses has to apply here — otherwise the verdict prints
+        # a confidence no defect of its own supports.
         breakdown.append(
             {
                 "defect": "contract_violation",
-                "attribution": _DETERMINISTIC_OBSERVATION,
-                "basis": (
-                    "deterministic: the carried parameter was observed intact "
-                    f"in the input and rewritten in the output ({detail}) — "
-                    "origination is observed, not inferred"
+                "attribution": (
+                    inp.config.unknown_confidence_cap
+                    if candidate.unknown_upstream
+                    else _DETERMINISTIC_OBSERVATION
+                ),
+                "basis": render_attribution_basis(
+                    "contract_violation", {"violations": _violations(inp, run_id)}
                 ),
             }
         )
-    content_attr = (
-        min(raw_attribution, _BOUNDARY_ATTRIBUTION_CAP)
-        if candidate.base_assumed
-        else raw_attribution
-    )
-    breakdown.append(
-        {
-            "defect": "content_degradation",
-            "attribution": content_attr,
-            "basis": (
-                "observability boundary — no scored predecessor, the baseline "
-                f"is assumed (capped at {_BOUNDARY_ATTRIBUTION_CAP:.2f})"
-                if candidate.base_assumed
-                else "measured drop from a scored predecessor"
-            ),
-        }
-    )
+    # A content_degradation defect exists ONLY when the CONTENT channel made this
+    # node an origin. A deterministic-only origin (judge-healthy node caught by a
+    # hard check) has no content defect — emitting a content_degradation row for
+    # it would be a fabricated number under a topological cap, not a measurement.
+    if candidate.via in ("content", "both"):
+        content_attr = (
+            min(raw_attribution, _BOUNDARY_ATTRIBUTION_CAP)
+            if candidate.base_assumed
+            else raw_attribution
+        )
+        breakdown.append(
+            {
+                "defect": "content_degradation",
+                "attribution": content_attr,
+                "basis": render_attribution_basis(
+                    "content_degradation",
+                    {
+                        "base_assumed": candidate.base_assumed,
+                        "cap": _BOUNDARY_ATTRIBUTION_CAP,
+                    },
+                ),
+            }
+        )
     return breakdown
 
 
 def _verdict_attribution(
-    inp: BlameInput, run_id: str, candidate, attribution: float, notes: list[str]
+    inp: BlameInput, run_id: str, candidate, attribution: float,
+    notes: list[NoteRecord],
 ) -> float:
     """Headline attribution = attribution of the defect that CARRIES the verdict.
 
@@ -162,21 +207,40 @@ def _verdict_attribution(
     """
     ns = inp.scores.get(run_id)
     if ns is not None and ns.contract_violations:
+        if candidate.unknown_upstream:
+            # The 0.95 above is earned by OBSERVED origination — the diff saw the
+            # parameter arrive intact and leave rewritten. This candidate is the
+            # other case: the value was already in circulation upstream and it is
+            # named only because the node that put it there is not reachable in
+            # this channel (a non-exit cycle member, or a node excluded as a
+            # propagation point). The breach is certain; that it ORIGINATED here
+            # is not, so attribution cannot carry the deterministic headline.
+            notes.append(
+                NoteRecord("attribution_capped", {"cap": inp.config.unknown_confidence_cap})
+            )
+            return inp.config.unknown_confidence_cap
         return _DETERMINISTIC_OBSERVATION
     if candidate.base_assumed and attribution > _BOUNDARY_ATTRIBUTION_CAP:
         notes.append(
-            "attribution_capped: content_degradation — the origin sits at the "
-            "observability boundary (no scored predecessor; the baseline is "
-            "assumed, not measured), so attribution of the content defect "
-            f"cannot exceed {_BOUNDARY_ATTRIBUTION_CAP:.2f}. The cap is "
-            "specific to inferred defects; a deterministically observed defect "
-            "(contract violation) is not subject to it"
+            NoteRecord("attribution_capped", {"cap": _BOUNDARY_ATTRIBUTION_CAP})
         )
         return _BOUNDARY_ATTRIBUTION_CAP
     return attribution
 
 
-def find_blame(inp: BlameInput) -> BlameReport:
+def find_blame(
+    inp: BlameInput, *, extra_findings: "Sequence[Finding] | None" = None
+) -> BlameReport:
+    """Localize blame and project the typed verdict.
+
+    ``extra_findings`` (verdict refactor F2 seam, §F2.2): typed Findings the
+    CALLER computed before derivation — fact/contract-propagation and
+    required-fact checks the engine cannot compute (it holds no payloads). They
+    join the schema-2 findings and take part in the mandatory reconcile pass
+    (§2.4), so a fact that disagrees with a terminal/contract finding surfaces a
+    divergence at derivation time instead of being printed twice unreconciled.
+    Backward compatible: ``None`` reproduces the pre-F2 output exactly.
+    """
     cfg = inp.config
     cond = condense(inp)
     analysis = _analyze(cond, inp)
@@ -192,6 +256,13 @@ def find_blame(inp: BlameInput) -> BlameReport:
     for _sid in cond.topo:
         graph_nodes.extend(cond.super_nodes[_sid].members)
     score_map = {n: _node_score(inp, n) for n in graph_nodes}
+    # Run-level evidence fact: the judged quality channel produced nothing at all
+    # (a `--no-judge` pass, or every composite below the minimum weight). Stamped
+    # onto every emitted Defect so the projection can tell "the content channel
+    # cleared this node" from "the content channel never ran" — without it a
+    # deterministic-only verdict derives as degraded_recovered, i.e. an absent
+    # measurement read as a passing one.
+    quality_unmeasured = all(s is None for s in score_map.values())
 
     # The tier1 terminal verdict is load-bearing evidence for several report
     # types; a report that leans on "terminal is bad" must SHOW that evidence.
@@ -212,6 +283,16 @@ def find_blame(inp: BlameInput) -> BlameReport:
     terminal_evidence = (
         {"bad": tv.bad, "score": tv.score, "reasoning": tv.reasoning,
          "checkable": tv.checkable, "stale": tv.stale}
+        | (
+            # Rubric split: record the FORM dimension whenever the judge
+            # produced one, so the report can show "content ok, form bad"
+            # instead of one conflated verdict.
+            {"form": {"bad": tv.form_bad, "requirement": tv.form_requirement,
+                      "observed": tv.form_observed,
+                      "reasoning": tv.form_reasoning}}
+            if (tv.form_bad or tv.form_requirement is not None)
+            else {}
+        )
         if tv is not None
         else None
     )
@@ -235,7 +316,10 @@ def find_blame(inp: BlameInput) -> BlameReport:
 
     hidden_unscored = [n for n in unscored if not _is_structural_root(n)]
 
-    notes: list[str] = []
+    # The classification rationale as TYPED records (§2.4: no free-prose channel
+    # out of decision code). Rendered to sentences once, at the end, by the
+    # narrative templates — nothing here writes English.
+    notes: list[NoteRecord] = []
     culprits: list[str] = []
     confidence = 0.0
     # Split confidence (see Evidence): observation = "is the output defective?"
@@ -263,10 +347,188 @@ def find_blame(inp: BlameInput) -> BlameReport:
         and ns.input_flawed is True
     ]
 
-    if all(s is None for s in score_map.values()):
-        # Row 1: all scores UNKNOWN.
-        report_type = "unclassified"
-        notes.append("no_scores: all scores unknown")
+    # Deterministic contract violations as their OWN evidence stream (provenance:
+    # a hard input/output diff, not the LLM judge). Kept separate from judge_notes
+    # so a strong, reproducible signal is never diluted into fluent prose.
+    # Computed BEFORE the cascade so the schema-2 findings (and the Defect[] the
+    # cascade emits) can reference them.
+    contract_breaches: list[dict] = []
+    for n in graph_nodes:
+        ns = inp.scores.get(n)
+        if ns is not None and ns.contract_violations:
+            for key, a, b in ns.contract_violations:
+                contract_breaches.append(
+                    {
+                        "run_id": n,
+                        "agent": inp.agent_names.get(n, n),
+                        "key": key,
+                        "from": a,
+                        "to": b,
+                    }
+                )
+
+    # Named deterministic signals (docs/deterministic-signals.md): node-level
+    # entries from scoring, stamped with the node identity. Graph-level entries
+    # (tier1 deliverable checks) are appended by the worker after serialization.
+    deterministic_signals: list[dict] = []
+    for n in graph_nodes:
+        ns = inp.scores.get(n)
+        if ns is not None and ns.deterministic_signals:
+            for sig in ns.deterministic_signals:
+                deterministic_signals.append(
+                    {
+                        **sig,
+                        "run_id": n,
+                        "agent": inp.agent_names.get(n, n),
+                        "provenance": "deterministic",
+                    }
+                )
+
+    # Schema-2 findings (verifier findings are added later — they depend on the
+    # verification gaps, which depend on the culprits the cascade selects). The
+    # cascade EMITS the typed Defect[] from what it localizes, referencing these
+    # findings; report_type is DERIVED from those defects afterwards.
+    # Terminal-review verifier lane: verifiers whose every successor is another
+    # verifier (or nothing) review the FINAL work product, so their judge's
+    # input_flawed claim measures the same fact the terminal content verdict
+    # measures — the §2.4 reconcile can then surface an assessment_conflict
+    # (e.g. the byte-stable "missing evidence notes" confabulation: verifier
+    # lane says flawed, checkable terminal says ok). A verifier feeding a
+    # producer reviews an intermediate artifact — different fact, no key.
+    _succ: dict[str, list[str]] = {}
+    for _ea, _eb in inp.edges:
+        _succ.setdefault(_ea, []).append(_eb)
+    assessment_lane = {
+        n
+        for n in graph_nodes
+        if _is_verifier(inp.agent_names.get(n))
+        and all(_is_verifier(inp.agent_names.get(s)) for s in _succ.get(n, []))
+    }
+    # Runs inside a multi-member SCC: their candidate drop is measured at the
+    # loop EXIT, but blame drills to the worst member — build_findings skips
+    # their build-time drop and the cascade emits the drilled member's real
+    # drop (ensure_content_drop_finding) once drilling has decided.
+    loop_runs = {
+        m
+        for sn in cond.super_nodes.values()
+        if len(sn.members) > 1
+        for m in sn.members
+    }
+    idx = build_findings(
+        inp,
+        graph_nodes,
+        contract_breaches,
+        deterministic_signals,
+        [],
+        tv,
+        anomalies,
+        candidates=candidates,
+        threshold=cfg.threshold,
+        assessment_lane=assessment_lane,
+        loop_runs=loop_runs,
+    )
+    # Caller-supplied findings join the index BEFORE defect emission (§F2.2):
+    # a worker-verified breach_propagated is what lets the contract defect cite
+    # the evidence for its own "shipped" claim instead of asserting it.
+    if extra_findings:
+        add_extra_findings(idx, extra_findings)
+    via_by_run = {c.run_id: c.via for c in candidates}
+    base_assumed_by_run = {c.run_id: c.base_assumed for c in candidates}
+    defects: list = []
+
+    def _resolve_culprit(candidate) -> str:
+        """The culprit run_id for one candidate, drilling into a cycle when the
+        origin sits inside one, and emitting the localization fact its content
+        defect will cite.
+
+        Shared by every multi-origin row. Before this existed the multi-culprit
+        row explicitly never drilled, so the SAME fault localized differently
+        depending on how many faults the graph happened to contain: alone it
+        named the loop member that broke, alongside a second origin it named the
+        loop's exit — a node that can sit comfortably above the threshold.
+        """
+        drilled, members, real_drop = _drill_into_loop(
+            cond, inp, candidate.super_id, candidate.run_id, candidate.scc_member
+        )
+        # Drill only in the CONTENT channel: a deterministic origin's evidence is
+        # the exit node's own input/output diff and must not move off it. A drill
+        # without either a measured drop or a qualified member would leave the
+        # content defect with no supporting finding (§2.4 validator).
+        if (
+            len(members) > 1
+            and candidate.via == "content"
+            and (real_drop is not None or candidate.scc_member is not None)
+        ):
+            loop_members.extend(m for m in members if m not in loop_members)
+            if real_drop is not None:
+                loop_drops[drilled] = real_drop
+                _s = _node_score(inp, drilled)
+                ensure_content_drop_finding(
+                    idx,
+                    inp,
+                    drilled,
+                    score=_s,
+                    base=(_s + real_drop) if _s is not None else None,
+                    drop=real_drop,
+                    loop_members=members,
+                )
+            return drilled
+        # Not drilled: the exit IS the culprit, so restore its own drop as the
+        # localization fact (build-time emission is skipped for cycle members).
+        if candidate.run_id in loop_runs and (
+            candidate.via in ("content", "both") or candidate.cumulative_path
+        ):
+            ensure_content_drop_finding(
+                idx,
+                inp,
+                candidate.run_id,
+                score=candidate.score,
+                base=candidate.base,
+                drop=candidate.drop,
+            )
+        return candidate.run_id
+
+    def _conf_candidate(candidate, culprit):
+        """Confidence inputs for a drilled culprit: the member's own score and
+        in-cycle drop, never the exit's."""
+        if culprit == candidate.run_id:
+            return candidate
+        _s = _node_score(inp, culprit)
+        _d = loop_drops.get(culprit, candidate.drop)
+        return replace(
+            candidate,
+            run_id=culprit,
+            score=_s if _s is not None else candidate.score,
+            drop=_d,
+            base=(_s + _d) if (_s is not None and _d is not None) else candidate.base,
+        )
+
+    def _stamp(ds: list) -> list:
+        """Stamp the run-level ``quality_unmeasured`` fact onto emitted defects.
+
+        Applied at the derivation points rather than threaded through nine
+        emitter signatures: it is one fact about the RUN, not a per-emitter
+        decision, and every defect of the run carries the same value."""
+        if not quality_unmeasured:
+            return ds
+        return [replace(d, quality_unmeasured=True) for d in ds]
+
+    if quality_unmeasured and not candidates and not anomalies:
+        # Row 1: NOTHING was measured — no judged score anywhere, AND no
+        # deterministic channel localised anything either.
+        #
+        # The score half of this condition used to stand alone, ahead of the
+        # candidate list, and that cost the product its sharpest silent failure:
+        # a trace whose contract check DID observe `format` markdown->html at one
+        # node (select_candidates returns that node, the breach is already in
+        # evidence.contract_violations) was reported as `unclassified`, zero
+        # culprits, confidence 0.0 — the CLI printing "NOT VERIFIED · nothing
+        # could be measured" over evidence the engine had in hand. The row
+        # predates channel decoupling: "no quality score" is not "no evidence",
+        # which is precisely what the deterministic channel exists to disprove.
+        # A loop-limit breach (`anomalies`) is deterministic for the same reason
+        # and is likewise not an absence of measurement.
+        notes.append(NoteRecord("no_scores"))
     elif not candidates and flawed_sources:
         # Row 2: no in-graph origin, but a source reports input_flawed=True.
         run_id = flawed_sources[0]
@@ -283,13 +545,15 @@ def find_blame(inp: BlameInput) -> BlameReport:
             iterations=cond.super_nodes[sid].iterations,
             end_time=inp.node_end_times.get(run_id),
         )
-        report_type = "root_cause_external"
         culprits = [run_id]
         confidence = compute_confidence(candidate, cfg)
-        notes.append(
-            f"root_cause_external: source candidate '{candidate.run_id}' "
-            "reports input_flawed=True"
+        defects = emit_external(
+            idx,
+            run_id,
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
         )
+        notes.append(NoteRecord("root_cause_external", {"run_id": candidate.run_id}))
     elif anomalies and (
         not candidates or anomalous_candidate_sids & candidate_sids.keys()
     ):
@@ -302,15 +566,67 @@ def find_blame(inp: BlameInput) -> BlameReport:
             ),
             anomalies[0],
         )
-        report_type = "loop_detected"
         culprits = list(anomaly.member_run_ids)
-        loop_candidate = candidate_sids.get(cond.node_to_super[anomaly.member_run_ids[0]])
+        loop_sid = cond.node_to_super[anomaly.member_run_ids[0]]
+        loop_candidate = candidate_sids.get(loop_sid)
         # No candidate: the deterministic limit breach itself is the evidence.
         confidence = compute_confidence(loop_candidate, cfg) if loop_candidate else 1.0
-        notes.append(
-            f"loop_detected: {anomaly.iterations} iterations "
-            f"({anomaly.limit_kind}) of agent(s) {sorted(set(anomaly.agent_names))}"
+        defects = emit_loop(
+            idx,
+            culprits[0],
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
         )
+        notes.append(
+            NoteRecord(
+                "loop_detected",
+                {
+                    "iterations": anomaly.iterations,
+                    "limit_kind": anomaly.limit_kind,
+                    "agents": sorted(set(anomaly.agent_names)),
+                },
+            )
+        )
+        # An anomalous loop does NOT absorb the rest of the graph. This row used
+        # to replace every defect with the loop's, so a graph with a retry storm
+        # in one branch and an independent break in another reported only the
+        # loop — the second fault vanished from culprits, defects and candidacy
+        # alike. Retry-heavy topologies (reflection, self-critique) hit that
+        # constantly, and from the first anomaly on the rest of the graph was a
+        # blind spot.
+        other_candidates = [c for c in candidates if c.super_id != loop_sid]
+        if other_candidates:
+            other_culprits = [_resolve_culprit(c) for c in other_candidates]
+            defects = defects + emit_multi(
+                idx,
+                other_culprits,
+                via_by_run=via_by_run,
+                base_assumed_by_run=base_assumed_by_run,
+                terminal_bad=terminal_bad,
+                observation_confidence=observation_confidence,
+                attribution_confidence=attribution_confidence,
+            )
+            culprits = culprits + [c for c in other_culprits if c not in culprits]
+            confidence = (
+                confidence
+                + sum(
+                    compute_confidence(
+                        _conf_candidate(c, cul), cfg, multi_culprit=True
+                    )
+                    for c, cul in zip(other_candidates, other_culprits)
+                )
+            ) / (1 + len(other_candidates))
+            notes.append(
+                NoteRecord(
+                    "independent_origins",
+                    {
+                        "count": len(other_culprits),
+                        "agents": [
+                            inp.agent_names.get(c, c) for c in other_culprits
+                        ],
+                    },
+                )
+            )
     elif len(candidates) == 1:
         # Row 4: exactly one unshadowed candidate.
         candidate = candidates[0]
@@ -321,9 +637,50 @@ def find_blame(inp: BlameInput) -> BlameReport:
         # a live quality break. Reporting it as a cut_point "where quality broke"
         # is a false alarm on a run that turned out fine (alert fatigue). It is
         # still worth surfacing: this node may not be lucky next time.
-        if candidate.recovered and terminal_ok and len(members_all) <= 1:
-            report_type = "degraded_recovered"
-            culprit = candidate.run_id
+        # A recovered origin localized INSIDE a cycle belongs here too: a retry
+        # loop whose earlier iteration was bad and whose later one came out
+        # healthy is the loop doing its job. Without this the intra-cycle
+        # localizer would turn every successful retry into a fresh cut_point —
+        # trading one blind spot for a wave of false alarms.
+        if candidate.recovered and terminal_ok and (
+            len(members_all) <= 1 or candidate.scc_member is not None
+        ):
+            culprit = candidate.scc_member or candidate.run_id
+            # Keyed on the LOCALIZER, not on whether the member happens to be the
+            # cycle's exit node. The drop finding is skipped at build time for
+            # every cycle member, so an intra-cycle origin that IS the exit would
+            # otherwise reach the emitters with no measured drop — and if its own
+            # score sits at or above the threshold (a 0.50 that fell from a
+            # healthy 1.00 predecessor inside the cycle), the defect ends up with
+            # no supporting evidence at all and the §2.4 validator rightly
+            # refuses to build it, taking the whole analysis down with a
+            # ValueError.
+            if candidate.scc_member is not None:
+                _dr_score = _node_score(inp, culprit)
+                _dr_preds = [
+                    score_map[p]
+                    for p in cond.graph.predecessors(culprit)
+                    if score_map.get(p) is not None
+                ]
+                _dr_base = max(_dr_preds) if _dr_preds else None
+                _dr_drop = (
+                    max(0.0, _dr_base - _dr_score)
+                    if _dr_base is not None and _dr_score is not None
+                    else None
+                )
+                candidate = replace(
+                    candidate,
+                    run_id=culprit,
+                    score=_dr_score if _dr_score is not None else candidate.score,
+                    base=_dr_base,
+                    drop=_dr_drop,
+                )
+                loop_members = members_all
+                ensure_content_drop_finding(
+                    idx, inp, culprit,
+                    score=_dr_score, base=_dr_base, drop=_dr_drop,
+                    loop_members=members_all,
+                )
             culprits = [culprit]
             _raw_attr = compute_confidence(candidate, cfg)
             attribution_confidence = _verdict_attribution(
@@ -339,32 +696,82 @@ def find_blame(inp: BlameInput) -> BlameReport:
             # (that is the signal). Attribution is shown alongside but the story is
             # "degraded here, recovered downstream", not "this is the culprit".
             confidence = observation_confidence
+            defects = emit_degraded_recovered(
+                idx,
+                culprit,
+                via=via_by_run.get(culprit, "content"),
+                base_assumed=base_assumed_by_run.get(culprit, False),
+                attribution_breakdown=attribution_breakdown,
+                observation_confidence=observation_confidence,
+                attribution_confidence=attribution_confidence,
+            )
+            # The localisation clause depends on the CHANNEL (a deterministic
+            # origin is localised by the hard check, NOT by a sub-threshold score)
+            # — the template picks the wording from `via`, so decision code cannot
+            # print "scored 0.89 (below threshold 0.50)" over a healthy judged one.
             notes.append(
-                f"degraded_recovered: '{inp.agent_names.get(culprit, culprit)}' "
-                f"scored {candidate.score:.2f} (below threshold {cfg.threshold:.2f})"
-                + (
-                    f" and silently violated an input contract "
-                    f"({'; '.join(f'{k}:{a!r}->{b!r}' for k, a, b in inp.scores[culprit].contract_violations)})"
-                    if inp.scores.get(culprit) and inp.scores[culprit].contract_violations
-                    else ""
+                NoteRecord(
+                    "degraded_recovered",
+                    {
+                        "agent": inp.agent_names.get(culprit, culprit),
+                        "score": candidate.score,
+                        "threshold": cfg.threshold,
+                        "via": candidate.via,
+                        "violations": _violations(inp, culprit),
+                        "terminal_reasoning": tv.reasoning,
+                    },
                 )
-                + f", but every successor scored healthy and the terminal "
-                f"deliverable is ok (checkable ground truth: {tv.reasoning!r}) — a "
-                "near-miss the pipeline compensated for, not a live quality break. "
-                "Surfaced as a fragile point to harden, not paged as a broken run"
-                + (
-                    ". CAVEAT: recovery is proven for CONTENT only — the silently "
-                    "rewritten contract parameter leaves the run unverified in "
-                    "contract (see contract_vs_terminal); do not treat it as fully "
-                    "clean"
-                    if inp.scores.get(culprit) and inp.scores[culprit].contract_violations
-                    else ""
+            )
+        elif (
+            candidate.recovered
+            and terminal_bad
+            and candidate.via == "deterministic"
+            and len(members_all) <= 1
+        ):
+            # TERMINAL DEFECT, ORIGIN NOT LOCALIZED (terminal rubric split): the
+            # terminal verdict reports a CONTENT defect, but the sole candidate
+            # is a deterministic-channel origin whose own content the judge
+            # scored healthy and whose successors recovered — the content defect
+            # observed at the terminal has NO origin in the score map. Calling
+            # this a cut_point would pin the content failure on a node the
+            # evidence explicitly clears (a verdict claiming a defect its own
+            # evidence does not show). The contract fault IS localized here; the
+            # content defect is reported as observed-but-unlocalized.
+            culprit = candidate.run_id
+            culprits = [culprit]
+            _raw_attr = compute_confidence(candidate, cfg)
+            attribution_confidence = _verdict_attribution(
+                inp, culprit, candidate, _raw_attr, notes
+            )
+            # via=deterministic → breakdown carries the contract row ONLY; no
+            # content_degradation row exists to misread as terminal blame.
+            attribution_breakdown = _attribution_breakdown(
+                inp, culprit, candidate, _raw_attr
+            )
+            observation_confidence = compute_observation_confidence(
+                candidate, cfg, deterministic=_has_deterministic_defect(inp, culprit)
+            )
+            # Headline is the UNLOCALIZED terminal observation, not the contract
+            # attribution — showing 0.95 here would sell the contract fault's
+            # certainty as certainty about the content defect's origin.
+            confidence = _CONFIDENCE_CAP["terminal_defect_unlocalized"]
+            defects = emit_terminal_unlocalized(
+                idx, culprit, observation_confidence=observation_confidence
+            )
+            notes.append(
+                NoteRecord(
+                    "terminal_defect_unlocalized",
+                    {
+                        "terminal_reasoning": tv.reasoning,
+                        "agent": inp.agent_names.get(culprit, culprit),
+                        "violations": _violations(inp, culprit),
+                        "score": candidate.score,
+                    },
                 )
             )
         else:
-            report_type = "cut_point"
             culprit, members, real_drop = _drill_into_loop(
-                cond, inp, candidate.super_id, candidate.run_id
+                cond, inp, candidate.super_id, candidate.run_id, candidate.scc_member
             )
             culprits = [culprit]
             conf_candidate = candidate
@@ -372,41 +779,134 @@ def find_blame(inp: BlameInput) -> BlameReport:
                 loop_members = members
                 # Blame drilled into a loop member; score/drop confidence off the
                 # member's real break, not the loop-exit's.
-                member_cand = replace(candidate, run_id=culprit,
-                                       score=_node_score(inp, culprit) or candidate.score,
-                                       drop=real_drop)
+                _member_score = _node_score(inp, culprit)
+                if _member_score is None:
+                    _member_score = candidate.score
+                member_cand = replace(
+                    candidate,
+                    run_id=culprit,
+                    score=_member_score,
+                    drop=real_drop,
+                    # The member's drop was measured against a REAL in-cycle
+                    # predecessor, so the baseline is observed: carry it, or the
+                    # predecessor term silently scores 0 and understates a fully
+                    # evidenced break.
+                    base=_member_score + real_drop,
+                    base_assumed=False,
+                )
                 conf_candidate = member_cand
                 loop_drops[culprit] = real_drop
+                # The drilled member's real drop IS the localization fact the
+                # content defect cites (the exit's drop was skipped at build).
+                _c_score = _node_score(inp, culprit)
+                ensure_content_drop_finding(
+                    idx, inp, culprit,
+                    score=_c_score,
+                    base=(_c_score + real_drop) if _c_score is not None else None,
+                    drop=real_drop,
+                    loop_members=members,
+                )
                 notes.append(
-                    f"cut_point: quality broke at '{culprit}' "
-                    f"(score={_node_score(inp, culprit):.3f}, drop={real_drop:.3f}) "
-                    f"inside a {len(members)}-member retry loop; the loop's exit "
-                    f"'{candidate.run_id}' only carried it downstream"
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            # "Cycle", not "retry loop": the engine sees no edge
+                            # types, and the common case is an orchestrator↔
+                            # sub-agent delegation pair, not a retry of anything.
+                            "variant": "loop",
+                            "run_id": culprit,
+                            "score": _node_score(inp, culprit),
+                            "drop": real_drop,
+                            "members": len(members),
+                            "exit_run_id": candidate.run_id,
+                            # Only claim "the exit only carried it downstream"
+                            # when the drill actually MOVED the blame.
+                            "drilled": culprit != candidate.run_id,
+                        },
+                    )
+                )
+            elif (
+                len(members) > 1
+                and candidate.via == "content"
+                and not candidate.cumulative_path
+            ):
+                # Localized inside the cycle, but the member has no scored
+                # predecessor to measure against (its upstream is unscored or
+                # outside the observed graph). Say that instead of printing a
+                # drop the evidence does not contain.
+                loop_members = members
+                _c_score = _node_score(inp, culprit)
+                conf_candidate = replace(
+                    candidate,
+                    run_id=culprit,
+                    score=_c_score if _c_score is not None else candidate.score,
+                )
+                notes.append(
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            "variant": "loop_unmeasured",
+                            "run_id": culprit,
+                            "score": conf_candidate.score,
+                            "members": len(members),
+                        },
+                    )
                 )
             elif candidate.cumulative_path:
-                chain = " -> ".join(
-                    f"{inp.agent_names.get(r, r)}({_node_score(inp, r):.2f})"
-                    for r in candidate.cumulative_path
-                )
                 notes.append(
-                    f"cut_point (cumulative degradation): no single step crossed the "
-                    f"gap threshold ({cfg.gap_threshold:.2f}), but quality eroded by "
-                    f"{candidate.drop:.2f} across {chain} — past the cumulative "
-                    f"threshold ({cfg.cum_drop_threshold:.2f}). The erosion starts at "
-                    f"'{candidate.run_id}' (score {candidate.score:.2f} from healthy "
-                    f"base {candidate.base:.2f}); review the whole chain, the seed of "
-                    f"the failure may sit in the last healthy node's output"
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            "variant": "cumulative",
+                            "gap_threshold": cfg.gap_threshold,
+                            "drop": candidate.drop,
+                            "chain": [
+                                {
+                                    "agent": inp.agent_names.get(r, r),
+                                    "score": _node_score(inp, r),
+                                }
+                                for r in candidate.cumulative_path
+                            ],
+                            "cum_threshold": cfg.cum_drop_threshold,
+                            "run_id": candidate.run_id,
+                            "score": candidate.score,
+                            "base": candidate.base,
+                        },
+                    )
+                )
+            elif candidate.via == "deterministic":
+                notes.append(
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            "variant": "deterministic",
+                            "run_id": candidate.run_id,
+                            "score": candidate.score,
+                        },
+                    )
                 )
             elif candidate.base_assumed:
                 notes.append(
-                    f"cut_point: single unshadowed candidate '{candidate.run_id}' "
-                    f"(score={candidate.score:.3f}; no scored predecessor — the "
-                    "1.00 baseline is ASSUMED from a clean handoff, not measured)"
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            "variant": "base_assumed",
+                            "run_id": candidate.run_id,
+                            "score": candidate.score,
+                        },
+                    )
                 )
             else:
                 notes.append(
-                    f"cut_point: single unshadowed candidate '{candidate.run_id}' "
-                    f"(score={candidate.score:.3f}, drop={candidate.drop})"
+                    NoteRecord(
+                        "cut_point",
+                        {
+                            "variant": "plain",
+                            "run_id": candidate.run_id,
+                            "score": candidate.score,
+                            "drop": candidate.drop,
+                        },
+                    )
                 )
             # Split confidence: headline is ATTRIBUTION (honest about whether the
             # fault originated here), observation is shown alongside so a certain
@@ -425,15 +925,49 @@ def find_blame(inp: BlameInput) -> BlameReport:
                 conf_candidate, cfg, deterministic=_has_deterministic_defect(inp, culprit)
             )
             confidence = attribution_confidence
+            # Non-drilled SCC candidate (no scored member to drill into): the
+            # exit IS the culprit — restore its own drop as the localization
+            # fact (build-time emission was skipped for loop members).
+            if culprit == candidate.run_id and candidate.run_id in loop_runs and (
+                candidate.via in ("content", "both") or candidate.cumulative_path
+            ):
+                ensure_content_drop_finding(
+                    idx, inp, culprit,
+                    score=candidate.score, base=candidate.base, drop=candidate.drop,
+                )
+            defects = emit_cut_point(
+                idx,
+                culprit,
+                via=via_by_run.get(culprit, "content"),
+                base_assumed=base_assumed_by_run.get(culprit, False),
+                terminal_bad=terminal_bad,
+                attribution_breakdown=attribution_breakdown,
+                observation_confidence=observation_confidence,
+                attribution_confidence=attribution_confidence,
+            )
     elif len(candidates) > 1:
-        # Row 5: multiple independent candidates.
-        report_type = "multi_culprit"
-        culprits = [c.run_id for c in candidates]
+        # Row 5: multiple independent candidates. Each is resolved the same way
+        # a lone candidate is — including the drill into a cycle — so one fault
+        # cannot localize differently just because a second fault exists.
+        culprits = [_resolve_culprit(c) for c in candidates]
         confidence = sum(
-            compute_confidence(c, cfg, multi_culprit=True) for c in candidates
+            compute_confidence(_conf_candidate(c, cul), cfg, multi_culprit=True)
+            for c, cul in zip(candidates, culprits)
         ) / len(candidates)
+        defects = emit_multi(
+            idx,
+            culprits,
+            via_by_run=via_by_run,
+            base_assumed_by_run=base_assumed_by_run,
+            terminal_bad=terminal_bad,
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
+        )
         notes.append(
-            f"multi_culprit: {len(candidates)} independent candidates: {culprits}"
+            NoteRecord(
+                "multi_culprit",
+                {"count": len(candidates), "culprits": list(culprits)},
+            )
         )
     elif not candidates and terminal_bad and (
         content_flagged := [
@@ -453,25 +987,38 @@ def find_blame(inp: BlameInput) -> BlameReport:
         # flagged node, while everything downstream reported success anyway. The
         # honest self-critical node is the origin; the confident downstream
         # claims are the cascade.
-        report_type = "cut_point"
         fabrication_origin = content_flagged[0]
         culprits = [fabrication_origin]
         # Indirect but corroborated evidence (flag + terminal ground truth):
         # stronger than the composition guess (0.4), weaker than a hard score gap.
-        confidence = 0.65
+        confidence = CORROBORATED_FLAG
+        defects = emit_cut_point(
+            idx,
+            fabrication_origin,
+            via=via_by_run.get(fabrication_origin, "content"),
+            base_assumed=base_assumed_by_run.get(fabrication_origin, False),
+            terminal_bad=terminal_bad,
+            attribution_breakdown=attribution_breakdown,
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
+        )
         f_ns = inp.scores[fabrication_origin]
-        f_flags = ", ".join(sorted(_CONTENT_FLAGS.intersection(f_ns.flags)))
-        others = [
-            inp.agent_names.get(n, n) for n in content_flagged[1:]
-        ]
         notes.append(
-            "cut_point (fabrication cascade): no score gap, but "
-            f"'{inp.agent_names.get(fabrication_origin, fabrication_origin)}' was "
-            f"flagged [{f_flags}] by its own judge and the bad terminal verdict "
-            f"corroborates it — terminal evidence: {tv.reasoning!r} (tier1 "
-            f"terminal judge, score={tv.score}). Required content went missing "
-            "here first; downstream nodes claimed success over it"
-            + (f" (also flagged: {others})" if others else "")
+            NoteRecord(
+                "cut_point",
+                {
+                    "variant": "fabrication",
+                    "agent": inp.agent_names.get(
+                        fabrication_origin, fabrication_origin
+                    ),
+                    "flags": sorted(_CONTENT_FLAGS.intersection(f_ns.flags)),
+                    "terminal_reasoning": tv.reasoning,
+                    "terminal_score": tv.score,
+                    "others": [
+                        inp.agent_names.get(n, n) for n in content_flagged[1:]
+                    ],
+                },
+            )
         )
     elif (
         not candidates
@@ -482,81 +1029,71 @@ def find_blame(inp: BlameInput) -> BlameReport:
         # checkable=False and exposed the raw check.)
         and terminal_bad
         and not hidden_unscored
-        and all(
-            sn.score >= cfg.threshold
-            for sn in cond.super_nodes.values()
-            if sn.score is not None
-        )
+        # Over the RAW nodes, not the super-nodes. A cycle's super-node score is
+        # its EXIT member's, so a sub-threshold member inside a cycle used to slip
+        # through this guard — and the verdict then asserted "no node individually
+        # failed (all scores above threshold)" directly beside a score map showing
+        # that member at 0.10. A report may not contradict its own evidence
+        # (§11 row 4); the guard has to read what the report renders.
+        and all(s >= cfg.threshold for s in score_map.values() if s is not None)
         and not analysis.had_significant_drop
         and cond.sources
     ):
         # Row 6: composition failure — everything looks healthy individually,
         # yet the terminal verdict is bad; blame the source/orchestrator.
-        report_type = "composition_failure"
         source = min(cond.sources, key=lambda s: _chron_key(inp, cond.super_nodes[s].exit_node))
         culprits = [cond.super_nodes[source].exit_node]
         # Fallback verdict: no node individually broke, so we cannot localise the
         # fault. This is a *suspect* (likely an orchestration/design issue), not a
         # proven culprit — the cap below keeps the reported confidence honest.
         confidence = _CONFIDENCE_CAP["composition_failure"]
+        defects = emit_composition(
+            idx,
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
+        )
         notes.append(
-            "composition_failure: no node individually failed (all scores above "
-            "threshold, no significant single-edge drops, no cumulative "
-            "degradation chain) yet the terminal verdict is bad — terminal "
-            f"evidence: {tv.reasoning!r} (tier1 terminal judge, score={tv.score}). "
-            "Most likely an orchestration/task-design issue entering at source "
-            f"'{culprits[0]}'"
+            NoteRecord(
+                "composition_failure",
+                {
+                    "terminal_reasoning": tv.reasoning,
+                    "terminal_score": tv.score,
+                    "source": culprits[0],
+                },
+            )
         )
     else:
         # Row 7 fallback. A negative conclusion needs a trace as much as a
         # positive one: state exactly WHICH precondition ruled each verdict out,
         # so "correctly rejected" is distinguishable from "never ran".
-        report_type = "unclassified"
-        reasons: list[str] = []
+        reasons: list[dict] = []
         if tv is None:
-            reasons.append(
-                "no terminal verdict available (tier1 terminal judge missing or "
-                "errored) — composition_failure and fabrication-cascade both "
-                "require terminal ground truth"
-            )
+            reasons.append({"code": "no_terminal_verdict"})
         elif not tv.checkable:
-            reasons.append(
-                "terminal verdict not checkable (the judge never saw the "
-                "deliverable) — discarded as ground truth, so it cannot support "
-                "composition_failure or fabrication-cascade"
-            )
+            reasons.append({"code": "terminal_not_checkable"})
         elif not tv.bad:
-            reasons.append(
-                f"terminal verdict is ok (score={tv.score}) — there is no "
-                "terminal failure for a fallback verdict to explain"
-            )
+            reasons.append({"code": "terminal_ok", "score": tv.score})
         if hidden_unscored:
-            names = sorted(inp.agent_names.get(n, n) for n in hidden_unscored)
             reasons.append(
-                f"genuinely unscored node(s) {names} could hide the culprit — "
-                "blocks composition_failure"
+                {
+                    "code": "hidden_unscored",
+                    "agents": sorted(
+                        inp.agent_names.get(n, n) for n in hidden_unscored
+                    ),
+                }
             )
         if analysis.had_significant_drop:
-            reasons.append(
-                "a significant drop was observed but every origin was shadowed "
-                "or excluded"
-            )
+            reasons.append({"code": "significant_drop_shadowed"})
         unhealthy = sorted(
             inp.agent_names.get(n, n)
             for n in graph_nodes
             if (u := score_map.get(n)) is not None and u < cfg.threshold
         )
         if unhealthy:
-            reasons.append(
-                f"below-threshold node(s) {unhealthy} did not qualify as an "
-                "origin (inherited/recovered degradation)"
-            )
+            reasons.append({"code": "unhealthy_not_origin", "agents": unhealthy})
         if not reasons:
-            reasons.append(
-                "all scored nodes healthy and no failure signal to explain "
-                "(e.g. a sampled healthy graph)"
-            )
-        notes.append("unclassified: no origin localised — " + "; ".join(reasons))
+            reasons.append({"code": "no_failure_signal"})
+        notes.append(NoteRecord("unclassified", {"reasons": reasons}))
 
     # Honesty: a terminal verdict whose deliverable the judge could not see is
     # not evidence of anything. Say so plainly instead of letting a fabricated
@@ -564,26 +1101,12 @@ def find_blame(inp: BlameInput) -> BlameReport:
     # gets its own narrative — the problem is not instrumentation, it is that
     # the verdict's deterministic basis no longer reproduces.
     if tv is not None and not terminal_checkable:
-        if tv.stale:
-            notes.append(
-                "terminal_stale: the terminal verdict's deterministic basis no "
-                "longer reproduces on the current payload/rule set — the tier1 "
-                "verdict was computed under a different registered rule set, or "
-                "the artifact/payload diverged (representation divergence). Its "
-                f"verdict (bad={tv.bad}, score={tv.score}, {tv.reasoning!r}) is "
-                "treated as UNRELIABLE, not ground truth. Re-run the analysis "
-                "end-to-end (tier1 included) for a fresh verdict"
+        _tv_data = {"bad": tv.bad, "score": tv.score, "reasoning": tv.reasoning}
+        notes.append(
+            NoteRecord(
+                "terminal_stale" if tv.stale else "terminal_not_checkable", _tv_data
             )
-        else:
-            notes.append(
-                "terminal_not_checkable: the terminal judge could not see the final "
-                "deliverable (its content was absent from the payload — a file "
-                "reference, an orchestrator wrapper, or a verifier verdict rather "
-                "than the artifact), so there is NO terminal ground truth. Its "
-                f"verdict (bad={tv.bad}, score={tv.score}, {tv.reasoning!r}) is "
-                "discarded — not treated as a failure. Fix the instrumentation to "
-                "embed the artifact text if you want a terminal check here"
-            )
+        )
 
     # Instrumentation health: a NON-root node without an output payload cannot
     # be scored or blamed — that is a data-quality defect in the exporter and
@@ -598,9 +1121,7 @@ def find_blame(inp: BlameInput) -> BlameReport:
     )
     if missing_payload:
         notes.append(
-            f"instrumentation_warning: node(s) {missing_payload} have no output "
-            "payload — they cannot be scored or blamed, which blinds the "
-            "analysis; fix the exporter/instrumentation for these nodes"
+            NoteRecord("instrumentation_warning", {"agents": missing_payload})
         )
 
     # Topology-driven instrumentation-quality warning (same family as
@@ -608,10 +1129,7 @@ def find_blame(inp: BlameInput) -> BlameReport:
     # a disconnected graph means edges between components were never recorded.
     if topology["primary"] == "disconnected":
         notes.append(
-            f"topology: graph has {topology['components']} weakly-connected "
-            "components — runs share membership but lack instrumented edges "
-            "between components; blame localisation across components is "
-            "impossible. Enable A2A detection or instrument SPAWN/TOOL edges"
+            NoteRecord("topology", {"components": topology["components"]})
         )
 
     # Score/verdict conflict (honesty check): the tier1 terminal judge says the
@@ -623,12 +1141,16 @@ def find_blame(inp: BlameInput) -> BlameReport:
             _sn = cond.super_nodes[_sid]
             if _sn.score is not None and _sn.score >= cfg.threshold:
                 notes.append(
-                    f"verdict_conflict: terminal verdict is bad (tier1 judge: "
-                    f"{tv.reasoning!r}) yet terminal node "
-                    f"'{inp.agent_names.get(_sn.exit_node, _sn.exit_node)}' scored "
-                    f"{_sn.score:.2f} — treating the terminal verdict as ground "
-                    "truth; the healthy score of a verifier that passed bad work "
-                    "is itself part of the failure (see verification gaps)"
+                    NoteRecord(
+                        "verdict_conflict",
+                        {
+                            "terminal_reasoning": tv.reasoning,
+                            "agent": inp.agent_names.get(
+                                _sn.exit_node, _sn.exit_node
+                            ),
+                            "score": _sn.score,
+                        },
+                    )
                 )
 
     # Verification gap: a verifier (qa/eval/review/…) whose PASS was wrong.
@@ -714,6 +1236,15 @@ def find_blame(inp: BlameInput) -> BlameReport:
                     }
                 )
 
+    # The verification gaps are now known → their findings can join the index
+    # (kept last so finding indices are stable) and the report_type can be
+    # DERIVED from the Defect[] the cascade emitted. This is the single source of
+    # truth (§2.3): report_type is a projection of the typed defects, never a
+    # string the cascade decided that could disagree with its own evidence.
+    add_verifier_findings(idx, inp, verification_gaps)
+    defects = _stamp(defects)
+    report_type = derive_report_type(defects)
+
     # Ground-truth score override: a role-aware verifier score CLAIMS to be
     # "verdict correctness". A verifier whose PASS is refuted by the terminal
     # verdict has that number disproved — the effective correctness of a rubber
@@ -724,48 +1255,19 @@ def find_blame(inp: BlameInput) -> BlameReport:
             "run_id": g["run_id"],
             "original": score_map.get(g["run_id"]),
             "effective": 0.1,
-            "reason": "PASS refuted by terminal ground truth — the judged "
-            "'verdict correctness' cannot stand (rubber stamp)",
+            "reason": render_score_override_reason(),
         }
         for g in verification_gaps
         if g.get("basis") == "passed_bad_terminal"
         and score_map.get(g["run_id"]) is not None
     ]
-    # PRODUCERS refuted by a deterministic check get the same claimed→effective
-    # treatment: the worker records the pre-override judged composite when a
-    # contract/deterministic override lowered the score. Without this, the score
-    # map shows a bare 0.10 while the judge note below still praises the work —
-    # the refutation would be invisible exactly where the cascade shows.
-    for n in graph_nodes:
-        ns = inp.scores.get(n)
-        if ns is None or ns.score is None:
-            continue
-        pre = ns.components.get("pre_override_composite")
-        if pre is None or any(o["run_id"] == n for o in score_overrides):
-            continue
-        refuting = sorted(
-            set(ns.flags)
-            & (
-                {"artifact_integrity_fail", "missing_required_section",
-                 "numeric_invariant_breach", "language_mismatch",
-                 "duplicate_side_effect", "tool_args_invalid"}
-            )
-        )
-        if ns.contract_violations:
-            refuting.append("contract_violation")
-        if not refuting:
-            refuting = ["deterministic override"]
-        score_overrides.append(
-            {
-                "run_id": n,
-                "original": pre,
-                "effective": ns.score,
-                "reason": (
-                    "judged score refuted by deterministic check(s): "
-                    + ", ".join(refuting)
-                ),
-            }
-        )
+    # NOTE (channel decoupling): producers get NO claimed→effective override.
+    # The judged score is never overwritten by a deterministic fault, so there is
+    # no "claimed" number to strike through — the judged score IS the score, and
+    # the hard check localises blame through the engine's deterministic channel
+    # (candidacy via="deterministic": "judged 0.89 · contract check FAILED"). The
+    # override vehicle below survives ONLY for verifiers whose PASS is refuted by
+    # terminal ground truth (a distinct, still-valid mechanism).
 
     # When nothing localised as an origin but verifiers issued a wrong verdict,
     # the rubber-stamping (or false-alarming) verifiers ARE the failure —
@@ -776,44 +1278,139 @@ def find_blame(inp: BlameInput) -> BlameReport:
     # bad terminal here — worse, while quoting an OK verdict's reasoning — is the
     # exact dishonesty this fixes (a false verification_gap on a healthy run).
     if report_type in ("composition_failure", "unclassified") and verification_gaps:
-        report_type = "verification_gap"
         culprits = [g["run_id"] for g in verification_gaps]
         confidence = _CONFIDENCE_CAP["verification_gap"]
-        parts: list[str] = []
-        for g in verification_gaps:
-            rid, name = g["run_id"], g["agent_name"]
-            s = score_map.get(rid)
-            gflags = inp.scores[rid].flags if inp.scores.get(rid) is not None else ()
-            if g["basis"] == "passed_bad_terminal":
-                parts.append(
-                    f"'{name}' scored healthy ({s:.2f}) yet let the work through "
-                    "while the terminal output is bad"
-                )
-            elif "issued_fail" in gflags:
-                parts.append(
-                    f"'{name}' issued a FAIL the role-aware judge scored wrong "
-                    f"(score {s:.2f} < threshold {cfg.threshold:.2f}) — a false "
-                    "alarm the ok terminal contradicts"
-                )
-            else:
-                parts.append(
-                    f"'{name}' issued a PASS the role-aware judge scored wrong "
-                    f"(score {s:.2f} < threshold {cfg.threshold:.2f})"
-                )
-        note = "verification_gap: " + "; ".join(parts) + "."
-        # Only quote the terminal as ground truth when it genuinely is one.
-        if terminal_bad:
-            note += (
-                f" Terminal evidence (bad, ground truth): {tv.reasoning!r} "
-                "(tier1 terminal judge)."
+        # The rubber-stamping (or false-alarming) verifiers ARE the failure now:
+        # replace the (composition/none) primary defects with the localized
+        # verification defects and re-derive — report_type becomes verification_gap
+        # BECAUSE the evidence changed, not by a string reassignment.
+        defects = emit_verification(
+            idx,
+            culprits,
+            observation_confidence=observation_confidence,
+            attribution_confidence=attribution_confidence,
+        )
+        defects = _stamp(defects)
+        report_type = derive_report_type(defects)
+        notes.append(
+            NoteRecord(
+                "verification_gap",
+                {
+                    "gaps": [
+                        {
+                            "agent": g["agent_name"],
+                            "score": score_map.get(g["run_id"]),
+                            "basis": g["basis"],
+                            "issued_fail": "issued_fail"
+                            in (
+                                inp.scores[g["run_id"]].flags
+                                if inp.scores.get(g["run_id"]) is not None
+                                else ()
+                            ),
+                        }
+                        for g in verification_gaps
+                    ],
+                    "threshold": cfg.threshold,
+                    # Only quote the terminal as ground truth when it genuinely
+                    # is one — a gap resting on the role-aware score alone must
+                    # not borrow the terminal's authority.
+                    "terminal": (
+                        "bad" if terminal_bad else "ok" if terminal_ok else None
+                    ),
+                    "terminal_reasoning": tv.reasoning if tv is not None else None,
+                    "terminal_score": tv.score if tv is not None else None,
+                },
             )
-        elif terminal_ok:
-            note += (
-                f" The terminal verdict is ok (score={tv.score}) — these are "
-                "wrong-FAIL false alarms confirmed by ground truth, not "
-                "passed-through bad work."
+        )
+
+    # Escalation (§2.3, single home): a degraded_recovered verdict over a breach
+    # the WORKER VERIFIED as propagated (breach_propagated finding, deterministic)
+    # escalates to shipped_with_latent_defect INSIDE the single pass — the worker
+    # never edits a verdict, and the escalated headline is backed by the same
+    # finding the contract defect cites as support.
+    _propagated_findings = [f for f in idx.findings if f.kind == "breach_propagated"]
+    # The verified-shipped breaches, kept so the CANDIDACY of the escalated
+    # origin is written in the same pass from the same evidence. The worker used
+    # to overwrite the engine's "near-miss" candidacy AFTER the fact — a second
+    # writer whose text stood in self-negation next to the escalated headline
+    # (§11 row 6). Deriving it here makes that state unreachable.
+    _shipped_breaches: list[dict] = []
+    if _propagated_findings:
+        _shipped_breaches = [
+            {
+                "key": f.data.get("key"),
+                "from": f.data.get("from"),
+                "to": f.data.get("to"),
+                "basis": f.data.get("basis"),
+            }
+            for f in _propagated_findings
+        ]
+        report_type, _esc_notes = derive_escalation_records(
+            report_type,
+            [
+                {
+                    "key": f.data.get("key"),
+                    "from": f.data.get("from"),
+                    "to": f.data.get("to"),
+                    "basis": f.data.get("basis"),
+                    "status": "propagated",
+                }
+                for f in _propagated_findings
+            ],
+        )
+        notes.extend(_esc_notes)
+
+    # Terminal rubric split — FORM dimension. A bad form verdict (the shipped
+    # deliverable's form does not match the explicitly requested one) is a
+    # DESIGN-level gap, never an individual verifier's: no verifier charter in
+    # the graph covers form/contract vision (they verify content), so no
+    # verification gap is opened on any of them for a form miss. Without this
+    # note the form breach would either vanish (content ok) or masquerade as
+    # rubber-stamping (content bad).
+    if tv is not None and tv.checkable and tv.form_bad:
+        # A form defect is a design-level annotation: it adds a latent_defect
+        # incident downstream but never changes the PRIMARY report_type, so it is
+        # appended without re-deriving.
+        defects.extend(_stamp(emit_form(idx, tv)))
+        notes.append(
+            NoteRecord(
+                "form_defect_shipped",
+                {
+                    "requirement": tv.form_requirement,
+                    "observed": tv.form_observed,
+                },
             )
-        notes.append(note)
+        )
+
+    # Requirement provenance (terminal rubric split): reconcile the
+    # deterministic contract reference against the requirement the terminal
+    # judge read VERBATIM from the initial input. When the contract's "from"
+    # value does not appear in that quote, the reference is NOT
+    # user-request-derived — it is harness scaffold or an upstream rewrite —
+    # and "verified against the contract" must not be read as "verified
+    # against the user's ask". Printing both references side by side without
+    # this reconcile is the report-#1 error family.
+    if tv is not None and tv.form_requirement:
+        _req_lower = tv.form_requirement.lower()
+        for _pn in graph_nodes:
+            _pns = inp.scores.get(_pn)
+            if _pns is None or not _pns.contract_violations:
+                continue
+            for _pk, _pfrom, _pto in _pns.contract_violations:
+                if _pfrom is None or str(_pfrom).lower() in _req_lower:
+                    continue
+                notes.append(
+                    NoteRecord(
+                        "requirement_provenance",
+                        {
+                            "key": _pk,
+                            "agent": inp.agent_names.get(_pn, _pn),
+                            "from": _pfrom,
+                            "to": _pto,
+                            "requirement": tv.form_requirement,
+                        },
+                    )
+                )
 
     # Manifestation: where the failure SURFACED — the terminal artifact/output.
     # A verifier sink (qa/eval) did not manifest anything; it issued a verdict
@@ -866,11 +1463,14 @@ def find_blame(inp: BlameInput) -> BlameReport:
             if m not in culprit_set and ms is not None and ms >= cfg.threshold:
                 reality_conflicts.add(m)
                 notes.append(
-                    f"claims_vs_reality: producer "
-                    f"'{inp.agent_names.get(m, m)}' scored {ms:.2f} ('healthy') "
-                    "for the very artifact the terminal judge rejected — "
-                    f"terminal evidence: {tv.reasoning!r}. The node-level score "
-                    "is overridden as a claim, not accepted as fact"
+                    NoteRecord(
+                        "claims_vs_reality",
+                        {
+                            "agent": inp.agent_names.get(m, m),
+                            "score": ms,
+                            "terminal_reasoning": tv.reasoning,
+                        },
+                    )
                 )
 
     # Cascade participants: healthy-scoring PRODUCERS downstream of a
@@ -889,18 +1489,21 @@ def find_blame(inp: BlameInput) -> BlameReport:
             and cs >= cfg.threshold
         ]
         if cascade_participants:
-            names = [inp.agent_names.get(n, n) for n in cascade_participants]
             notes.append(
-                f"cascade_participants: producer(s) {names} scored healthy "
-                "while building on input flagged for missing required content — "
-                "their success claims are unverified against the missing "
-                "content, not independent evidence of quality"
+                NoteRecord(
+                    "cascade_participants",
+                    {
+                        "agents": [
+                            inp.agent_names.get(n, n) for n in cascade_participants
+                        ]
+                    },
+                )
             )
 
     # Honest-confidence ceiling per report type (cut_point / loop_detected keep
     # their computed value; fallback verdicts are capped so the UI never shows
     # "100% sure" on a guess).
-    confidence = min(confidence, _CONFIDENCE_CAP.get(report_type, 1.0))
+    confidence = min(confidence, report_type_cap(report_type))
 
     path = propagation_path(inp, cond, culprits[0]) if culprits else []
     cost = downstream_cost(inp, culprits)
@@ -919,73 +1522,29 @@ def find_blame(inp: BlameInput) -> BlameReport:
                 if score_map.get(n) is None and not _is_structural_root(n)
             )
 
-    # Deterministic contract violations as their OWN evidence stream (provenance:
-    # a hard input/output diff, not the LLM judge). Kept separate from judge_notes
-    # so a strong, reproducible signal is never diluted into fluent prose.
-    contract_breaches: list[dict] = []
-    for n in graph_nodes:
-        ns = inp.scores.get(n)
-        if ns is not None and ns.contract_violations:
-            for key, a, b in ns.contract_violations:
-                contract_breaches.append(
-                    {
-                        "run_id": n,
-                        "agent": inp.agent_names.get(n, n),
-                        "key": key,
-                        "from": a,
-                        "to": b,
-                    }
-                )
-
-    # Named deterministic signals (docs/deterministic-signals.md): node-level
-    # entries from scoring, stamped with the node identity. Graph-level entries
-    # (tier1 deliverable checks) are appended by the worker after serialization.
-    deterministic_signals: list[dict] = []
-    for n in graph_nodes:
-        ns = inp.scores.get(n)
-        if ns is not None and ns.deterministic_signals:
-            for sig in ns.deterministic_signals:
-                deterministic_signals.append(
-                    {
-                        **sig,
-                        "run_id": n,
-                        "agent": inp.agent_names.get(n, n),
-                        "provenance": "deterministic",
-                    }
-                )
-
     # Cross-check: a deterministic contract breach vs the terminal verdict. The
     # terminal judge sees the deliverable's CONTENT, not the carried contract
     # parameters — so an "ok" terminal does NOT clear a breach that reached the
     # deliverable. Say so explicitly: it is a latent defect the ground truth is
     # blind to, exactly the kind of silent failure this product exists to surface.
     if contract_breaches and terminal_ok:
-        detail = "; ".join(
-            f"{b['agent']} {b['key']}: {b['from']!r}->{b['to']!r}"
-            for b in contract_breaches
-        )
         # The terminal section is the report's loudest element — an unqualified
         # "ok 1.00" above a proven mid-pipeline breach makes the header lie by
         # omission. Qualify the verdict AT the verdict, not five rows below.
         # (The worker upgrades this caveat to a VERIFIED shipped/corrected wording
         # once it has checked the deliverable payload.)
         if terminal_evidence is not None:
-            terminal_evidence["caveat"] = (
-                f"ok in CONTENT only — a contract breach ({detail}) was "
-                "introduced mid-pipeline; conformance of the shipped artifact "
-                "to the carried contract is unverified at this level (see "
-                "contract_vs_terminal / contract_propagation)"
-            )
+            terminal_evidence["caveat"] = render_terminal_caveat(contract_breaches)
         notes.append(
-            f"contract_vs_terminal: a deterministic contract breach ({detail}) "
-            f"was introduced mid-pipeline, and the terminal judge still passed "
-            f"the run (score={tv.score}, {tv.reasoning!r}). The terminal judge "
-            "verifies content, not carried contract parameters, so its ok "
-            "verdict cannot clear the breach. Whether the rewritten value "
-            "propagated into the final artifact is NOT decidable from node "
-            "scores alone (see the contract_propagation note if payload evidence "
-            "settled it, else verify out of band) — treat the run as recovered "
-            "in content but unverified in contract, not as clean"
+            NoteRecord(
+                "contract_vs_terminal",
+                {
+                    "variant": "terminal_ok",
+                    "breaches": contract_breaches,
+                    "terminal_score": tv.score,
+                    "terminal_reasoning": tv.reasoning,
+                },
+            )
         )
     elif contract_breaches and terminal_bad:
         # A bad terminal does NOT automatically corroborate the breach: the
@@ -1000,25 +1559,17 @@ def find_blame(inp: BlameInput) -> BlameReport:
             if str(b["key"]).casefold() in reasoning_text
             or str(b["to"]).casefold() in reasoning_text
         ]
-        detail = "; ".join(
-            f"{b['agent']} {b['key']}: {b['from']!r}->{b['to']!r}"
-            for b in contract_breaches
+        notes.append(
+            NoteRecord(
+                "contract_vs_terminal",
+                {
+                    "variant": "corroborated" if cited else "independent",
+                    "breaches": contract_breaches,
+                    "terminal_score": tv.score,
+                    "terminal_reasoning": tv.reasoning,
+                },
+            )
         )
-        if cited:
-            notes.append(
-                f"contract_vs_terminal: the bad terminal verdict cites the "
-                f"breached parameter — the contract breach ({detail}) and the "
-                "terminal failure describe the same fault (corroborated)"
-            )
-        else:
-            notes.append(
-                f"contract_vs_terminal: a deterministic contract breach "
-                f"({detail}) exists AND the terminal verdict is bad — but the "
-                "terminal reasoning does not cite the breached parameter, so "
-                "these are treated as TWO INDEPENDENT faults sharing an origin "
-                "(a content failure does not corroborate a format breach); "
-                "remediate both"
-            )
 
     # Show every significant quality drop (> min_drop) against a node's best
     # scored predecessor, not only the candidates — the biggest drop in the graph
@@ -1047,6 +1598,12 @@ def find_blame(inp: BlameInput) -> BlameReport:
     # reason) — an audit trail, not a label. A verdict you cannot audit is one
     # the user will not trust.
     culprit_set = set(culprits)
+    # Nodes a localised culprit actually reaches — the only ones whose low score
+    # may honestly be called "inherited / shadowed by the origin upstream".
+    downstream_of_any_culprit: set[str] = set()
+    for _c in culprit_set:
+        if _c in cond.graph:
+            downstream_of_any_culprit |= nx.descendants(cond.graph, _c)
     gap_basis = {g["run_id"]: g.get("basis") for g in verification_gaps}
     loop_set = set(loop_members)
     chain_pos: dict[str, tuple] = {}
@@ -1054,7 +1611,7 @@ def find_blame(inp: BlameInput) -> BlameReport:
         for i, r in enumerate(ch.run_ids):
             chain_pos.setdefault(r, (ch, i))
     t = cfg.threshold
-    candidacy: dict[str, str] = {}
+    candidacy: dict[str, CandidacyRecord] = {}
     for n in graph_nodes:
         s = score_map.get(n)
         ns = inp.scores.get(n)
@@ -1063,66 +1620,55 @@ def find_blame(inp: BlameInput) -> BlameReport:
             # Headline suspect of a fallback verdict: the orchestration/design
             # LAYER is suspected, not this node's own work. Saying "never a
             # culprit" and "suspect" about the same node was a contradiction.
-            candidacy[n] = (
-                "suspect (fallback) — no node individually broke; the "
-                "orchestration/task-design layer enters the graph here. "
-                "Not a proven culprit"
-            )
-        elif s is None:
-            reason = (ns.unscored_reason if ns is not None else None) or "unknown"
+            candidacy[n] = CandidacyRecord("composition_suspect")
+        elif s is None and not (
+            # An unscored node CAN be a culprit — but only through the
+            # deterministic channel, which localises without the judge. Falling
+            # into the generic "unscored: never a candidate" line for such a node
+            # made the report contradict its own headline: the verdict named the
+            # agent while its candidacy row said it was never in the running.
+            n in culprit_set
+            and cand is not None
+            and cand.via == "deterministic"
+        ):
             if _is_structural_root(n):
-                candidacy[n] = (
-                    "structural root — intentionally unscored (orchestrator "
-                    "entry point with no output payload); excluded by design, "
-                    "not a data-quality problem"
-                )
+                candidacy[n] = CandidacyRecord("structural_root")
             else:
-                candidacy[n] = (
-                    f"unscored ({reason}) — excluded: a node without a score can "
-                    "never be scored-in or -out as culprit. If this is "
-                    "unexpected, fix the instrumentation (see notes)"
+                candidacy[n] = CandidacyRecord(
+                    "unscored",
+                    {
+                        "reason": (ns.unscored_reason if ns is not None else None)
+                        or "unknown"
+                    },
                 )
         elif gap_basis.get(n) == "verdict_scored_incorrect":
-            candidacy[n] = (
-                f"verification gap — the verifier's own PASS/FAIL was judged "
-                f"wrong (score {s:.2f} < threshold {t:.2f})"
+            candidacy[n] = CandidacyRecord(
+                "gap_verdict_scored_incorrect", {"score": s, "threshold": t}
             )
         elif gap_basis.get(n) == "passed_bad_terminal":
-            candidacy[n] = (
-                f"verification gap — scored healthy ({s:.2f} >= {t:.2f}) yet the "
-                "terminal verdict is bad: its PASS let bad work through"
+            candidacy[n] = CandidacyRecord(
+                "gap_passed_bad_terminal", {"score": s, "threshold": t}
+            )
+        elif report_type == "shipped_with_latent_defect" and n in culprit_set:
+            # Escalation rewrites the NARRATIVE, not just the verdict type — and
+            # it does so in the SAME pass, from the breach findings that caused
+            # the escalation. This branch fires only for a shipped CONTRACT
+            # breach, so the origin is deterministic: lead with the hard check,
+            # never "degraded here (score X)" (the judged score is untouched and
+            # typically above threshold).
+            candidacy[n] = CandidacyRecord(
+                "origin_escalated", {"score": s, "shipped": _shipped_breaches}
             )
         elif report_type == "degraded_recovered" and n in culprit_set:
-            det = (
-                "; ".join(
-                    f"{k}:{a!r}->{b!r}"
-                    for k, a, b in inp.scores[n].contract_violations
-                )
-                if inp.scores.get(n) and inp.scores[n].contract_violations
-                else ""
-            )
-            if det:
-                # The contract check compares the node's OWN observed input to its
-                # output: the parameter demonstrably ARRIVED intact, so the fault
-                # demonstrably originated here — attribution rests on observation.
-                provenance = (
-                    "attribution: its input was observed intact (the contract "
-                    "parameter arrived correctly), so the rewrite demonstrably "
-                    "originated here"
-                )
-            elif cand is not None and cand.base_assumed:
-                provenance = (
-                    "attribution: no scored predecessor — the clean 1.00 baseline "
-                    "is ASSUMED (structural-root handoff carries no content)"
-                )
-            else:
-                provenance = None
-            candidacy[n] = (
-                f"degraded here — score {s:.2f} < threshold {t:.2f}"
-                + (f", contract violation ({det})" if det else "")
-                + " — but every successor recovered and the terminal is ok; a "
-                "near-miss (fragile node), not the origin of a live failure"
-                + (f". {provenance}" if provenance else "")
+            candidacy[n] = CandidacyRecord(
+                "degraded_recovered",
+                {
+                    "score": s,
+                    "threshold": t,
+                    "via": cand.via if cand is not None else None,
+                    "violations": _violations(inp, n),
+                    "base_assumed": cand is not None and cand.base_assumed,
+                },
             )
         elif n in culprit_set:
             # Every origin line must carry numbers that are TRUE for this node —
@@ -1134,103 +1680,148 @@ def find_blame(inp: BlameInput) -> BlameReport:
                 if score_map.get(p) is not None
             ]
             if n == fabrication_origin:
-                f_flags = ", ".join(
-                    sorted(_CONTENT_FLAGS.intersection(inp.scores[n].flags))
+                candidacy[n] = CandidacyRecord(
+                    "origin_fabrication",
+                    {
+                        "flags": sorted(
+                            _CONTENT_FLAGS.intersection(inp.scores[n].flags)
+                        ),
+                        "score": s,
+                        "threshold": t,
+                    },
                 )
-                candidacy[n] = (
-                    f"origin (fabrication cascade) — own judge flagged "
-                    f"[{f_flags}]; blended score {s:.2f} stayed above threshold "
-                    f"{t:.2f}, but the bad terminal verdict corroborates the "
-                    "missing content, and downstream nodes claimed success "
-                    "over it"
+            elif cand is not None and cand.via == "deterministic":
+                candidacy[n] = CandidacyRecord(
+                    "origin_deterministic",
+                    {"violations": _violations(inp, n), "score": s},
                 )
             elif cand is not None and cand.cumulative_path:
-                candidacy[n] = (
-                    f"origin — erosion starts here: cumulative drop "
-                    f"{cand.drop:.2f} from healthy base {cand.base:.2f} across "
-                    f"{' -> '.join(cand.cumulative_path)} (cumulative threshold "
-                    f"{cfg.cum_drop_threshold:.2f})"
+                candidacy[n] = CandidacyRecord(
+                    "origin_cumulative",
+                    {
+                        "drop": cand.drop,
+                        "base": cand.base,
+                        "path": list(cand.cumulative_path),
+                        "cum_threshold": cfg.cum_drop_threshold,
+                    },
                 )
             elif all_drops.get(n) is not None:
-                candidacy[n] = (
-                    f"origin — score {s:.2f}, dropped {all_drops[n]:.2f} from its "
-                    f"best scored predecessor (gap threshold "
-                    f"{cfg.gap_threshold:.2f}, node threshold {t:.2f})"
+                candidacy[n] = CandidacyRecord(
+                    "origin_drop",
+                    {
+                        "score": s,
+                        "drop": all_drops[n],
+                        "gap_threshold": cfg.gap_threshold,
+                        "threshold": t,
+                        # "Quality was fine going in" is measured over the inputs
+                        # we could score. Naming the ones we could not is the
+                        # difference between an observed and an assumed handoff.
+                        "unmeasured_inputs": [
+                            inp.agent_names.get(u, u) for u in cand.unmeasured_inputs
+                        ]
+                        if cand is not None and cand.unmeasured_inputs
+                        else [],
+                    },
                 )
             elif pred_scores:
                 base = max(pred_scores)
-                candidacy[n] = (
-                    f"origin — score {s:.2f} vs best scored predecessor "
-                    f"{base:.2f} (drop {max(0.0, base - s):.2f}, threshold "
-                    f"{t:.2f})"
+                candidacy[n] = CandidacyRecord(
+                    "origin_vs_predecessor",
+                    {
+                        "score": s,
+                        "base": base,
+                        "drop": max(0.0, base - s),
+                        "threshold": t,
+                    },
                 )
             elif s < t:
-                candidacy[n] = (
-                    f"origin — score {s:.2f} < threshold {t:.2f} at the "
-                    "observable boundary (genuinely no scored predecessor)"
+                candidacy[n] = CandidacyRecord(
+                    "origin_boundary", {"score": s, "threshold": t}
                 )
             else:
-                candidacy[n] = (
-                    f"origin — score {s:.2f}; selected by classification, see "
-                    "notes for the evidence"
+                candidacy[n] = CandidacyRecord(
+                    "origin_by_classification", {"score": s}
                 )
         elif n in loop_set:
-            candidacy[n] = (
-                f"loop member — score {s:.2f}, same retry loop as the origin; "
-                "blame drilled into the worst member"
-            )
+            candidacy[n] = CandidacyRecord("loop_member", {"score": s})
         elif s < t:
-            candidacy[n] = (
-                f"score {s:.2f} < threshold {t:.2f} — inherited degradation, "
-                "shadowed by the origin upstream"
-            )
-        elif n in chain_pos:
-            ch, i = chain_pos[n]
-            names = " -> ".join(ch.run_ids)
-            if i == 0:
-                candidacy[n] = (
-                    f"degradation-path start — last healthy node ({s:.2f} >= "
-                    f"{t:.2f}) before the erosion ({names}, cumulative "
-                    f"-{ch.cumulative_drop:.2f}); its output may carry the seed "
-                    "of the failure and is worth manual review"
+            # "Shadowed by the origin upstream" is a CLAIM about the graph: it
+            # may only be made when a culprit really is an ancestor of this node.
+            # Printed unconditionally it turned every sub-threshold node into
+            # "inherited degradation" even in reports that localized no origin at
+            # all — the reader was told to look upstream at nothing.
+            if n in downstream_of_any_culprit:
+                candidacy[n] = CandidacyRecord(
+                    "inherited", {"score": s, "threshold": t}
+                )
+            elif culprit_set:
+                candidacy[n] = CandidacyRecord(
+                    "independent_low", {"score": s, "threshold": t}
                 )
             else:
-                candidacy[n] = (
-                    f"on the degradation path ({names}) — score {s:.2f} still >= "
-                    f"threshold {t:.2f}, part of a cumulative "
-                    f"-{ch.cumulative_drop:.2f} erosion"
+                pred_scores = [
+                    score_map[p]
+                    for p in cond.graph.predecessors(n)
+                    if score_map.get(p) is not None
+                ]
+                base = max(pred_scores) if pred_scores else None
+                candidacy[n] = CandidacyRecord(
+                    "below_not_origin",
+                    {
+                        "score": s,
+                        "threshold": t,
+                        "base": base,
+                        "gap_threshold": cfg.gap_threshold,
+                        "why": (
+                            "no_predecessor"
+                            if base is None
+                            else "predecessor_also_low"
+                            if base < t
+                            else "drop_under_gap"
+                        ),
+                    },
                 )
+        elif n in chain_pos:
+            ch, i = chain_pos[n]
+            candidacy[n] = CandidacyRecord(
+                "degradation_path_start" if i == 0 else "degradation_path_member",
+                {
+                    "score": s,
+                    "threshold": t,
+                    "path": list(ch.run_ids),
+                    "cumulative_drop": ch.cumulative_drop,
+                },
+            )
         elif (
             terminal_bad
             and _is_verifier(inp.agent_names.get(n))
             and ns is not None
             and "issued_fail" in ns.flags
         ):
-            candidacy[n] = (
-                f"honest whistle-blower — issued FAIL on the bad work (score "
-                f"{s:.2f} = verdict correctness); not a gap"
-            )
+            candidacy[n] = CandidacyRecord("whistleblower", {"score": s})
         elif n in reality_conflicts:
-            candidacy[n] = (
-                f"claims-vs-reality conflict — scored {s:.2f} ('healthy') for "
-                "the very artifact the terminal judge rejected; the healthy "
-                "score is treated as an unverified claim, not as fact"
-            )
+            candidacy[n] = CandidacyRecord("claims_conflict", {"score": s})
         elif n in cascade_participants:
-            candidacy[n] = (
-                f"fabrication-cascade participant — scored {s:.2f}, but built "
-                "on input flagged for missing required content and claimed "
-                "success over it; the score is an unverified claim, not "
-                "independent evidence"
-            )
+            candidacy[n] = CandidacyRecord("cascade_participant", {"score": s})
         elif all_drops.get(n, 0.0) > 0.2:
-            candidacy[n] = (
-                f"dropped {all_drops[n]:.2f} to {s:.2f} but downstream recovered "
-                "— transient low, not a spreading origin"
+            candidacy[n] = CandidacyRecord(
+                "transient_low", {"drop": all_drops[n], "score": s}
             )
         else:
-            candidacy[n] = f"healthy — score {s:.2f} >= threshold {t:.2f}"
+            candidacy[n] = CandidacyRecord("healthy", {"score": s, "threshold": t})
 
+    # --- Schema-2 typed layers: the Defect[] the cascade EMITTED as it localized
+    # (report_type above is a projection of these via derive_report_type). Append
+    # any caller findings, run the mandatory reconcile pass, and serialize.
+    # extra_findings were indexed into ``idx`` before emission (add_extra_findings)
+    # so defects could reference them; finalize only reconciles + validates.
+    schema2_findings, schema2_defects = finalize_schema2(idx, defects)
+
+    # Prose is rendered ONCE, here, from the typed records — a single pass with
+    # no second writer (§2.4). ``notes``/``candidacy`` keep their string shape
+    # for the legacy renderer and for grep/export; ``note_records`` and
+    # ``candidacy_records`` are the machine-readable originals consumers key off
+    # instead of parsing sentences back.
     evidence = Evidence(
         score_map=score_map,
         drops=all_drops,
@@ -1243,10 +1834,14 @@ def find_blame(inp: BlameInput) -> BlameReport:
         loop_anomalies=anomalies,
         unknown_ancestors=sorted(unknown_ancestors),
         fact_propagation=None,
-        notes=notes,
+        notes=render_notes(notes),
+        note_records=[serialize_note(n) for n in notes],
         manifestation_run_ids=manifestation,
         verification_gaps=verification_gaps,
-        candidacy=candidacy,
+        candidacy={n: render_candidacy(c) for n, c in candidacy.items()},
+        candidacy_records={
+            n: serialize_candidacy(c) for n, c in candidacy.items()
+        },
         terminal_verdict=terminal_evidence,
         degradation_paths=[
             {
@@ -1272,6 +1867,9 @@ def find_blame(inp: BlameInput) -> BlameReport:
         contract_violations=contract_breaches,
         deterministic_signals=deterministic_signals,
         topology=topology,
+        schema=2,
+        findings=schema2_findings,
+        defects=schema2_defects,
     )
     return BlameReport(
         report_type=report_type,

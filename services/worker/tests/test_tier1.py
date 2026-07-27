@@ -2,8 +2,13 @@
 
 import asyncio
 
+from worker.scoring import _body_prose_word_count
 from worker.tier1 import Tier1Processor
-from worker.types import STREAM_GRAPHS_TIER2, OutputContract
+from worker.types import (
+    FLAG_UNINSPECTED_MEDIA,
+    STREAM_GRAPHS_TIER2,
+    OutputContract,
+)
 
 from conftest import (
     FakeJudge,
@@ -331,3 +336,400 @@ def test_tier1_verdict_is_stamped_with_judge_prompt_hash():
     verdict = _verdict(repo)
     assert verdict.judge_prompt_hash == judge_prompts_fingerprint()
     assert re.fullmatch(r"[0-9a-f]{12}", verdict.judge_prompt_hash)
+
+
+# ---- Terminal rubric split (content vs form) ----------------------------------
+
+
+def test_split_rubric_form_breach_is_hard_flag_and_persisted():
+    """Content ok + form bad (md shipped where PDF was asked): the run must
+    page tier2 via the terminal_form_breach HARD flag — before the split a
+    form-only miss reached tier2 only via sampling — and the form dimension
+    (with the verbatim requirement quote) must persist for reconciliation."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [make_run(1, "orch"), make_run(2, "writer", end_time=2.0)],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={
+            "content": {"verdict": "ok", "score": 1.0, "reasoning": "content complete"},
+            "form": {
+                "verdict": "bad",
+                "requirement": "jako PDF",
+                "observed": "markdown text",
+                "reasoning": "markdown shipped where PDF was requested",
+            },
+        }
+    )
+    streams = run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    # Content dimension carries the stored verdict columns.
+    assert verdict.terminal_judge_verdict == "ok"
+    assert verdict.terminal_judge_score == 1.0
+    # Form dimension: HARD flag + persisted split with the verbatim quote.
+    assert "terminal_form_breach" in verdict.flags
+    assert verdict.flagged is True
+    assert verdict.terminal_form == {
+        "verdict": "bad",
+        "requirement": "jako PDF",
+        "observed": "markdown text",
+        "reasoning": "markdown shipped where PDF was requested",
+    }
+    messages = streams.messages(STREAM_GRAPHS_TIER2)
+    assert len(messages) == 1
+    assert messages[0]["trigger"] == "tier1"
+
+
+def test_split_rubric_form_ok_does_not_flag():
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [make_run(1, "orch"), make_run(2, "writer", end_time=2.0)],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={
+            "content": {"verdict": "ok", "score": 0.95, "reasoning": "good"},
+            "form": {"verdict": "ok", "requirement": "jako PDF",
+                     "observed": "pdf", "reasoning": "matches"},
+        }
+    )
+    run_tier1(repo, judge=judge, settings=make_settings(tier2_sample_pct=0))
+    verdict = _verdict(repo)
+    assert "terminal_form_breach" not in verdict.flags
+    assert verdict.flagged is False
+    assert verdict.terminal_form["verdict"] == "ok"
+
+
+def test_split_rubric_content_bad_form_bad_are_independent():
+    """Both dimensions bad: content carries the verdict, form adds its flag —
+    two faults recorded, neither masked by the other."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [make_run(1, "orch"), make_run(2, "writer", end_time=2.0)],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={
+            "content": {"verdict": "bad", "score": 0.3, "reasoning": "missing figures"},
+            "form": {"verdict": "bad", "requirement": "jako PDF",
+                     "observed": "markdown text", "reasoning": "wrong format"},
+        }
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "bad"
+    assert "terminal_form_breach" in verdict.flags
+
+
+def test_legacy_flat_terminal_shape_still_parses_with_no_form():
+    """Cassette replay / older judge responses use the flat single-verdict
+    shape: accepted as content-only, terminal_form stays None."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [make_run(1, "orch"), make_run(2, "writer", end_time=2.0)],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(terminal={"verdict": "bad", "score": 0.2, "reasoning": "wrong"})
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "bad"
+    assert verdict.terminal_form is None
+    assert "terminal_form_breach" not in verdict.flags
+
+
+def _illustrated_dossier() -> str:
+    """The SHAPE from two production runs, at test scale: a markdown dossier
+    whose whole text is in the payload, illustrating itself with
+    `![alt](photos/x.jpg)`.
+
+    Scale honesty: 1,075 bytes and 134 body-prose words (pinned by
+    test_illustrated_dossier_fixture_measurements), not the multi-kilobyte
+    payload the production incident carried. It reproduces the structure the
+    classifier keys on, not the size."""
+    return """# Dossier: Villa Kalina, Cadastral Area Bubenec
+
+## Overview
+The property occupies a plot of 1,240 square metres with a southern exposure and
+direct access from the eastern service road. The main building was completed in
+1932 and last renovated in 2019, when the roof structure and all window units
+were replaced. Ownership has been unbroken since 1996 and no liens are recorded.
+
+![Front elevation from the street](photos/afea18287da0626c.jpg)
+
+## Structural condition
+The roof covering is ceramic tile laid in 2019; no displaced tiles or moss
+accumulation were observed from ground level. The facade retains its original
+lime render, with hairline cracking along the northern wall close to grade,
+consistent with settlement rather than active movement.
+
+![North wall detail showing hairline cracking](photos/8c5300c9b9545da4.jpg)
+
+## Valuation
+Comparable transactions recorded in the district over the trailing eighteen
+months support a range of 18.5 to 21.0 million crowns once adjusted for plot
+area, the 2019 renovation, and the absence of an off-street parking space.
+"""
+
+
+def test_illustrated_dossier_fixture_measurements():
+    """Pins what this fixture actually IS. The previous round's docstrings called
+    it "a real ~18 KB markdown dossier" while it was ~1 KB, which mattered
+    because the whole rule under test turned on a word count nobody had run."""
+    text = _illustrated_dossier()
+    assert len(text.encode("utf-8")) == 1075
+    assert _body_prose_word_count(text) == 134
+
+
+def test_illustrated_markdown_deliverable_keeps_its_terminal_verdict():
+    """The regression this fix exists for: on two production runs a complete
+    markdown dossier — its full text in the payload — was forced to
+    not_checkable because it embedded `![alt](photos/8c5300c9.jpg)`, and a real
+    terminal verdict was discarded. The document is checkable on its text.
+
+    The verdict is KEPT (that is the fix). The score is capped, because no text
+    rule separates this dossier from a chat agent handing over a logo with 82
+    words of claims about it — both embed an image and both carry body prose. So
+    the number says what was actually established: the text was read, the
+    pictures were not.
+    """
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(2, "writer", output_inline=_illustrated_dossier(), end_time=2.0),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.9, "reasoning": "all sections present"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "ok"      # not discarded — the fix
+    assert verdict.terminal_judge_score == 0.85        # ...but not full verification
+
+
+def test_a_verbose_image_only_handoff_cannot_earn_a_confident_pass():
+    """The residual of the same class: a chat agent shipping only a picture.
+
+    82 words of prose, every sentence a claim ABOUT the file, plus one embedded
+    image — that satisfies every structural test the illustrated dossier does,
+    so classification alone can never separate them. What can be said honestly is
+    that in BOTH cases the pictures were never opened, so neither may carry a
+    full-confidence pass. Without the cap this persisted 0.95 for work nobody saw.
+    """
+    handoff = (
+        "I have finished the logo you asked for. The palette is a deep indigo "
+        "with a warm amber accent, chosen to stay legible when the mark is "
+        "reduced to favicon size. The wordmark sits to the right of the glyph "
+        "and uses a geometric sans so it holds up in print as well as on screen. "
+        "I exported it at three resolutions and checked the contrast ratio "
+        "against the light and dark backgrounds you sent over earlier today. "
+        "The file is saved and ready for review whenever you have a moment.\n\n"
+        "![the finished logo](assets/logo.png)"
+    )
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [make_run(1, "orch"), make_run(2, "designer", output_inline=handoff, end_time=2.0)],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.95, "reasoning": "logo delivered as asked"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_score == 0.85
+    assert "not inspected" in (verdict.terminal_judge_reasoning or "")
+
+
+def test_illustrated_deliverable_states_the_images_were_not_inspected():
+    """Checkable is not "fully verified": the photos may show what the prose
+    does not, so the reasoning carries the limit instead of an unspoken claim."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(2, "writer", output_inline=_illustrated_dossier(), end_time=2.0),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.9, "reasoning": "all sections present"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    reasoning = verdict.terminal_judge_reasoning
+    assert "all sections present" in reasoning
+    assert "text only" in reasoning
+    assert "photos/8c5300c9b9545da4.jpg" in reasoning
+    # The limit is DATA, not only a sentence: nothing downstream can key off a
+    # suffix appended to a reasoning string, so a partial verdict records the
+    # flag as well. SOFT — an illustrated dossier is not an incident.
+    assert FLAG_UNINSPECTED_MEDIA in verdict.flags
+    assert verdict.flagged is False
+
+
+def test_bad_verdict_on_an_illustrated_deliverable_survives_too():
+    """The caveat qualifies the verdict, it does not replace it: a bad terminal
+    over a readable document still flags and still pages tier2."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(2, "writer", output_inline=_illustrated_dossier(), end_time=2.0),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "bad", "score": 0.2, "reasoning": "valuation invented"}
+    )
+    streams = run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "bad"
+    assert verdict.flagged is True
+    assert len(streams.messages(STREAM_GRAPHS_TIER2)) == 1
+
+
+def test_deliverable_that_only_references_a_docx_stays_not_checkable():
+    """The protection the opacity rule exists for. A payload that merely claims
+    a document was written is a description; grading it would grade the claim,
+    not the work — and the judge's confident "ok" must not survive that."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(
+                    2,
+                    "writer",
+                    output_inline="Task complete. See the attached out/report.docx.",
+                    end_time=2.0,
+                ),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.95, "reasoning": "looks complete"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "not_checkable"
+    assert verdict.terminal_judge_score is None
+    assert "out/report.docx" in verdict.terminal_judge_reasoning
+
+
+def test_deliverable_that_is_only_an_image_stays_not_checkable():
+    """Media is not blanket-exempt: when the deliverable IS the picture the
+    payload is a one-line announcement and there is still nothing to grade."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(
+                    2,
+                    "designer",
+                    output_inline="Logo generated and saved to assets/logo.png",
+                    end_time=2.0,
+                ),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.95, "reasoning": "logo looks great"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "not_checkable"
+    assert "assets/logo.png" in verdict.terminal_judge_reasoning
+
+
+def test_verbose_deliverable_that_is_only_an_image_stays_not_checkable():
+    """The false CERTAINTY a bare word-count bar bought, at the terminal layer.
+    Sixty words is a normal length for an LLM's final answer, so an image-only
+    hand-off that talks about its work — 87 body words here, all of them a claim
+    ABOUT the file — cleared the bar and came back verdict=ok, score=0.9 on a
+    picture nobody opened. The previous test pins only the one-line variant, so
+    it read as protecting the media class while protecting half of it."""
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(
+                    2,
+                    "designer",
+                    output_inline=(
+                        "I have finished the logo. It uses a deep indigo as the "
+                        "primary colour with a warm sand accent, chosen so the mark "
+                        "reads well at small sizes and keeps enough contrast in the "
+                        "reversed variant. The mark itself is a stylised compass "
+                        "rose whose needle forms the letter A. I exported it at 512 "
+                        "pixels and at 2048 pixels so it can be used both in the app "
+                        "header and on printed material. The palette is documented "
+                        "in the file header for anyone who needs to rebuild it "
+                        "later. The file is saved to assets/logo.png."
+                    ),
+                    end_time=2.0,
+                ),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.9, "reasoning": "the palette is coherent"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "not_checkable"
+    assert verdict.terminal_judge_score is None
+    assert "assets/logo.png" in verdict.terminal_judge_reasoning
+    # Withheld, not partially verified: nothing here was read except claims.
+    assert FLAG_UNINSPECTED_MEDIA not in verdict.flags
+
+
+def test_photo_gallery_deliverable_is_not_verified_on_its_captions():
+    """A twelve-image markdown gallery is embedded and carries 72 words of alt
+    text — real production shape, and it used to clear the prose bar on caption
+    words alone and be graded 'ok'. The captions describe pictures nobody
+    opened; there is no body to verify, so the verdict is withheld."""
+    gallery = "\n\n".join(
+        f"![Front elevation seen from the street](photos/img_{i:03d}.jpg)"
+        for i in range(12)
+    )
+    repo = FakeRepo()
+    repo.add_bundle(
+        make_bundle(
+            [
+                make_run(1, "orch"),
+                make_run(2, "photographer", output_inline=gallery, end_time=2.0),
+            ],
+            [(1, 2)],
+        )
+    )
+    judge = FakeJudge(
+        terminal={"verdict": "ok", "score": 0.88, "reasoning": "all elevations covered"}
+    )
+    run_tier1(repo, judge=judge)
+    verdict = _verdict(repo)
+    assert verdict.terminal_judge_verdict == "not_checkable"
+    assert verdict.terminal_judge_score is None

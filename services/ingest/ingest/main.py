@@ -2,7 +2,8 @@
 
 FastAPI app with:
 
-- ``POST /v1/traces`` — OTLP/HTTP JSON (ExportTraceServiceRequest). Raw spans
+- ``POST /v1/traces`` — OTLP/HTTP (ExportTraceServiceRequest), JSON or
+  protobuf by content-type. Raw spans
   go to ClickHouse ``otel_spans``, then otel_mapper candidates are upserted
   into Postgres (graphs/runs/edges, idempotent under redelivery), and
   input/output payloads are routed inline or to MinIO by size.
@@ -28,7 +29,8 @@ from fastapi.responses import JSONResponse
 
 from .config import Settings
 from .finalizer import Finalizer
-from .pipeline import build_batch
+from .otlp_protobuf import parse_protobuf_traces
+from .pipeline import TraceRemapper, build_batch
 from .repository import PgRepo, Repo
 from .spans import ClickHouseSpanSink, SpanSink
 from .store import MinioObjectStore, ObjectStore
@@ -64,7 +66,12 @@ def build_dependencies(settings: Settings) -> Dependencies:
 
 
 def create_app(settings: Settings, deps: Dependencies) -> FastAPI:
-    finalizer = Finalizer(deps.repo, deps.publisher, settings.graph_quiescence_seconds)
+    finalizer = Finalizer(
+        deps.repo,
+        deps.publisher,
+        settings.graph_quiescence_seconds,
+        remapper=TraceRemapper(deps.repo, deps.span_sink, settings, deps.store),
+    )
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -91,10 +98,26 @@ def create_app(settings: Settings, deps: Dependencies) -> FastAPI:
 
     @app.post("/v1/traces")
     async def post_traces(request: Request) -> JSONResponse:
-        try:
-            payload: Any = await request.json()
-        except Exception:
-            return JSONResponse({"detail": "request body must be JSON"}, status_code=400)
+        content_type = request.headers.get("content-type", "")
+        if "protobuf" in content_type:
+            try:
+                payload: Any = parse_protobuf_traces(await request.body())
+            except Exception:
+                return JSONResponse(
+                    {"detail": "request body must be a valid OTLP ExportTraceServiceRequest protobuf"},
+                    status_code=400,
+                )
+        else:
+            try:
+                payload = await request.json()
+            except Exception:
+                return JSONResponse(
+                    {
+                        "detail": "request body must be JSON"
+                        " (or OTLP protobuf with content-type application/x-protobuf)"
+                    },
+                    status_code=400,
+                )
         if not isinstance(payload, dict):
             return JSONResponse(
                 {"detail": "request body must be an OTLP ExportTraceServiceRequest JSON object"},

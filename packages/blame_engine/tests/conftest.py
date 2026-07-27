@@ -60,3 +60,45 @@ def make_input(
 @pytest.fixture
 def mk():
     return make_input
+
+
+# --- Typed rationale accessors (verdict refactor §2.4) -------------------
+#
+# Notes and candidacy are RENDER artifacts. Asserting on their sentences made
+# every rewording a breaking change and let a template drift away from the data
+# it claims to describe without a single test noticing (§11 row 19). These
+# helpers read the typed records instead — the slug, the candidacy verdict and
+# their payloads — which is all a behaviour test is entitled to know. The prose
+# itself is covered exactly once, in test_narrative.py.
+
+
+def note_slugs(report) -> list[str]:
+    """Slugs of every note the report emitted, in order."""
+    return [n["slug"] for n in report.evidence.note_records]
+
+
+def notes_of(report, slug: str, **match):
+    """Every note record with ``slug`` whose data matches the given fields."""
+    return [
+        n["data"]
+        for n in report.evidence.note_records
+        if n["slug"] == slug
+        and all(n["data"].get(k) == v for k, v in match.items())
+    ]
+
+
+def note_of(report, slug: str, **match):
+    """The single note record with ``slug``, or None when it did not fire."""
+    found = notes_of(report, slug, **match)
+    assert len(found) <= 1, f"expected at most one {slug!r} note, got {len(found)}"
+    return found[0] if found else None
+
+
+def verdict_of(report, run_id: str) -> str:
+    """The candidacy VERDICT code for one node (e.g. 'origin_deterministic')."""
+    return report.evidence.candidacy_records[run_id]["verdict"]
+
+
+def candidacy_of(report, run_id: str) -> dict:
+    """The candidacy payload for one node (the numbers the decision rested on)."""
+    return report.evidence.candidacy_records[run_id]["data"]

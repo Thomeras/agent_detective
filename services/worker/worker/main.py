@@ -26,7 +26,8 @@ from dataclasses import dataclass
 from .alerter import Alerter, HttpxWebhookClient, WebhookClient, run_alerter
 from .config import Settings
 from .judge_client import JudgeClient, OpenAIJudgeClient
-from .repository import PgRepo, Repo
+from .pg import PgRepo
+from .repository import Repo
 from .store import MinioObjectStore, ObjectStore
 from .streams import (
     RedisStreams,

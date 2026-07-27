@@ -37,6 +37,11 @@ class AgentRunCandidate:
     prompt_hash: str | None
     tool_schema_hash: str | None  # agent_detective.tool_schema_hash identity attribute
     artifact_meta: str | None  # raw agent_detective.artifact_meta span attribute
+    # Raw agent_detective.contract_params span attribute (JSON object of
+    # carried parameters the run's input is contractually bound to, e.g.
+    # {"file_type": "pdf"}). The convention lane into the deterministic
+    # contract channel for pipelines that cannot ship JSON payloads.
+    contract_params: str | None
     # Compact JSON digest of the run's TOOL member spans, in execution order:
     # [{"name": ..., "args_sha": <12 hex of sha256(input.value)>, "status":
     # "ok"|"error"}, ...]. None when the run has no TOOL member spans.
@@ -72,8 +77,14 @@ class MappingResult:
     (from_run_key, to_run_key, type); both orders are deterministic for a
     given input. ``graph_ids`` is the set of graph identities seen (correlation
     header values, or trace ids when no header is present).
+
+    ``graph_types`` maps each graph id to the OTLP resource ``service.name`` of
+    the runs exported under it (the cohort key ingest stores as
+    ``execution_graphs.graph_type``); ``None`` when the resource carried no
+    service.name. First non-empty value in deterministic run order wins.
     """
 
     runs: list[AgentRunCandidate] = field(default_factory=list)
     edges: list[EdgeCandidate] = field(default_factory=list)
     graph_ids: set[str] = field(default_factory=set)
+    graph_types: dict[str, str | None] = field(default_factory=dict)

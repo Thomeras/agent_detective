@@ -30,6 +30,20 @@ FLAG_SCHEMA_VIOLATION = "schema_violation"
 FLAG_DEGENERATE_OUTPUT = "degenerate_output"
 FLAG_ARTIFACT_INTEGRITY = "artifact_integrity"
 FLAG_REQUIRED_SECTION = "required_section_missing"
+# Terminal rubric split: the judge's FORM dimension is bad — the deliverable
+# visibly shipped in a form other than the one explicitly requested in the
+# initial input. HARD flag: it pages tier2 even when the CONTENT verdict is ok
+# (a form-only miss used to reach tier2 only via sampling — a judge false
+# negative on format left the run unanalyzed at production sample rates).
+FLAG_TERMINAL_FORM = "terminal_form_breach"
+# The deliverable was read and graded, but part of what it delivers lives in
+# images nobody opened (scoring.ARTIFACT_PARTIAL). SOFT flag: it is a recorded
+# LIMIT on the verdict, not a defect — an illustrated dossier is not a fault and
+# must not page. It exists so "verified on the text only" survives as structured
+# data instead of living solely in a sentence appended to the reasoning; two out
+# of two real production runs delivered work whose value was partly in
+# photographs, so this is the normal multimodal case, not an edge one.
+FLAG_UNINSPECTED_MEDIA = "uninspected_media"
 
 
 @dataclass(frozen=True)
@@ -64,6 +78,12 @@ class RunRecord:
     # Fingerprint of the tool schema the run executed under (migration 0009);
     # completes the per-run identity tuple used by version-diff views.
     tool_schema_hash: str | None = None
+    # Raw ``agent_detective.contract_params`` span attribute (JSON object
+    # string, migration 0011): parameters the run's input is contractually
+    # bound to, declared out-of-band. The convention lane for pipelines whose
+    # payloads are prose/code and give the input-side JSON diff nothing to
+    # parse. Text on purpose — scoring parses it tolerantly.
+    contract_params: str | None = None
 
 
 @dataclass(frozen=True)
@@ -153,6 +173,12 @@ class Tier1Verdict:
     # sliced by judge-prompt version. The judge MODEL is not recorded — a
     # known limitation. None on verdicts that predate stamping.
     judge_prompt_hash: str | None = None
+    # Terminal rubric split (migration 0010): the judge's FORM dimension —
+    # {"verdict": "ok|bad|not_applicable", "requirement": <verbatim quote from
+    # the initial input or None>, "observed": ..., "reasoning": ...}. The
+    # verdict/score/reasoning columns above are the CONTENT dimension only.
+    # None on verdicts that predate the split (legacy single-verdict rows).
+    terminal_form: dict | None = None
 
 
 @dataclass(frozen=True)
@@ -190,7 +216,7 @@ class BlameDraft:
     culprit_run_ids: list[UUID]
     propagation_path: list[UUID]
     confidence: float
-    downstream_cost_usd: float
+    downstream_cost_usd: float | None
     unscored_run_ids: list[UUID]
     evidence: dict[str, Any]
     # Judge-prompt fingerprint the blame analysis ran under (migration 0009).

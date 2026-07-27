@@ -15,6 +15,7 @@ behavioral leak from the classifier fails this battery.
 import pytest
 
 from blame_engine import NodeScore, TerminalVerdict, find_blame
+from conftest import note_of, verdict_of
 
 try:  # agent T's classifier — frozen contract; skip topology locks until landed
     from blame_engine.topology import classify_topology
@@ -222,14 +223,14 @@ def test_single_agent_blames_itself_with_boundary_capped_attribution(mk) -> None
     # ... while the OBSERVATION (is the output defective?) is not capped:
     # severity (0.5 - 0.1) / 0.5 = 0.8.
     assert report.evidence.observation_confidence == pytest.approx(0.8)
-    assert any(n.startswith("attribution_capped") for n in report.evidence.notes)
+    assert note_of(report, "attribution_capped") is not None
     content = next(
         b for b in report.evidence.attribution_breakdown
         if b["defect"] == "content_degradation"
     )
     assert content["attribution"] == pytest.approx(0.6)
     assert "observability boundary" in content["basis"]
-    assert "origin" in report.evidence.candidacy["solo"]
+    assert verdict_of(report, "solo").startswith("origin")
 
 
 # ---------------------------------------------------------------------------
@@ -246,11 +247,11 @@ def test_star_blames_failing_specialist_aggregator_inherits(mk) -> None:
     assert report.propagation_path == ["spec_code", "aggregator"]
     # The aggregator dropped 0.55 from a healthy spoke — origin-shaped — but is
     # SHADOWED by its ancestor origin: inherited degradation, not a second cause.
-    assert "shadowed by the origin upstream" in report.evidence.candidacy["aggregator"]
+    assert verdict_of(report, "aggregator") == "inherited"
     assert report.evidence.drops["spec_code"] == pytest.approx(0.75)
     assert report.evidence.drops["aggregator"] == pytest.approx(0.55)
     for healthy in ("orchestrator", "spec_research", "spec_data", "spec_writer"):
-        assert report.evidence.candidacy[healthy].startswith("healthy")
+        assert verdict_of(report, healthy) == "healthy"
 
 
 # ---------------------------------------------------------------------------
@@ -265,10 +266,10 @@ def test_hierarchy_blames_deep_worker_merge_inherits(mk) -> None:
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["worker_b1"]
     assert report.propagation_path == ["worker_b1", "merge"]
-    assert "shadowed by the origin upstream" in report.evidence.candidacy["merge"]
+    assert verdict_of(report, "merge") == "inherited"
     for healthy in ("manager", "lead_alpha", "lead_beta", "worker_a1",
                     "worker_a2", "worker_b2"):
-        assert report.evidence.candidacy[healthy].startswith("healthy")
+        assert verdict_of(report, healthy) == "healthy"
 
 
 # ---------------------------------------------------------------------------
@@ -288,21 +289,30 @@ def test_peer_mesh_drills_into_scc_and_blames_worst_member(mk) -> None:
     # (peer_delta) that merely carried the poisoned consensus downstream.
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["peer_alpha"]
-    note = next(n for n in report.evidence.notes if n.startswith("cut_point"))
-    assert "4-member retry loop" in note
-    assert "peer_delta" in note  # names the exit that only carried it
+    # "cycle", not "retry loop": the engine has no edge types, and the shape is
+    # just as often an orchestrator↔sub-agent delegation pair.
+    cut = note_of(report, "cut_point")
+    assert cut["variant"] == "loop" and cut["members"] == 4
+    # Names the exit that only carried it, and says the drill MOVED the blame.
+    assert cut["exit_run_id"] == "peer_delta" and cut["drilled"] is True
     # The drilled drop is measured against the member's raw in-mesh
     # predecessors (bravo 0.40 / delta 0.40 -> alpha 0.15), not the exit drop.
     assert report.evidence.drops["peer_alpha"] == pytest.approx(0.25)
     for member in ("peer_bravo", "peer_charlie", "peer_delta"):
-        assert "loop member" in report.evidence.candidacy[member]
+        assert verdict_of(report, member) == "loop_member"
         assert member not in report.culprit_run_ids
     # A 4-member SCC is under max_loop_iterations (10) with no baselines: this
     # is mesh collaboration, NOT an anomalous loop.
     assert report.evidence.loop_anomalies == []
     # Multi-member SCC honesty: the scc penalty (x0.8) applies to attribution.
-    # (0.5*gap(0.25/0.5) + 0.3*sev(0.7) + 0.2*pred(1.0)) * 0.8 = 0.528.
-    assert report.confidence == pytest.approx(0.528)
+    # (0.5*gap(0.25/0.5) + 0.3*sev(0.7) + 0.2*pred(0.0)) * 0.8 = 0.368.
+    # The predecessor term is 0 because alpha's real in-mesh predecessors are
+    # 0.40 — below threshold. It read 1.0 (=> 0.528) while the drop came from
+    # those same 0.40 predecessors but the baseline came from the SCC's ASSUMED
+    # 1.00 source baseline: the gap term measured the mesh, the predecessor term
+    # measured a fiction. In a mesh where everyone is already degraded,
+    # attribution of the break to one peer IS weaker, and the number now says so.
+    assert report.confidence == pytest.approx(0.368)
     # All four members expanded on the propagation path, end-time order.
     assert report.propagation_path == PEER_MESH["nodes"]
 
@@ -321,9 +331,9 @@ def test_pipeline_blames_mid_stage_downstream_inherited(mk) -> None:
     assert report.propagation_path == ["draft", "refine", "publish"]
     assert report.evidence.drops["draft"] == pytest.approx(0.7)
     for inherited in ("refine", "publish"):
-        assert "inherited degradation" in report.evidence.candidacy[inherited]
-    assert report.evidence.candidacy["ingest"].startswith("healthy")
-    assert report.evidence.candidacy["plan"].startswith("healthy")
+        assert verdict_of(report, inherited) == "inherited"
+    assert verdict_of(report, "ingest") == "healthy"
+    assert verdict_of(report, "plan") == "healthy"
 
 
 # ---------------------------------------------------------------------------
@@ -357,13 +367,13 @@ def test_feedback_loop_contract_violation_is_degraded_recovered(mk) -> None:
     assert contract["attribution"] == pytest.approx(0.95)
     # The ok terminal must NOT clear the breach: recovered in content,
     # unverified in contract — said out loud.
-    assert any(n.startswith("contract_vs_terminal") for n in report.evidence.notes)
+    assert note_of(report, "contract_vs_terminal") is not None
     assert report.evidence.contract_violations == [
         {"run_id": "think", "agent": "think", "key": "file_type",
          "from": "docx", "to": "md"}
     ]
     assert report.evidence.verification_gaps == []
-    assert "structural root" in report.evidence.candidacy["start"]
+    assert verdict_of(report, "start") == "structural_root"
 
 
 # ---------------------------------------------------------------------------
@@ -394,7 +404,7 @@ def test_market_blames_winner_never_the_losing_bidders(mk) -> None:
     # blame). Blame localisation itself is untouched — the assertion above is
     # the contract; this one documents today's side-band evidence.
     for loser in ("bidder_a", "bidder_c"):
-        assert "claims-vs-reality" in report.evidence.candidacy[loser]
+        assert verdict_of(report, loser) == "claims_conflict"
 
 
 # ---------------------------------------------------------------------------
@@ -413,9 +423,9 @@ def test_swarm_two_independent_regional_failures_multi_culprit(mk) -> None:
     assert report.culprit_run_ids == ["drone_03", "drone_09"]
     for inherited in ("drone_04", "drone_05", "drone_06",
                       "drone_10", "drone_11", "drone_12"):
-        assert "shadowed by the origin upstream" in report.evidence.candidacy[inherited]
+        assert verdict_of(report, inherited) == "inherited"
     for healthy in ("drone_01", "drone_02", "drone_07", "drone_08"):
-        assert report.evidence.candidacy[healthy].startswith("healthy")
+        assert verdict_of(report, healthy) == "healthy"
     # Honest multi-culprit ceiling: penalised per candidate, capped at 0.8.
     assert 0.5 < report.confidence <= 0.8
 

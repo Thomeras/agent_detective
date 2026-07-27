@@ -12,6 +12,7 @@ is a recovered near-miss with high observation confidence and no manifestation.
 import pytest
 
 from blame_engine import NodeScore, TerminalVerdict, find_blame
+from conftest import candidacy_of, note_of
 
 
 def _score(run_id, value, *, contract=(), flags=(), note="judged"):
@@ -123,21 +124,26 @@ def test_contract_vs_terminal_note_flags_terminal_blind_spot(mk):
     reached the final artifact is settled by the worker's contract_propagation
     check, or out of band)."""
     inp = mk(**_pipeline(0.15, contract=[("file_type", "docx", "md")], terminal=_TERMINAL_OK))
-    notes = " ".join(find_blame(inp).evidence.notes)
-    assert "contract_vs_terminal" in notes
-    assert "introduced mid-pipeline" in notes
-    assert "unverified in contract" in notes
-    # The engine must NOT assert propagation it did not observe.
-    assert "reached the deliverable" not in notes
+    report = find_blame(inp)
+    cvt = note_of(report, "contract_vs_terminal")
+    # The terminal-ok variant IS the "blind spot" statement: a breach exists and
+    # the CONTENT judge still passed. The engine must not claim propagation it
+    # did not observe — that variant carries no propagation evidence at all.
+    assert cvt["variant"] == "terminal_ok"
+    assert cvt["breaches"] == report.evidence.contract_violations
 
 
 def test_recovered_verdict_reconciles_with_contract_caveat(mk):
     """#1: 'recovered' and 'breach' must not stand side by side unreconciled —
     the verdict itself says recovery is content-only and the run is not clean."""
     inp = mk(**_pipeline(0.15, contract=[("file_type", "docx", "md")], terminal=_TERMINAL_OK))
-    notes = " ".join(find_blame(inp).evidence.notes)
-    assert "recovery is proven for CONTENT only" in notes
-    assert "do not treat it as fully clean" in notes
+    report = find_blame(inp)
+    # The content-only caveat is not an optional sentence: it is carried by the
+    # degraded_recovered note's own violation payload, so a recovered verdict
+    # over a live breach cannot be rendered without it.
+    assert note_of(report, "degraded_recovered")["violations"] == [
+        {"key": "file_type", "from": "docx", "to": "md"}
+    ]
 
 
 def test_no_fabricated_drop_against_assumed_baseline(mk):
@@ -146,10 +152,12 @@ def test_no_fabricated_drop_against_assumed_baseline(mk):
     predecessor' computed against the assumed 1.00. The assumption lives,
     declared, in candidacy instead."""
     inp = mk(**_pipeline(0.15, contract=[("file_type", "docx", "md")], terminal=_TERMINAL_OK))
-    ev = find_blame(inp).evidence
-    assert "think" not in ev.drops
+    report = find_blame(inp)
+    assert "think" not in report.evidence.drops
     # The attribution basis is stated: observed-intact input, not a fictional base.
-    assert "input was observed intact" in ev.candidacy["think"]
+    assert candidacy_of(report, "think")["violations"] == [
+        {"key": "file_type", "from": "docx", "to": "md"}
+    ]
 
 
 def test_bad_terminal_keeps_it_a_cut_point(mk):
@@ -211,8 +219,8 @@ def test_boundary_attribution_capped_without_contract_evidence(mk):
     report = find_blame(inp)
     assert report.report_type == "cut_point"
     assert report.evidence.attribution_confidence == pytest.approx(0.6)
-    assert any("attribution_capped" in n for n in report.evidence.notes)
-    assert any("observability boundary" in n for n in report.evidence.notes)
+    capped = note_of(report, "attribution_capped")
+    assert capped is not None and capped["cap"] == pytest.approx(0.6)
 
 
 def test_observed_predecessor_attribution_not_capped(mk):
@@ -227,7 +235,7 @@ def test_observed_predecessor_attribution_not_capped(mk):
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["c"]
     assert report.confidence > 0.8  # measured drop, no boundary cap
-    assert not any("attribution_capped" in n for n in report.evidence.notes)
+    assert note_of(report, "attribution_capped") is None
 
 
 def test_stale_terminal_suppresses_manifestation(mk):
@@ -241,4 +249,4 @@ def test_stale_terminal_suppresses_manifestation(mk):
     report = find_blame(inp)
     assert report.report_type == "cut_point"  # contract fault is still live
     assert report.evidence.manifestation_run_ids == []
-    assert any("terminal_stale" in n for n in report.evidence.notes)
+    assert note_of(report, "terminal_stale") is not None

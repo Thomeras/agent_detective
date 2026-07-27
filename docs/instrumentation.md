@@ -1,15 +1,34 @@
 # Instrumentation
 
-Agent Detective is OTEL-native: there is no custom SDK and no proprietary
-protocol. If your agents already emit OpenTelemetry traces with
+Agent Detective is OTEL-native: no proprietary protocol, nothing to adopt in
+your stack. If your agents already emit OpenTelemetry traces with
 [OpenInference](https://github.com/Arize-ai/openinference) or
 [OpenLLMetry](https://github.com/traceloop/openllmetry) conventions, connecting
 them is a matter of pointing their OTLP exporter at the ingest endpoint.
 
+**Have no instrumentation yet?** `detective-sdk` gives you a context manager per
+agent step and emits exactly the same standard spans — see
+[Nothing instrumented yet](#nothing-instrumented-yet-detective-sdk) below. It is
+optional and dependency-free; you are never locked into it.
+
+## Two receivers, one protocol
+
+Both ends of Agent Detective speak the same endpoint, so instrumentation is
+written once and works against either:
+
+| Receiver | Command | For |
+|---|---|---|
+| `detective capture` | `pip install agent-detective` | one run, no stack, verdict in the terminal |
+| ingest service | `docker compose up` | continuous ingest, incident inbox, cross-run history |
+
+`detective capture` binds `127.0.0.1:8900` by default and prints the verdict
+when the run ends; ingest listens on `8001` and persists. Point the same
+exporter at whichever you want — nothing else in your app changes.
+
 ## One environment variable
 
-The ingest service accepts **OTLP/HTTP JSON** at `POST /v1/traces` (default
-port `8001`). Point your app's OTLP/HTTP exporter at it:
+The receiver accepts **OTLP/HTTP JSON** at `POST /v1/traces`. Point your app's
+OTLP/HTTP exporter at it:
 
 ```bash
 export OTEL_EXPORTER_OTLP_ENDPOINT=http://<ingest-host>:8001
@@ -22,6 +41,60 @@ sure the exporter is the HTTP/JSON one (`http/json`), not gRPC or protobuf.
 
 That is the entire integration. Everything else — building the execution graph,
 scoring nodes, and blame analysis — happens server-side from the spans you send.
+
+## Nothing instrumented yet? `detective-sdk`
+
+Everything above assumes you already emit OTEL spans. If you do not, the
+conventions on this page are short but easy to get subtly wrong — and a wrong
+guess is expensive, because the analysis stays confident while being wrong. A
+span without `openinference.span.kind=AGENT` never becomes a node; a node whose
+`output.value` holds a status record (`{"ok": true}`) gets its *phrasing* judged
+instead of its work; an omitted cost is indistinguishable from a free run.
+
+`detective-sdk` is that exporter, written once. Pure stdlib, zero dependencies —
+instrumentation runs inside your agent's process, so it must not drag a judge or
+a database in with it:
+
+```python
+from detective_sdk import run
+
+with run("intel", task=user_request) as r:          # root carries the ORIGINAL ask
+    with r.step("resolve") as s:                    # pipeline: parent = previous step
+        s.output = company                          # the WORK, not {"ok": true}
+    with r.step("collect") as s:                    # input defaults to resolve's output
+        s.output = documents
+        s.cost(usd=0.012, tokens_in=22_000, tokens_out=1_500, model="gpt-4o")
+    with r.step("write") as s:
+        s.output = dossier_markdown                 # deliverable text, not a file path
+        s.artifact("out/dossier.md")                # integrity, outside the payload
+```
+
+Two shapes, because topology changes how the graph reads:
+
+| Call | Parent | Use for |
+|---|---|---|
+| `r.step(name)` | the previous step | pipelines / handoff chains |
+| `r.span(name)` | the innermost open span | orchestrator trees, sub-agents |
+
+`step` also defaults each step's input to the previous step's output — that
+handoff is what lets blame compare neighbours; without it every node looks like
+it started from nothing.
+
+Switched off unless `AGENT_DETECTIVE_ENDPOINT` or `AGENT_DETECTIVE_TRACE_FILE`
+is set, so instrumented code ships to production untouched:
+
+```bash
+detective capture --once --out run.json        # terminal 1
+AGENT_DETECTIVE_ENDPOINT=http://127.0.0.1:8900 python -m myagent   # terminal 2
+
+# or skip the listener entirely
+AGENT_DETECTIVE_TRACE_FILE=run.json python -m myagent && detective analyze run.json
+```
+
+Report only what you measured. `cost()` omits what you do not pass, and an
+absent cost stays honestly unknown rather than becoming `$0` — otherwise a
+metered agent looks more expensive than an unmetered one. Agent Detective ships
+no pricing table and never infers a price.
 
 ## A concrete Python example
 
@@ -78,14 +151,48 @@ sends OTLP/HTTP JSON with these attributes is compatible.
 
 ## Framework adapters (e.g. LangGraph)
 
+### The short way: `detective_sdk.otel.collect`
+
+All three gotchas below are mechanical, and all three fail *quietly* — you get
+an empty or misshapen graph, never an error. `detective-sdk[otel]` ships them
+solved, so an existing OTEL system connects in three lines instead of ~60 lines
+of exporter glue:
+
+```python
+from detective_sdk.otel import collect
+
+collect(
+    endpoint="http://127.0.0.1:8900",            # or trace_file="run.json"
+    promote=lambda s: s.name if s.name in NODES else None,   # CHAIN -> AGENT
+    chain=True,                                  # sequential nodes -> SPAWN edges
+    task=user_request,                           # optional run root (provenance)
+)
+```
+
+`promote` also accepts a plain list of span names. The collector buffers the run
+and sends one `ExportTraceServiceRequest` as JSON when the process exits —
+promotion and chaining need the whole run, since you cannot re-parent node #4 to
+node #3 in a batch that has not met node #3 yet.
+
+Child LLM spans keep their original parent, which is what makes their tokens and
+cost roll up into the node above them. Measured on a bridged vanilla-CrewAI-shaped
+trace: three `CHAIN` nodes became a 4-node pipeline with 3 `SPAWN` edges and
+per-node cost ($0.004 / $0.011 / $0.02), with the root honestly cost-unknown.
+
+The rest of this section explains what `collect` does, for anyone writing the
+exporter by hand.
+
+### The gotchas it solves
+
 Two practical gotchas when wiring a real framework, learned the hard way:
 
-- **Send JSON, not protobuf.** Python's stock `OTLPSpanExporter`
-  (`opentelemetry-exporter-otlp-proto-http`) serializes to protobuf, which the
-  ingest endpoint rejects with `400`. Either configure a JSON exporter, or use a
-  small **collecting exporter** that buffers a run's spans and POSTs one
-  `ExportTraceServiceRequest` as JSON on shutdown (hex `traceId`/`spanId`,
-  key/value attributes — the shape in `packages/otel_mapper/testdata`).
+- **Protobuf and JSON both work.** Python's stock `OTLPSpanExporter`
+  (`opentelemetry-exporter-otlp-proto-http`) serializes to protobuf; the ingest
+  endpoint accepts it (`content-type: application/x-protobuf`) as well as the
+  OTLP/JSON shape in `packages/otel_mapper/testdata` — both land on identical
+  rows. Batch splitting is also safe: the finalizer re-maps the full stored
+  span set before announcing the graph, so cross-batch edges and late root
+  spans are recovered.
 
 - **Auto-instrumentation opens no runs by itself.** Framework auto-instrumentors
   (e.g. `openinference-instrumentation-langchain`) trace each graph node as a
@@ -157,6 +264,26 @@ AGENT-ancestor within the same trace. Token/cost values on the AGENT span win;
 otherwise they are summed over member spans; absent everywhere → unknown
 (`None`, never a default). A missing score is treated as unknown all the way
 through blame analysis — it is never assumed healthy.
+
+**An empty payload is not a bad payload.** A span whose `output.value` is
+absent — *or present but empty/whitespace* — leaves the node unscored
+(`payload_missing`); it is never scored `0.0`. Orchestrator and wrapper spans
+(LangGraph roots, CrewAI kickoff, a framework's top-level "run" span)
+legitimately carry no output of their own, and treating emptiness as
+"demonstrably bad" made them the culprit of every graph they appeared in — the
+strongest possible verdict from the weakest possible evidence. If an empty
+output genuinely *is* the defect, it reaches the report through the
+deterministic channel (a failed status, a signal, a terminal verdict), not
+through a quality number inferred from nothing. Non-root nodes in this state
+raise an `instrumentation_warning` on the report — *"these nodes have no output
+payload, fix the exporter"* — so the gap stays visible without being charged to
+the agent.
+
+**Unknown cost stays unknown.** With no `gen_ai.usage.cost` anywhere, a run's
+cost is `null` — and it stays `null` through the graph total, the leaderboard,
+and a blame report's `downstream_cost_usd`, rather than summing to a confident
+`$0`. A partial sum (some nodes priced, some not) is reported as-is and is a
+floor, not a total. Cost-ordered views place unmeasured agents last.
 
 **File artifacts must be embedded, not referenced.** A payload that only names
 a produced file (`{"artifact_path": "report.docx"}`) gives every judge a

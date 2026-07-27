@@ -25,6 +25,17 @@ class JudgeError(Exception):
     """Raised when a judge call fails at transport or JSON-parse level."""
 
 
+class PermanentJudgeError(JudgeError):
+    """A judge failure that retrying cannot fix.
+
+    The retry loop treats it as immediately exhausted: there is no judge to
+    reach (none configured for this run), so backing off and asking again only
+    buys latency. Callers see the same ``None`` an exhausted retry produces —
+    "no judged verdict" is one outcome regardless of why — so nothing
+    downstream needs to distinguish the two.
+    """
+
+
 class JudgeClient(Protocol):
     """Async judge seam; faked in tests."""
 
@@ -167,6 +178,11 @@ async def judge_json_with_retries(
     for attempt in range(attempts):
         try:
             return await client.complete_json(prompt, system=system)
+        except PermanentJudgeError as exc:
+            # Nothing to retry against, and nothing alarming either — a run
+            # with no judge configured is a supported mode, not a fault.
+            logger.debug("judge unavailable: %s", exc)
+            return None
         except JudgeError as exc:
             if attempt + 1 >= attempts:
                 logger.warning("judge call failed after %d attempts: %s", attempts, exc)

@@ -1,0 +1,408 @@
+{
+  "a2a_diamond_fault": {
+    "a2a": true,
+    "edges": [
+      [
+        "analyst",
+        "editor",
+        "A2A_MESSAGE"
+      ],
+      [
+        "retriever",
+        "analyst",
+        "A2A_MESSAGE"
+      ],
+      [
+        "retriever",
+        "translator",
+        "A2A_MESSAGE"
+      ],
+      [
+        "translator",
+        "editor",
+        "A2A_MESSAGE"
+      ]
+    ],
+    "end_times": {
+      "analyst": 2.0,
+      "editor": 3.0,
+      "retriever": 1.0,
+      "translator": 2.2
+    },
+    "file": "a2a_diamond_fault.json",
+    "nodes": [
+      "retriever",
+      "analyst",
+      "translator",
+      "editor"
+    ],
+    "topology": {
+      "articulation_points": [],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 3,
+      "edge_count": 4,
+      "max_fan_out": 2,
+      "node_count": 4,
+      "primary": "star",
+      "scc_count": 0
+    }
+  },
+  "fanout_branch_fault": {
+    "a2a": false,
+    "edges": [
+      [
+        "orchestrator",
+        "merge",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_intro",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_pricing",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_specs",
+        "SPAWN"
+      ],
+      [
+        "write_intro",
+        "merge",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "write_pricing",
+        "merge",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "write_specs",
+        "merge",
+        "TOOL_DELEGATION"
+      ]
+    ],
+    "end_times": {
+      "merge": 4.0,
+      "orchestrator": 9.0,
+      "write_intro": 2.0,
+      "write_pricing": 2.4,
+      "write_specs": 2.2
+    },
+    "file": "fanout_branch_fault.json",
+    "nodes": [
+      "orchestrator",
+      "write_intro",
+      "write_specs",
+      "write_pricing",
+      "merge"
+    ],
+    "topology": {
+      "articulation_points": [],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 3,
+      "edge_count": 7,
+      "max_fan_out": 4,
+      "node_count": 5,
+      "primary": "dag",
+      "scc_count": 0
+    }
+  },
+  "fanout_join_echoes_breach": {
+    "a2a": false,
+    "edges": [
+      [
+        "orchestrator",
+        "merge",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_intro",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_pricing",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "write_specs",
+        "SPAWN"
+      ],
+      [
+        "write_intro",
+        "merge",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "write_pricing",
+        "merge",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "write_specs",
+        "merge",
+        "TOOL_DELEGATION"
+      ]
+    ],
+    "end_times": {
+      "merge": 4.0,
+      "orchestrator": 9.0,
+      "write_intro": 2.0,
+      "write_pricing": 2.4,
+      "write_specs": 2.2
+    },
+    "file": "fanout_join_echoes_breach.json",
+    "nodes": [
+      "orchestrator",
+      "write_intro",
+      "write_specs",
+      "write_pricing",
+      "merge"
+    ],
+    "topology": {
+      "articulation_points": [],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 3,
+      "edge_count": 7,
+      "max_fan_out": 4,
+      "node_count": 5,
+      "primary": "dag",
+      "scc_count": 0
+    }
+  },
+  "retry_loop_recovered": {
+    "a2a": false,
+    "edges": [
+      [
+        "draft",
+        "qa",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "draft",
+        "SPAWN"
+      ],
+      [
+        "qa",
+        "revise",
+        "SPAWN"
+      ],
+      [
+        "revise",
+        "draft",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "revise",
+        "publish",
+        "SPAWN"
+      ]
+    ],
+    "end_times": {
+      "draft": 2.0,
+      "orchestrator": 9.0,
+      "publish": 5.0,
+      "qa": 3.0,
+      "revise": 4.0
+    },
+    "file": "retry_loop_recovered.json",
+    "nodes": [
+      "orchestrator",
+      "draft",
+      "qa",
+      "revise",
+      "publish"
+    ],
+    "topology": {
+      "articulation_points": [
+        "draft",
+        "revise"
+      ],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 3,
+      "edge_count": 5,
+      "max_fan_out": 2,
+      "node_count": 5,
+      "primary": "pipeline_with_feedback",
+      "scc_count": 1
+    }
+  },
+  "retry_loop_unrecovered": {
+    "a2a": false,
+    "edges": [
+      [
+        "draft",
+        "qa",
+        "SPAWN"
+      ],
+      [
+        "orchestrator",
+        "draft",
+        "SPAWN"
+      ],
+      [
+        "qa",
+        "revise",
+        "SPAWN"
+      ],
+      [
+        "revise",
+        "draft",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "revise",
+        "publish",
+        "SPAWN"
+      ]
+    ],
+    "end_times": {
+      "draft": 2.0,
+      "orchestrator": 9.0,
+      "publish": 5.0,
+      "qa": 3.0,
+      "revise": 4.0
+    },
+    "file": "retry_loop_unrecovered.json",
+    "nodes": [
+      "orchestrator",
+      "draft",
+      "qa",
+      "revise",
+      "publish"
+    ],
+    "topology": {
+      "articulation_points": [
+        "draft",
+        "revise"
+      ],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 3,
+      "edge_count": 5,
+      "max_fan_out": 2,
+      "node_count": 5,
+      "primary": "pipeline_with_feedback",
+      "scc_count": 1
+    }
+  },
+  "retry_runaway": {
+    "a2a": false,
+    "edges": [
+      [
+        "orchestrator",
+        "revise_1",
+        "SPAWN"
+      ],
+      [
+        "revise_1",
+        "revise_2",
+        "SPAWN"
+      ],
+      [
+        "revise_10",
+        "revise_11",
+        "SPAWN"
+      ],
+      [
+        "revise_11",
+        "revise_1",
+        "TOOL_DELEGATION"
+      ],
+      [
+        "revise_2",
+        "revise_3",
+        "SPAWN"
+      ],
+      [
+        "revise_3",
+        "revise_4",
+        "SPAWN"
+      ],
+      [
+        "revise_4",
+        "revise_5",
+        "SPAWN"
+      ],
+      [
+        "revise_5",
+        "revise_6",
+        "SPAWN"
+      ],
+      [
+        "revise_6",
+        "revise_7",
+        "SPAWN"
+      ],
+      [
+        "revise_7",
+        "revise_8",
+        "SPAWN"
+      ],
+      [
+        "revise_8",
+        "revise_9",
+        "SPAWN"
+      ],
+      [
+        "revise_9",
+        "revise_10",
+        "SPAWN"
+      ]
+    ],
+    "end_times": {
+      "orchestrator": 30.0,
+      "revise_1": 1.5,
+      "revise_10": 10.5,
+      "revise_11": 11.5,
+      "revise_2": 2.5,
+      "revise_3": 3.5,
+      "revise_4": 4.5,
+      "revise_5": 5.5,
+      "revise_6": 6.5,
+      "revise_7": 7.5,
+      "revise_8": 8.5,
+      "revise_9": 9.5
+    },
+    "file": "retry_runaway.json",
+    "nodes": [
+      "orchestrator",
+      "revise_1",
+      "revise_2",
+      "revise_3",
+      "revise_4",
+      "revise_5",
+      "revise_6",
+      "revise_7",
+      "revise_8",
+      "revise_9",
+      "revise_10",
+      "revise_11"
+    ],
+    "topology": {
+      "articulation_points": [
+        "revise_1"
+      ],
+      "bidirectional_pairs": 0,
+      "components": 1,
+      "depth": 2,
+      "edge_count": 12,
+      "max_fan_out": 1,
+      "node_count": 12,
+      "primary": "pipeline_with_feedback",
+      "scc_count": 1
+    }
+  }
+}

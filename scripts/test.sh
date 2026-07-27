@@ -22,8 +22,11 @@ run() { # <dir> <package> [extra pytest args...]
 
 run packages/blame_engine blame-engine --cov=blame_engine --cov-fail-under=90
 run packages/otel_mapper  otel-mapper
+run packages/detective_sdk detective-sdk
+run packages/detective_ci  detective-ci
+run packages/detective_cli agent-detective
 run services/ingest       ingest
 run services/api          api
-run services/worker       worker
+run services/worker       agent-detective-worker
 
 echo "All unit suites passed."

@@ -124,6 +124,23 @@ def make_verdict(graph_id: uuid.UUID = GRAPH_ID, **overrides: Any) -> dict[str, 
     return verdict
 
 
+def _sum_cost(runs: list[dict[str, Any]]) -> Decimal | None:
+    """SQL ``SUM(cost_usd)`` semantics: NULLs skipped, all-NULL -> NULL.
+
+    An agent nobody instrumented for cost is unknown-cost, not free, so the
+    fake must not fold it to 0 either — otherwise the suite would keep passing
+    against the very bug the real query was fixed for.
+    """
+    priced = [r["cost_usd"] for r in runs if r["cost_usd"] is not None]
+    return sum(priced) if priced else None
+
+
+def _cost_desc_nulls_last(row: dict[str, Any]) -> tuple:
+    """Ordering key for ``total_cost DESC NULLS LAST``, then agent name."""
+    cost = row["total_cost_usd"]
+    return (cost is None, -(cost if cost is not None else 0), row["agent_name"])
+
+
 class FakeRepository:
     """In-memory stand-in implementing the Repository protocol."""
 
@@ -216,13 +233,14 @@ class FakeRepository:
             rows.append(
                 {
                     "agent_name": agent_name,
-                    "total_cost_usd": sum((r["cost_usd"] or Decimal("0")) for r in agent_runs),
+                    # Mirrors SUM() without coalesce: NULL when nothing priced.
+                    "total_cost_usd": _sum_cost(agent_runs),
                     "run_count": len(agent_runs),
                     "failure_rate": failed / len(agent_runs),
                     "avg_quality_score": (sum(scored) / len(scored)) if scored else None,
                 }
             )
-        rows.sort(key=lambda r: (-r["total_cost_usd"], r["agent_name"]))
+        rows.sort(key=_cost_desc_nulls_last)
         return rows
 
     async def leaderboard_by_version(self) -> list[dict[str, Any]]:
@@ -240,13 +258,13 @@ class FakeRepository:
                     "agent_version": agent_version,
                     "model_name": model_name,
                     "prompt_hash": prompt_hash,
-                    "total_cost_usd": sum((r["cost_usd"] or Decimal("0")) for r in identity_runs),
+                    "total_cost_usd": _sum_cost(identity_runs),
                     "run_count": len(identity_runs),
                     "failure_rate": failed / len(identity_runs),
                     "avg_quality_score": (sum(scored) / len(scored)) if scored else None,
                 }
             )
-        rows.sort(key=lambda r: (-r["total_cost_usd"], r["agent_name"], str(r["agent_version"])))
+        rows.sort(key=lambda r: (*_cost_desc_nulls_last(r), str(r["agent_version"])))
         return rows
 
     async def has_tier1_verdict(self, graph_id: uuid.UUID) -> bool:

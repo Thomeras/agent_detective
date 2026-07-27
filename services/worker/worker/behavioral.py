@@ -27,6 +27,7 @@ import json
 from typing import Any
 
 from .types import AgentStat
+from .narrative import signal
 
 SIGNAL_LOOP_FINGERPRINT = "loop_fingerprint"
 SIGNAL_RETRY_STORM = "retry_storm"
@@ -124,15 +125,10 @@ def loop_fingerprint_signals(tool_calls: list[dict] | None) -> list[dict]:
         if streak >= 2:
             name, sha = _key(entries[index])
             signals.append(
-                {
-                    "name": SIGNAL_LOOP_FINGERPRINT,
-                    "severity": "warn",
-                    "detail": (
-                        f"tool '{name}' called {streak}x consecutively "
-                        "with identical args"
-                    ),
-                    "basis": f"args_sha {sha} repeated",
-                }
+                signal(
+                    SIGNAL_LOOP_FINGERPRINT, "warn", "loop_fingerprint",
+                    tool=name, calls=streak, args_sha=sha,
+                )
             )
         index += streak
     return signals
@@ -156,15 +152,11 @@ def retry_storm_signals(
         if errors == 0:
             continue
         signals.append(
-            {
-                "name": SIGNAL_RETRY_STORM,
-                "severity": "warn",
-                "detail": (
-                    f"tool '{name}' called {len(group)}x with identical args, "
-                    f"{errors} with status=error"
-                ),
-                "basis": f"args_sha {sha}; retry threshold {threshold}",
-            }
+            signal(
+                SIGNAL_RETRY_STORM, "warn", "retry_storm",
+                tool=name, calls=len(group), errors=errors, args_sha=sha,
+                threshold=threshold,
+            )
         )
     return signals
 
@@ -193,18 +185,10 @@ def duplicate_side_effect_signals(
         if marker is None:
             continue
         signals.append(
-            {
-                "name": SIGNAL_DUPLICATE_SIDE_EFFECT,
-                "severity": "fail",
-                "detail": (
-                    f"side-effecting tool '{name}' executed {len(group)}x "
-                    "with identical args"
-                ),
-                "basis": (
-                    f"args_sha {sha}; all {len(group)} calls status=ok; "
-                    f"name matches side-effect marker '{marker}'"
-                ),
-            }
+            signal(
+                SIGNAL_DUPLICATE_SIDE_EFFECT, "fail", "duplicate_side_effect",
+                tool=name, calls=len(group), args_sha=sha, marker=marker,
+            )
         )
     return signals
 
@@ -265,18 +249,10 @@ def tool_args_signals(
         if not valid:
             flagged.add(name)
             signals.append(
-                {
-                    "name": SIGNAL_TOOL_ARGS_INVALID,
-                    "severity": "fail",
-                    "detail": (
-                        f"tool '{name}' called with args violating "
-                        "the registered schema"
-                    ),
-                    "basis": (
-                        f"registered tool_schema for '{name}' "
-                        "(type/required/properties subset check)"
-                    ),
-                }
+                signal(
+                    SIGNAL_TOOL_ARGS_INVALID, "fail", "tool_args_invalid",
+                    tool=name,
+                )
             )
     return signals
 
@@ -338,16 +314,10 @@ def cost_zscore_signals(
         z = (value - mean) / std
         if z >= _ZSCORE_THRESHOLD:
             signals.append(
-                {
-                    "name": signal_name,
-                    "severity": "warn",
-                    "detail": (
-                        f"{metric}={value:g} is {z:.1f}σ above "
-                        f"the rolling mean {mean:g}"
-                    ),
-                    "basis": (
-                        f"baseline n={sample_count}, mean={mean:g}, std={std:g}"
-                    ),
-                }
+                signal(
+                    signal_name, "warn", "metric_outlier",
+                    metric=metric, value=value, z=z, mean=mean, std=std,
+                    sample_count=sample_count,
+                )
             )
     return signals

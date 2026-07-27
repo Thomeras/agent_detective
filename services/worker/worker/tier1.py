@@ -36,16 +36,19 @@ from .judge_client import JudgeClient, judge_json_with_retries
 from .policy import judge_prompts_fingerprint
 from .repository import Repo
 from .scoring import (
+    ARTIFACT_OPAQUE,
+    ARTIFACT_PARTIAL,
+    classify_artifact_visibility,
     evaluate_schema,
     is_degenerate_output,
     load_prompt,
-    opaque_artifact_refs,
     render_prompt,
     truncate_for_judge,
 )
 from .signals import artifact_integrity_signals, check_rules_fingerprint
+from .narrative import render_opaque_deliverable_reason, render_uninspected_media_caveat
 from .store import ObjectStore, resolve_payload
-from .streams import StreamConsumer, StreamPublisher
+from .streams import StreamConsumer, StreamPublisher, reclaim_pending_messages
 from .types import (
     FLAG_ARTIFACT_INTEGRITY,
     FLAG_COST_OVERRUN,
@@ -54,6 +57,8 @@ from .types import (
     FLAG_LOOP_ANOMALY,
     FLAG_REQUIRED_SECTION,
     FLAG_SCHEMA_VIOLATION,
+    FLAG_TERMINAL_FORM,
+    FLAG_UNINSPECTED_MEDIA,
     GROUP_TIER1,
     STREAM_GRAPHS_COMPLETED,
     STREAM_GRAPHS_TIER2,
@@ -63,6 +68,12 @@ from .types import (
 )
 
 logger = logging.getLogger(__name__)
+
+# Ceiling for a terminal verdict reached on a deliverable whose media was never
+# opened. Not a penalty — the text really was read — but 1.0 would assert the
+# whole artifact was verified, and part of it was never seen. Mirrors the
+# engine's convention of capping an attribution whose basis is unobserved.
+_PARTIAL_VERIFICATION_CAP = 0.85
 
 
 def _graph_cost(bundle: GraphBundle) -> float:
@@ -106,24 +117,46 @@ class Tier1Processor:
 
     async def _terminal_judge(
         self, bundle: GraphBundle, terminal_output: str | None
-    ) -> tuple[str, float | None, str | None]:
-        """Return (verdict, score, reasoning); verdict in {ok, bad, not_checkable, error}.
+    ) -> tuple[str, float | None, str | None, dict | None, bool]:
+        """Return (verdict, score, reasoning, form, partial).
+
+        ``verdict`` in {ok, bad, not_checkable, error} and is the CONTENT
+        dimension of the split rubric (substance vs goal); ``form`` is the FORM
+        dimension dict ({"verdict", "requirement", "observed", "reasoning"}) or
+        None when the judge produced none / the deliverable was not visible.
+        ``partial`` is True when the verdict was reached on the deliverable's
+        TEXT while part of what it delivers stayed unopened (images) — the
+        caller records that limit as a soft flag.
 
         ``terminal_output`` must be the DELIVERABLE (see ``deliverable_run``), not
         the orchestrator root's empty output or a verifier's PASS/FAIL verdict.
 
         Honesty guard: if the deliverable content is not actually visible — the
-        payload is empty, or it only *references* a binary artifact (docx/pdf/…)
-        whose text was never embedded — we cannot confirm OR deny the goal.
-        Whatever the LLM guessed is overridden to ``not_checkable``. A confident
-        "the final output is completely empty" over an unseen file is exactly the
-        false-certainty this project exists to prevent.
+        payload is empty, or it only *references* an artifact (a docx/pdf whose
+        text was never embedded, an image that is merely named) — we cannot
+        confirm OR deny the goal. Whatever the LLM guessed is overridden to
+        ``not_checkable``. A confident "the final output is completely empty"
+        over an unseen file is exactly the false-certainty this project exists to
+        prevent.
+
+        The guard is not all-or-nothing, because a multimodal deliverable is not
+        an all-or-nothing object. A dossier whose own text IS present and which
+        embeds its photographs inside itself is graded on the text it actually
+        shows, and the unopened images ride out as a stated limit rather than as
+        a discarded verdict (``ARTIFACT_PARTIAL``). Withholding the whole verdict
+        there was false-uncertainty — the mirror image of the same sin.
         """
         # Deterministic, before trusting any LLM claim about content we may not
         # have shown it.
         if not (terminal_output or "").strip():
-            return "not_checkable", None, "deliverable payload was empty or absent"
-        opaque = opaque_artifact_refs(terminal_output)
+            return (
+                "not_checkable",
+                None,
+                "deliverable payload was empty or absent",
+                None,
+                False,
+            )
+        visibility = classify_artifact_visibility(terminal_output)
 
         root = root_run(bundle)
         graph_input = await self._input_text(root) if root is not None else None
@@ -138,28 +171,73 @@ class Tier1Processor:
         )
         verdict = await judge_json_with_retries(self._judge, prompt)
         if verdict is None:
-            return "error", None, None
-        raw_verdict = verdict.get("verdict")
+            return "error", None, None, None, False
+        # Rubric split: the judge answers {"content": {...}, "form": {...}}.
+        # A legacy flat {"verdict", "score", "reasoning"} response (older
+        # prompt, cassette replay) is accepted as content-only, form None.
+        content = verdict.get("content")
+        if not isinstance(content, dict):
+            content = verdict
+        raw_verdict = content.get("verdict")
         normalized = (
             "bad" if raw_verdict == "bad"
             else "ok" if raw_verdict == "ok"
             else "not_checkable" if raw_verdict == "not_checkable"
             else "error"
         )
-        score = verdict.get("score")
+        score = content.get("score")
         score_val = float(score) if isinstance(score, (int, float)) and not isinstance(score, bool) else None
-        reasoning = verdict.get("reasoning")
+        reasoning = content.get("reasoning")
         reasoning_val = reasoning if isinstance(reasoning, str) else None
+        form_raw = verdict.get("form")
+        form: dict | None = None
+        if isinstance(form_raw, dict) and form_raw.get("verdict") in (
+            "ok",
+            "bad",
+            "not_applicable",
+        ):
+            form = {
+                "verdict": form_raw["verdict"],
+                "requirement": form_raw.get("requirement")
+                if isinstance(form_raw.get("requirement"), str)
+                else None,
+                "observed": form_raw.get("observed")
+                if isinstance(form_raw.get("observed"), str)
+                else None,
+                "reasoning": form_raw.get("reasoning")
+                if isinstance(form_raw.get("reasoning"), str)
+                else None,
+            }
         # Override: the artifact content was never in the payload, so a bad/ok
-        # verdict is a guess about an unopened file. Force not_checkable.
-        if opaque:
+        # verdict is a guess about an unopened file. Force not_checkable — and
+        # drop the form verdict with it (a form judged over an unseen file is
+        # the same guess).
+        if visibility.state == ARTIFACT_OPAQUE:
             return (
                 "not_checkable",
                 None,
-                "deliverable references a file artifact whose content was not "
-                f"embedded ({', '.join(opaque[:3])}) — cannot verify the goal",
+                render_opaque_deliverable_reason(list(visibility.opaque_refs)),
+                None,
+                False,
             )
-        return normalized, score_val, reasoning_val
+        # PARTIAL: the text was read, so the verdict stands — but it was reached
+        # on the text alone. Saying so on the reasoning AND returning the partial
+        # flag keeps "ok" from quietly meaning "the photographs were checked
+        # too"; a verdict on a multimodal deliverable is never a full one.
+        if visibility.state == ARTIFACT_PARTIAL:
+            caveat = render_uninspected_media_caveat(list(visibility.uninspected_refs))
+            reasoning_val = f"{reasoning_val} | {caveat}" if reasoning_val else caveat
+            # ...and the SCORE has to say it too. No text rule separates "here is
+            # the document, illustrated" from "here is my description of the file
+            # I made" — 82 words of claims about an unopened logo satisfy every
+            # structural test a dossier does. So a partial verdict never carries a
+            # full-confidence pass: what was graded is the text, and the pictures
+            # are unseen either way. Capping is the honest move that does not
+            # require guessing which of the two we are looking at.
+            if score_val is not None:
+                score_val = min(score_val, _PARTIAL_VERIFICATION_CAP)
+            return normalized, score_val, reasoning_val, form, True
+        return normalized, score_val, reasoning_val, form, False
 
     async def process(self, graph_id_str: str) -> None:
         graph_id = UUID(graph_id_str)
@@ -276,6 +354,12 @@ class Tier1Processor:
                 if s["name"] not in soft_flags:
                     soft_flags.append(s["name"])
 
+        terminal_form: dict | None = None
+        # Whether the verdict below was reached on the deliverable's text while
+        # part of what it delivers (images) stayed unopened. False by default:
+        # the deterministic branch never issues a partial verdict, it issues a
+        # reproduced fact.
+        terminal_partial = False
         if integrity_fails or section_fails:
             # Deterministic ground truth about the deliverable: the verdict is
             # bad at score 0.0 and the LLM judge is skipped entirely (cost 0,
@@ -289,7 +373,28 @@ class Tier1Processor:
             verdict, score = "bad", 0.0
             reasoning = f"deterministic deliverable check failure: {details}"
         else:
-            verdict, score, reasoning = await self._terminal_judge(bundle, terminal_output)
+            (
+                verdict,
+                score,
+                reasoning,
+                terminal_form,
+                terminal_partial,
+            ) = await self._terminal_judge(bundle, terminal_output)
+
+        # A verdict reached on the text of a deliverable whose photographs were
+        # never opened is a PARTIAL one, and it says so in the persisted flags —
+        # not only in a sentence at the end of the reasoning, which nothing
+        # downstream can key off. SOFT: an illustrated dossier is a normal
+        # deliverable, not an incident, so it must not page tier2 on its own.
+        if terminal_partial and FLAG_UNINSPECTED_MEDIA not in soft_flags:
+            soft_flags.append(FLAG_UNINSPECTED_MEDIA)
+
+        # Rubric split: a bad FORM verdict is a HARD flag of its own — the
+        # deliverable visibly shipped in a form other than the explicitly
+        # requested one. Without it a form-only miss (content ok) reached tier2
+        # only via sampling.
+        if terminal_form is not None and terminal_form.get("verdict") == "bad":
+            flags.append(FLAG_TERMINAL_FORM)
 
         flagged = bool(flags) or verdict == "bad"
         # Soft flags are persisted for evidence/visibility but do not page.
@@ -302,6 +407,7 @@ class Tier1Processor:
                 terminal_judge_verdict=verdict,
                 terminal_judge_score=score,
                 terminal_judge_reasoning=reasoning,
+                terminal_form=terminal_form,
                 flags=flags,
                 flagged=flagged,
                 sampled=sampled,
@@ -370,6 +476,17 @@ async def run_tier1(
     """Consumer loop for ``ad.graphs.completed`` (group ``tier1``)."""
     await consumer.ensure_group(STREAM_GRAPHS_COMPLETED, GROUP_TIER1)
     while stop is None or not stop.is_set():
+        # Reclaim this group's own orphaned pending entries (a worker killed
+        # mid-tier1 before XACK) and reprocess them alongside new messages, so a
+        # graph never sits ingested-but-unanalysed waiting on a manual XADD.
+        reclaimed = await reclaim_pending_messages(
+            consumer,
+            STREAM_GRAPHS_COMPLETED,
+            GROUP_TIER1,
+            settings.consumer_name,
+            settings.reaper_idle_ms,
+            settings.max_deliveries,
+        )
         messages = await consumer.read(
             STREAM_GRAPHS_COMPLETED,
             GROUP_TIER1,
@@ -377,7 +494,7 @@ async def run_tier1(
             settings.stream_batch_size,
             settings.stream_block_ms,
         )
-        for message in messages:
+        for message in reclaimed + messages:
             graph_id = message.data.get("graph_id")
             try:
                 if graph_id:

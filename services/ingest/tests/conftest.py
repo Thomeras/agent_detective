@@ -53,12 +53,13 @@ class FakeRepo:
         self._edge_keys: set[tuple[Any, ...]] = set()
         self.fail_ping = False
 
-    async def upsert_batch(self, batch: IngestBatch) -> None:
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
         for graph in batch.graphs:
             existing = self.graphs.get(graph.graph_id)
             if existing is None:
                 self.graphs[graph.graph_id] = {
                     "graph_id": graph.graph_id,
+                    "graph_type": graph.graph_type,
                     "status": "active",
                     "started_at": graph.started_at,
                     "ended_at": graph.ended_at,
@@ -71,8 +72,13 @@ class FakeRepo:
                 # ON CONFLICT DO UPDATE with NULL-ignoring LEAST/GREATEST.
                 existing["started_at"] = _min_none(existing["started_at"], graph.started_at)
                 existing["ended_at"] = _max_none(existing["ended_at"], graph.ended_at)
+                # coalesce(existing, excluded): keep the first-known cohort key.
+                existing["graph_type"] = existing["graph_type"] or graph.graph_type
         for run in batch.runs:
-            self.runs.setdefault(run.run_id, run)  # ON CONFLICT DO NOTHING
+            if refresh_runs:
+                self.runs[run.run_id] = run  # ON CONFLICT DO UPDATE (re-map)
+            else:
+                self.runs.setdefault(run.run_id, run)  # ON CONFLICT DO NOTHING
         for edge in batch.edges:
             key = (edge.graph_id, edge.from_run_id, edge.to_run_id, edge.type)
             if key not in self._edge_keys:
@@ -83,6 +89,11 @@ class FakeRepo:
 
     def _run_count(self, graph_id: UUID) -> int:
         return sum(1 for r in self.runs.values() if r.graph_id == graph_id)
+
+    async def trace_ids_for_graph(self, graph_id: UUID) -> list[str]:
+        return sorted(
+            {r.trace_id for r in self.runs.values() if r.graph_id == graph_id and r.trace_id}
+        )
 
     async def list_active_graph_activity(self) -> list[GraphActivity]:
         out: list[GraphActivity] = []
@@ -139,6 +150,14 @@ class FakeSpanSink:
 
     async def insert_spans(self, rows: list[SpanRow]) -> None:
         self.rows.extend(rows)
+
+    async def select_spans(self, trace_ids: list[str]) -> list[dict[str, Any]]:
+        # Same row->span reconstruction as the real sink, so tests exercise
+        # the exact storage round-trip (epoch sentinel, stringified kinds).
+        from ingest.spans import _dedupe_latest, mappable_span
+
+        selected = [r for r in self.rows if r.trace_id in set(trace_ids)]
+        return [mappable_span(row) for row in _dedupe_latest(selected)]
 
     async def ping(self) -> None:
         if self.fail_ping:
@@ -202,12 +221,14 @@ class Harness:
         ) as client:
             return await client.post("/v1/traces", json=payload)
 
-    async def post_raw(self, content: bytes) -> httpx.Response:
+    async def post_raw(
+        self, content: bytes, content_type: str = "application/json"
+    ) -> httpx.Response:
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app=self.app), base_url="http://test"
         ) as client:
             return await client.post(
-                "/v1/traces", content=content, headers={"content-type": "application/json"}
+                "/v1/traces", content=content, headers={"content-type": content_type}
             )
 
     async def health(self) -> httpx.Response:

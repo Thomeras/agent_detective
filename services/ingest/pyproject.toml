@@ -15,6 +15,7 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "otel-mapper",
+    "opentelemetry-proto>=1.25",
 ]
 
 [tool.uv.sources]

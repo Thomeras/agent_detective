@@ -45,6 +45,71 @@ def _pick_target(
     return max(cand, key=lambda s: _chron_key(inp, cond.super_nodes[s].exit_node))
 
 
+_INF = float("inf")
+
+
+def _step_key(cond: Condensation, inp: BlameInput, sid: int):
+    """Ordering of one hop: most-degraded first, unknown last, then chronological.
+
+    Preferring the LOWER score picks the branch that actually carried the damage
+    — which is what a propagation path claims to show — and an unknown score is
+    not evidence of propagation, so it sorts behind any measured one.
+    """
+    sn = cond.super_nodes[sid]
+    known = 1 if sn.score is None else 0
+    return (known, sn.score if sn.score is not None else _INF) + _chron_key(
+        inp, sn.exit_node
+    )
+
+
+def _best_path(
+    cond: Condensation, inp: BlameInput, start: int, target: int
+) -> list[int]:
+    """Shortest path start -> target, ties broken DETERMINISTICALLY.
+
+    ``nx.shortest_path`` returns whichever equally-short path its traversal
+    reaches first, which on a diamond (one culprit, two branches, one join)
+    depends on the order the edges were inserted — i.e. on the order the exporter
+    happened to emit spans. The same run then produced two different propagation
+    paths, silently, and every golden fixture, judge cassette and cross-run diff
+    rests on that not happening.
+
+    Ties are broken by ``_step_key``: among equally short paths, the one through
+    the most degraded nodes wins. That is not just a tiebreak — it is the path
+    the report means.
+
+    DP over ``cond.topo`` (already a deterministic topological order): the key is
+    (hops, per-hop keys) compared lexicographically, and extending two prefixes of
+    equal length by the same node preserves their order, so the greedy choice per
+    node is optimal.
+    """
+    # sid -> (hop count, per-hop keys, predecessor on the winning path)
+    best: dict[int, tuple[int, tuple, int | None]] = {start: (0, (), None)}
+    for sid in cond.topo:
+        if sid == start:
+            continue
+        step = _step_key(cond, inp, sid)
+        options = [
+            (best[p][0] + 1, best[p][1] + (step,), p)
+            # Chronological key, not super-node id: ids are assigned in edge
+            # insertion order and are not stable across two encodings of the same
+            # run (see _degradation_chains for the same trap).
+            for p in sorted(
+                cond.dag.predecessors(sid),
+                key=lambda s: _chron_key(inp, cond.super_nodes[s].exit_node),
+            )
+            if p in best
+        ]
+        if options:
+            best[sid] = min(options, key=lambda o: (o[0], o[1]))
+    if target not in best:
+        return [start]
+    path = [target]
+    while path[-1] != start:
+        path.append(best[path[-1]][2])
+    return list(reversed(path))
+
+
 def propagation_path(inp: BlameInput, cond: Condensation, culprit_run_id: str) -> list[str]:
     start = cond.node_to_super.get(culprit_run_id)
     if start is None:
@@ -58,7 +123,7 @@ def propagation_path(inp: BlameInput, cond: Condensation, culprit_run_id: str) -
         if target not in reachable:
             # Disconnected graph: stay within the culprit's component.
             target = _pick_target(cond, inp, reachable_sinks)
-        sids = nx.shortest_path(cond.dag, start, target)
+        sids = _best_path(cond, inp, start, target)
     path: list[str] = []
     for sid in sids:
         path.extend(cond.super_nodes[sid].members)

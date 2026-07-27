@@ -6,7 +6,7 @@ from typing import Literal
 ReportType = Literal["cut_point", "multi_culprit", "composition_failure",
                      "loop_detected", "root_cause_external", "verification_gap",
                      "degraded_recovered", "shipped_with_latent_defect",
-                     "unclassified"]
+                     "terminal_defect_unlocalized", "unclassified"]
 
 
 @dataclass(frozen=True)
@@ -62,6 +62,20 @@ class TerminalVerdict:                     # Tier 1 result
     # the report explains WHY it was discarded instead of blaming
     # instrumentation.
     stale: bool = False
+    # Terminal rubric split: ``bad``/``score``/``reasoning`` above are the
+    # CONTENT dimension only (substance vs goal). The FORM dimension — does the
+    # deliverable's explicitly requested form (format/medium/structure stated in
+    # the initial input) match what shipped — is carried separately so a
+    # format-only miss can never masquerade as a content failure (and vice
+    # versa). ``form_requirement`` is the judge's VERBATIM quote of the
+    # requirement from the initial input — that provenance is what lets the
+    # engine reconcile it against a deterministic contract reference that may be
+    # harness scaffold rather than the user's ask. All default to the pre-split
+    # shape (no form signal) so existing callers are unchanged.
+    form_bad: bool = False
+    form_requirement: str | None = None
+    form_observed: str | None = None
+    form_reasoning: str | None = None
 
 
 @dataclass(frozen=True)
@@ -88,7 +102,7 @@ class BlameInput:
     nodes: list[str]                        # run_ids
     edges: list[tuple[str, str]]            # (from, to); cycles ALLOWED
     scores: dict[str, NodeScore]
-    node_costs: dict[str, float]
+    node_costs: dict[str, float | None]     # None = cost was never instrumented
     node_end_times: dict[str, float]        # epoch s; SCC exit-node + tie-breaks
     agent_names: dict[str, str]
     error_span_ids: dict[str, list[str]]
@@ -203,6 +217,25 @@ class Evidence:                             # worker serializes to JSONB
     # structural attributes + "primary" archetype. Presentational only — it
     # never drives verdicts, confidence, culprits or candidacy.
     topology: dict = field(default_factory=dict)
+    # --- Schema-2 typed layers (verdict refactor §2.5, dual-write) ----------
+    # ``schema`` gates the renderer: legacy (schema 1) reports keep rendering
+    # through the old path; schema-2 reports carry the typed streams below
+    # ALONGSIDE the legacy fields during migration. ``findings`` are the typed
+    # facts (serialize_finding dicts), ``defects`` the interpreted faults
+    # (serialize_defect dicts), each referencing findings by index. These are
+    # produced as a PROJECTION of the same verdict the legacy fields describe.
+    schema: int = 1
+    findings: list[dict] = field(default_factory=list)
+    defects: list[dict] = field(default_factory=list)
+    # The TYPED originals of ``notes`` and ``candidacy`` (verdict refactor §2.4,
+    # "no unsupported sentence"). Decision code emits these records; the
+    # narrative templates render the string forms above from them, once. A
+    # consumer that needs to branch on a note reads ``note_records`` — the slug
+    # and its payload are stable data, the sentence is a render artifact and
+    # must never be parsed back. Each note: {"slug", "data"}; each candidacy
+    # entry: run_id -> {"verdict", "data"}.
+    note_records: list[dict] = field(default_factory=list)
+    candidacy_records: dict[str, dict] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -212,5 +245,5 @@ class BlameReport:
     propagation_path: list[str]
     confidence: float
     evidence: Evidence
-    downstream_cost_usd: float
+    downstream_cost_usd: float | None       # None = no affected node priced it
     unscored_run_ids: list[str]

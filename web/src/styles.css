@@ -1141,3 +1141,200 @@ a:hover {
   align-items: baseline;
   gap: 8px;
 }
+
+/* ============================================================
+ * Track B — verdict-first run detail (schema-2)
+ * Leads with the verdict banner + defect cards; the graph canvas is a
+ * supporting visual below. All tone colours come from the shared --ad-tone-*
+ * helpers (tokens.css, loaded via ui/primitives), so this reads identically to
+ * the primitives.
+ * ============================================================ */
+
+.verdict-region {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-bottom: 20px;
+}
+
+.verdict-banner {
+  border: 1px solid var(--ad-tone-border, var(--border));
+  border-left: 4px solid var(--ad-tone-fg, var(--accent));
+  background: var(--ad-tone-bg, var(--bg-elev));
+  border-radius: 8px;
+  padding: 14px 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.verdict-banner-head {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.verdict-sentence {
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text);
+}
+.verdict-defect-lines {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.verdict-defect-lines li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.verdict-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: var(--ad-tone-fg, var(--text-faint));
+  flex: 0 0 auto;
+}
+
+/* Defect cards grid — the primary object. Responsive: multi-column on wide
+ * screens, single column when narrow (or when a card needs the width). */
+.defect-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(340px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.defect-card-wrap {
+  cursor: pointer;
+  border-radius: var(--ad-radius-lg, 8px);
+  outline: none;
+  min-width: 0;
+}
+.defect-card-wrap.selected .ad-card {
+  box-shadow: 0 0 0 2px var(--ad-tone-fg, var(--accent));
+}
+.defect-card-wrap:focus-visible .ad-card {
+  box-shadow: 0 0 0 2px var(--accent);
+}
+.defect-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.defect-sentence {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+}
+.defect-caveats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.defect-propagation {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.defect-propagation-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+.defect-propagation-path {
+  font-size: 13px;
+  color: var(--text);
+}
+.defect-propagation-path .path-arrow {
+  color: var(--text-faint);
+}
+
+/* Chip rows in the runs list + card headers. */
+.chip-row {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* Findings inside a defect card (behind the Disclosure), grouped by ref
+   polarity: supporting / counter-evidence / context. */
+.finding-group {
+  margin-bottom: 12px;
+}
+.finding-group:last-child {
+  margin-bottom: 0;
+}
+.finding-group-label {
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-bottom: 6px;
+}
+.finding-list {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.finding-row {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border-soft);
+}
+.finding-list .finding-row:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+.finding-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.finding-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text);
+}
+.finding-subject {
+  font-size: 12px;
+}
+.finding-certainty {
+  margin-left: auto;
+  font-size: 12px;
+}
+.finding-quote {
+  margin: 0;
+  padding: 4px 10px;
+  border-left: 2px solid var(--border);
+  color: var(--text-dim);
+  font-style: italic;
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.finding-basis {
+  overflow-wrap: anywhere;
+}
+.finding-data {
+  margin: 0;
+  display: grid;
+  grid-template-columns: minmax(80px, auto) 1fr;
+  gap: 2px 12px;
+  font-size: 12px;
+}
+.finding-data-row {
+  display: contents;
+}
+.finding-data-row dt {
+  color: var(--text-faint);
+}
+.finding-data-row dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}

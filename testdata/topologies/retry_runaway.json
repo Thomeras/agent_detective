@@ -1,0 +1,519 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "topology-corpus"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "detective_sdk.otel"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "orchestrator"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"goal\": \"Iterate the summary until the reviewer accepts\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000030000000000",
+              "kind": 1,
+              "name": "orchestrator",
+              "parentSpanId": "",
+              "spanId": "0000000000000001",
+              "startTimeUnixNano": "1752000000000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_1"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 1, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 1, \"format\": \"markdown\", \"text\": \"Revision 1 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001500000000",
+              "kind": 1,
+              "name": "revise_1",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000002",
+              "startTimeUnixNano": "1752000001000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 2, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 2, \"format\": \"markdown\", \"text\": \"Revision 2 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002500000000",
+              "kind": 1,
+              "name": "revise_2",
+              "parentSpanId": "0000000000000002",
+              "spanId": "0000000000000003",
+              "startTimeUnixNano": "1752000002000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_3"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 3, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 3, \"format\": \"markdown\", \"text\": \"Revision 3 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003500000000",
+              "kind": 1,
+              "name": "revise_3",
+              "parentSpanId": "0000000000000003",
+              "spanId": "0000000000000004",
+              "startTimeUnixNano": "1752000003000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_4"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 4, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 4, \"format\": \"markdown\", \"text\": \"Revision 4 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000004500000000",
+              "kind": 1,
+              "name": "revise_4",
+              "parentSpanId": "0000000000000004",
+              "spanId": "0000000000000005",
+              "startTimeUnixNano": "1752000004000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_5"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 5, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 5, \"format\": \"markdown\", \"text\": \"Revision 5 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000005500000000",
+              "kind": 1,
+              "name": "revise_5",
+              "parentSpanId": "0000000000000005",
+              "spanId": "0000000000000006",
+              "startTimeUnixNano": "1752000005000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_6"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 6, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 6, \"format\": \"markdown\", \"text\": \"Revision 6 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000006500000000",
+              "kind": 1,
+              "name": "revise_6",
+              "parentSpanId": "0000000000000006",
+              "spanId": "0000000000000007",
+              "startTimeUnixNano": "1752000006000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_7"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 7, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 7, \"format\": \"markdown\", \"text\": \"Revision 7 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000007500000000",
+              "kind": 1,
+              "name": "revise_7",
+              "parentSpanId": "0000000000000007",
+              "spanId": "0000000000000008",
+              "startTimeUnixNano": "1752000007000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_8"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 8, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 8, \"format\": \"markdown\", \"text\": \"Revision 8 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000008500000000",
+              "kind": 1,
+              "name": "revise_8",
+              "parentSpanId": "0000000000000008",
+              "spanId": "0000000000000009",
+              "startTimeUnixNano": "1752000008000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_9"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 9, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 9, \"format\": \"markdown\", \"text\": \"Revision 9 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000009500000000",
+              "kind": 1,
+              "name": "revise_9",
+              "parentSpanId": "0000000000000009",
+              "spanId": "000000000000000a",
+              "startTimeUnixNano": "1752000009000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_10"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 10, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 10, \"format\": \"markdown\", \"text\": \"Revision 10 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000010500000000",
+              "kind": 1,
+              "name": "revise_10",
+              "parentSpanId": "000000000000000a",
+              "spanId": "000000000000000b",
+              "startTimeUnixNano": "1752000010000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise_11"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 11, \"format\": \"markdown\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"attempt\": 11, \"format\": \"markdown\", \"text\": \"Revision 11 of the summary.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000011500000000",
+              "kind": 1,
+              "name": "revise_11",
+              "parentSpanId": "000000000000000b",
+              "spanId": "000000000000000c",
+              "startTimeUnixNano": "1752000011000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "handoff_revise_11"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "revise_11"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"target\": \"revise_11\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001300000000",
+              "kind": 1,
+              "name": "handoff_revise_11",
+              "parentSpanId": "0000000000000002",
+              "spanId": "000000000000000d",
+              "startTimeUnixNano": "1752000001200000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3b3"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

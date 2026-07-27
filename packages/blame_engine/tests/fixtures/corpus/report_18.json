@@ -1,0 +1,372 @@
+{
+  "label": "bad",
+  "defects": [
+    {
+      "kind": "contract",
+      "origin": {
+        "kind": "Localized",
+        "run_id": "e9d8b787-72aa-5381-abaf-d89f609e1866"
+      },
+      "channel": "deterministic",
+      "recovered": false,
+      "propagation": [
+        "4212bc75-073f-5903-88d3-50c2d9553d9f"
+      ],
+      "base_assumed": false,
+      "finding_refs": [
+        {
+          "ref": 10,
+          "role": "supporting"
+        },
+        {
+          "ref": 12,
+          "role": "context"
+        },
+        {
+          "ref": 14,
+          "role": "supporting"
+        },
+        {
+          "ref": 15,
+          "role": "context"
+        }
+      ],
+      "unverified_in_channel": null,
+      "attribution_confidence": 0.95,
+      "observability_boundary": false,
+      "observation_confidence": 0.95
+    },
+    {
+      "kind": "form",
+      "origin": {
+        "kind": "Localized",
+        "run_id": "e9d8b787-72aa-5381-abaf-d89f609e1866"
+      },
+      "channel": "deterministic",
+      "recovered": false,
+      "propagation": [],
+      "base_assumed": false,
+      "finding_refs": [
+        {
+          "ref": 10,
+          "role": "supporting"
+        },
+        {
+          "ref": 12,
+          "role": "supporting"
+        },
+        {
+          "ref": 13,
+          "role": "context"
+        },
+        {
+          "ref": 14,
+          "role": "supporting"
+        },
+        {
+          "ref": 15,
+          "role": "context"
+        }
+      ],
+      "unverified_in_channel": null,
+      "attribution_confidence": null,
+      "observability_boundary": false,
+      "observation_confidence": null
+    }
+  ],
+  "findings": [
+    {
+      "data": {
+        "agent": "think",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:e9d8b787-72aa-5381-abaf-d89f609e1866",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "flag": "missing_required_content",
+        "agent": "think"
+      },
+      "kind": "content_flag",
+      "channel": "judged",
+      "subject": "run:e9d8b787-72aa-5381-abaf-d89f609e1866",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "flag": "ignored_instruction",
+        "agent": "think"
+      },
+      "kind": "content_flag",
+      "channel": "judged",
+      "subject": "run:e9d8b787-72aa-5381-abaf-d89f609e1866",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "act",
+        "score": 0.9272727272727272
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:9f6ddeb5-c97f-5476-9270-f0b0f89e84e3",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "render",
+        "score": 1.0
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:4212bc75-073f-5903-88d3-50c2d9553d9f",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "qa",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:a28ee849-fbc5-595c-9954-9fa82ad28d0d",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "flag": "factual_error",
+        "agent": "qa"
+      },
+      "kind": "content_flag",
+      "channel": "judged",
+      "subject": "run:a28ee849-fbc5-595c-9954-9fa82ad28d0d",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "qa"
+      },
+      "kind": "input_flawed",
+      "channel": "judged",
+      "subject": "run:a28ee849-fbc5-595c-9954-9fa82ad28d0d",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "eval",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:695d270c-e388-5700-a2b3-c33ca291f539",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "eval"
+      },
+      "kind": "input_flawed",
+      "channel": "judged",
+      "subject": "run:695d270c-e388-5700-a2b3-c33ca291f539",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "agent": "think",
+        "value": "docx"
+      },
+      "kind": "contract_breach",
+      "channel": "deterministic",
+      "subject": "run:e9d8b787-72aa-5381-abaf-d89f609e1866",
+      "fact_key": "contract:file_type",
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "input_contract:file_type",
+        "detail": "input/output diff on a carried parameter"
+      }
+    },
+    {
+      "data": {
+        "bad": false,
+        "score": 1.0,
+        "stale": false,
+        "checkable": true,
+        "reasoning": "The visible output provides a comprehensive and coherent quarterly report for the fictional company Acme for Q2 2026, including key financial metrics, performance analysis, and strategic recommendations, all of which align with the initial request."
+      },
+      "kind": "terminal_content",
+      "channel": "judged",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 0.8,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "tier1 terminal judge (content rubric)",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "bad": true,
+        "value": "pdf",
+        "observed": "markdown text",
+        "reasoning": "The initial input explicitly requested a PDF, but the output is presented in markdown format instead.",
+        "requirement": "jako PDF"
+      },
+      "kind": "terminal_form",
+      "channel": "judged",
+      "subject": "terminal",
+      "fact_key": "contract:file_type",
+      "certainty": 0.8,
+      "provenance": {
+        "kind": "UserRequest",
+        "quote": "jako PDF",
+        "source": "initial_input"
+      }
+    },
+    {
+      "data": {
+        "reason": "no verifier charter in this graph covers form/contract vision (verifier charters cover content)",
+        "dimension": "form"
+      },
+      "kind": "detection_gap",
+      "channel": "judged",
+      "subject": "graph",
+      "fact_key": null,
+      "certainty": 0.6,
+      "provenance": {
+        "kind": "HarnessState",
+        "detail": "verifier charter roster"
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "basis": "artifact path 'output/report_20260724_075838.md' ends '.md'",
+        "deliverable_run_id": "4212bc75-073f-5903-88d3-50c2d9553d9f"
+      },
+      "kind": "breach_propagated",
+      "channel": "deterministic",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "contract_propagation:file_type",
+        "detail": "artifact path 'output/report_20260724_075838.md' ends '.md'"
+      }
+    },
+    {
+      "data": {
+        "values": [
+          "docx",
+          "pdf"
+        ],
+        "fact_key": "contract:file_type",
+        "reported_by": [
+          "run:e9d8b787-72aa-5381-abaf-d89f609e1866",
+          "terminal"
+        ],
+        "finding_refs": [
+          10,
+          12
+        ]
+      },
+      "kind": "requirement_provenance",
+      "channel": "deterministic",
+      "subject": "graph",
+      "fact_key": "contract:file_type",
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "HarnessState",
+        "detail": "reconcile pass over shared fact_key"
+      }
+    }
+  ],
+  "graph_id": "76f71161-681a-55df-9fe6-9af575553c18",
+  "report_id": 18,
+  "confidence": 0.95,
+  "report_type": "shipped_with_latent_defect",
+  "culprit_run_ids": [
+    "e9d8b787-72aa-5381-abaf-d89f609e1866"
+  ],
+  "environment": {
+    "judge_model": "openai/gpt-4o-mini",
+    "judge_endpoint": "https://openrouter.ai/api/v1",
+    "temperature": 0,
+    "judge_seed": null,
+    "tier2_check_rules_hash": "944ee758f3a5",
+    "recorded_at": "2026-07-24",
+    "note": "Byte-stable structured outputs (20/20 on graph A) are a property of THIS stack, not a guaranteed hosted-API behaviour — a broken exact assert against these cassettes means 'environment changed', not 'engine regression'. Compare cross-pass only under equal prompt hashes.",
+    "tier1_judge_prompt_hash": "68929138eb39",
+    "tier1_rubric": "split"
+  }
+}

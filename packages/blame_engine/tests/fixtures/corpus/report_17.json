@@ -1,0 +1,340 @@
+{
+  "label": "bad",
+  "defects": [
+    {
+      "kind": "contract",
+      "origin": {
+        "kind": "Localized",
+        "run_id": "2a9f8d4d-526f-5e19-a5ee-8745e28ca580"
+      },
+      "channel": "deterministic",
+      "recovered": false,
+      "propagation": [
+        "9c9d7bf4-9f29-561c-8046-de038d5de4ce"
+      ],
+      "base_assumed": false,
+      "finding_refs": [
+        {
+          "ref": 8,
+          "role": "supporting"
+        },
+        {
+          "ref": 10,
+          "role": "context"
+        },
+        {
+          "ref": 12,
+          "role": "supporting"
+        },
+        {
+          "ref": 13,
+          "role": "context"
+        }
+      ],
+      "unverified_in_channel": null,
+      "attribution_confidence": 0.95,
+      "observability_boundary": false,
+      "observation_confidence": 0.95
+    },
+    {
+      "kind": "form",
+      "origin": {
+        "kind": "Localized",
+        "run_id": "2a9f8d4d-526f-5e19-a5ee-8745e28ca580"
+      },
+      "channel": "deterministic",
+      "recovered": false,
+      "propagation": [],
+      "base_assumed": false,
+      "finding_refs": [
+        {
+          "ref": 8,
+          "role": "supporting"
+        },
+        {
+          "ref": 10,
+          "role": "supporting"
+        },
+        {
+          "ref": 11,
+          "role": "context"
+        },
+        {
+          "ref": 12,
+          "role": "supporting"
+        },
+        {
+          "ref": 13,
+          "role": "context"
+        }
+      ],
+      "unverified_in_channel": null,
+      "attribution_confidence": null,
+      "observability_boundary": false,
+      "observation_confidence": null
+    }
+  ],
+  "findings": [
+    {
+      "data": {
+        "agent": "think",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:2a9f8d4d-526f-5e19-a5ee-8745e28ca580",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "flag": "missing_required_content",
+        "agent": "think"
+      },
+      "kind": "content_flag",
+      "channel": "judged",
+      "subject": "run:2a9f8d4d-526f-5e19-a5ee-8745e28ca580",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "act",
+        "score": 0.9272727272727272
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:5a491bdc-54af-50b8-a59f-5327313a634f",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "render",
+        "score": 1.0
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:9c9d7bf4-9f29-561c-8046-de038d5de4ce",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "qa",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:be887e10-9b3e-5b6f-9832-18c2fa9bd592",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "qa"
+      },
+      "kind": "input_flawed",
+      "channel": "judged",
+      "subject": "run:be887e10-9b3e-5b6f-9832-18c2fa9bd592",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "eval",
+        "score": 0.5636363636363637
+      },
+      "kind": "content_score",
+      "channel": "judged",
+      "subject": "run:a0adb432-c1d7-5711-b953-cc7b86e8d422",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "agent": "eval"
+      },
+      "kind": "input_flawed",
+      "channel": "judged",
+      "subject": "run:a0adb432-c1d7-5711-b953-cc7b86e8d422",
+      "fact_key": null,
+      "certainty": 0.7,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "per-node quality judge",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "agent": "think",
+        "value": "docx"
+      },
+      "kind": "contract_breach",
+      "channel": "deterministic",
+      "subject": "run:2a9f8d4d-526f-5e19-a5ee-8745e28ca580",
+      "fact_key": "contract:file_type",
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "input_contract:file_type",
+        "detail": "input/output diff on a carried parameter"
+      }
+    },
+    {
+      "data": {
+        "bad": false,
+        "score": 1.0,
+        "stale": false,
+        "checkable": true,
+        "reasoning": "The visible output provides a comprehensive and coherent quarterly report for the fictional company Acme for Q2 2026, including key financial metrics, operational analysis, and future outlook, all of which align with the initial request."
+      },
+      "kind": "terminal_content",
+      "channel": "judged",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 0.8,
+      "provenance": {
+        "kind": "JudgePrompt",
+        "detail": "tier1 terminal judge (content rubric)",
+        "prompt": ""
+      }
+    },
+    {
+      "data": {
+        "bad": true,
+        "value": "pdf",
+        "observed": "markdown text",
+        "reasoning": "The initial input explicitly requested a PDF, but the output is presented in markdown format instead.",
+        "requirement": "jako PDF"
+      },
+      "kind": "terminal_form",
+      "channel": "judged",
+      "subject": "terminal",
+      "fact_key": "contract:file_type",
+      "certainty": 0.8,
+      "provenance": {
+        "kind": "UserRequest",
+        "quote": "jako PDF",
+        "source": "initial_input"
+      }
+    },
+    {
+      "data": {
+        "reason": "no verifier charter in this graph covers form/contract vision (verifier charters cover content)",
+        "dimension": "form"
+      },
+      "kind": "detection_gap",
+      "channel": "judged",
+      "subject": "graph",
+      "fact_key": null,
+      "certainty": 0.6,
+      "provenance": {
+        "kind": "HarnessState",
+        "detail": "verifier charter roster"
+      }
+    },
+    {
+      "data": {
+        "to": "md",
+        "key": "file_type",
+        "from": "docx",
+        "basis": "artifact path 'output/report_20260724_075746.md' ends '.md'",
+        "deliverable_run_id": "9c9d7bf4-9f29-561c-8046-de038d5de4ce"
+      },
+      "kind": "breach_propagated",
+      "channel": "deterministic",
+      "subject": "terminal",
+      "fact_key": null,
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "RuleFingerprint",
+        "rule": "contract_propagation:file_type",
+        "detail": "artifact path 'output/report_20260724_075746.md' ends '.md'"
+      }
+    },
+    {
+      "data": {
+        "values": [
+          "docx",
+          "pdf"
+        ],
+        "fact_key": "contract:file_type",
+        "reported_by": [
+          "run:2a9f8d4d-526f-5e19-a5ee-8745e28ca580",
+          "terminal"
+        ],
+        "finding_refs": [
+          8,
+          10
+        ]
+      },
+      "kind": "requirement_provenance",
+      "channel": "deterministic",
+      "subject": "graph",
+      "fact_key": "contract:file_type",
+      "certainty": 1.0,
+      "provenance": {
+        "kind": "HarnessState",
+        "detail": "reconcile pass over shared fact_key"
+      }
+    }
+  ],
+  "graph_id": "f5ab0db4-e28e-51a0-a200-aff84542030d",
+  "report_id": 17,
+  "confidence": 0.95,
+  "report_type": "shipped_with_latent_defect",
+  "culprit_run_ids": [
+    "2a9f8d4d-526f-5e19-a5ee-8745e28ca580"
+  ],
+  "environment": {
+    "judge_model": "openai/gpt-4o-mini",
+    "judge_endpoint": "https://openrouter.ai/api/v1",
+    "temperature": 0,
+    "judge_seed": null,
+    "tier2_check_rules_hash": "944ee758f3a5",
+    "recorded_at": "2026-07-24",
+    "note": "Byte-stable structured outputs (20/20 on graph A) are a property of THIS stack, not a guaranteed hosted-API behaviour — a broken exact assert against these cassettes means 'environment changed', not 'engine regression'. Compare cross-pass only under equal prompt hashes.",
+    "tier1_judge_prompt_hash": "68929138eb39",
+    "tier1_rubric": "split"
+  }
+}

@@ -133,9 +133,83 @@ def test_non_json_body_rejected(harness: Harness) -> None:
     assert response.status_code == 400
 
 
+def _fixture_as_protobuf(payload: dict) -> bytes:
+    """Encode an OTLP/JSON fixture as a protobuf ExportTraceServiceRequest.
+
+    Ids flip from the fixture's hex to protobuf bytes (JSON mapping: base64),
+    so posting this exercises the hex re-encoding in otlp_protobuf.
+    """
+    import base64
+    import copy
+
+    from google.protobuf.json_format import ParseDict
+    from opentelemetry.proto.collector.trace.v1.trace_service_pb2 import (
+        ExportTraceServiceRequest,
+    )
+
+    payload = copy.deepcopy(payload)
+    for resource_spans in payload.get("resourceSpans") or []:
+        for scope_spans in resource_spans.get("scopeSpans") or []:
+            for span in scope_spans.get("spans") or []:
+                for key in ("traceId", "spanId", "parentSpanId"):
+                    if span.get(key):
+                        span[key] = base64.b64encode(bytes.fromhex(span[key])).decode()
+    message = ParseDict(payload, ExportTraceServiceRequest(), ignore_unknown_fields=True)
+    return message.SerializeToString()
+
+
+def test_protobuf_body_maps_identically_to_json(harness: Harness) -> None:
+    """The protobuf wire format must land on the SAME graph/run/edge rows as
+    OTLP/JSON — in particular the uuid5 ids, which hash the hex span ids."""
+    payload = load_fixture("spawn_pipeline.json")
+    json_harness = Harness()
+    asyncio.run(json_harness.post_traces(payload))
+
+    response = asyncio.run(
+        harness.post_raw(
+            _fixture_as_protobuf(payload), content_type="application/x-protobuf"
+        )
+    )
+
+    assert response.status_code == 200
+    assert response.json() == {}
+    assert set(harness.repo.graphs) == set(json_harness.repo.graphs)
+    assert set(harness.repo.runs) == set(json_harness.repo.runs)
+    assert {(e.from_run_id, e.to_run_id, e.type) for e in harness.repo.edges} == {
+        (e.from_run_id, e.to_run_id, e.type) for e in json_harness.repo.edges
+    }
+    # Identity/payload extraction survives the conversion, not just ids.
+    for run_id, run in json_harness.repo.runs.items():
+        got = harness.repo.runs[run_id]
+        assert got.agent_name == run.agent_name
+        assert got.input_inline == run.input_inline
+        assert got.output_inline == run.output_inline
+
+
+def test_corrupt_protobuf_body_rejected(harness: Harness) -> None:
+    response = asyncio.run(
+        harness.post_raw(b"\xff\xff\xffgarbage", content_type="application/x-protobuf")
+    )
+    assert response.status_code == 400
+
+
 def test_non_object_json_rejected(harness: Harness) -> None:
     response = asyncio.run(harness.post_traces([1, 2, 3]))
     assert response.status_code == 400
+
+
+def test_contract_params_attribute_lands_on_the_run_row(harness: Harness) -> None:
+    payload = load_fixture("spawn_pipeline.json")
+    opener = payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0]
+    opener["attributes"].append(
+        {
+            "key": "agent_detective.contract_params",
+            "value": {"stringValue": '{"file_type": "pdf"}'},
+        }
+    )
+    asyncio.run(harness.post_traces(payload))
+    run = harness.repo.runs[run_id_from_key(ORCHESTRATOR_KEY)]
+    assert run.contract_params == '{"file_type": "pdf"}'
 
 
 def test_empty_payload_is_a_noop(harness: Harness) -> None:
@@ -145,3 +219,62 @@ def test_empty_payload_is_a_noop(harness: Harness) -> None:
     assert harness.repo.graphs == {}
     assert harness.repo.runs == {}
     assert harness.sink.rows == []
+
+
+def _agent_payload(trace_id: str, resource_attrs: list[dict]) -> dict:
+    """Minimal ExportTraceServiceRequest: one AGENT span under one resource."""
+    return {
+        "resourceSpans": [
+            {
+                "resource": {"attributes": resource_attrs},
+                "scopeSpans": [
+                    {
+                        "spans": [
+                            {
+                                "traceId": trace_id,
+                                "spanId": "00000000000000a1",
+                                "name": "node.run",
+                                "kind": 1,
+                                "startTimeUnixNano": "1752000000000000000",
+                                "endTimeUnixNano": "1752000001000000000",
+                                "attributes": [
+                                    {
+                                        "key": "openinference.span.kind",
+                                        "value": {"stringValue": "AGENT"},
+                                    }
+                                ],
+                            }
+                        ]
+                    }
+                ],
+            }
+        ]
+    }
+
+
+def test_graph_type_is_populated_from_resource_service_name(harness: Harness) -> None:
+    trace_id = "aaaa0000000000000000000000000001"
+    payload = _agent_payload(
+        trace_id,
+        [{"key": "service.name", "value": {"stringValue": "generative-simon"}}],
+    )
+
+    response = asyncio.run(harness.post_traces(payload))
+
+    assert response.status_code == 200
+    graph = harness.repo.graphs[graph_id_from_str(trace_id)]
+    assert graph["graph_type"] == "generative-simon"
+
+
+def test_graph_type_is_none_without_resource_service_name(harness: Harness) -> None:
+    trace_id = "aaaa0000000000000000000000000002"
+    payload = _agent_payload(
+        trace_id,
+        [{"key": "telemetry.sdk.name", "value": {"stringValue": "opentelemetry"}}],
+    )
+
+    response = asyncio.run(harness.post_traces(payload))
+
+    assert response.status_code == 200
+    graph = harness.repo.graphs[graph_id_from_str(trace_id)]
+    assert graph["graph_type"] is None

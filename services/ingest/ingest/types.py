@@ -10,26 +10,33 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from uuid import NAMESPACE_URL, UUID, uuid5
+from uuid import UUID
+
+# Re-exported: the uuid5 derivation moved next to the keys it hashes
+# (otel_mapper.ids) so ingest and the local-mode CLI cannot drift into
+# assigning different ids to the same span.
+from otel_mapper import graph_id_from_str, run_id_from_key
+
+__all__ = [
+    "STREAM_GRAPHS_COMPLETED",
+    "SUMMARY_CHARS",
+    "EdgeRow",
+    "GraphActivity",
+    "GraphRow",
+    "IngestBatch",
+    "FinalizeResult",
+    "RunRow",
+    "SpanRow",
+    "StoredPayload",
+    "graph_id_from_str",
+    "run_id_from_key",
+]
 
 # Redis stream the finalizer publishes to (build spec section 4.1).
 STREAM_GRAPHS_COMPLETED = "ad.graphs.completed"
 
 # Length of the derived input/output summaries kept for UI display.
 SUMMARY_CHARS = 500
-
-
-def run_id_from_key(run_key: str) -> UUID:
-    """Deterministic ``agent_runs.run_id`` for an otel_mapper ``run_key``.
-
-    uuid5 makes redelivery of the same spans upsert idempotently.
-    """
-    return uuid5(NAMESPACE_URL, run_key)
-
-
-def graph_id_from_str(graph_id: str) -> UUID:
-    """Deterministic ``execution_graphs.graph_id`` for a mapper graph id."""
-    return uuid5(NAMESPACE_URL, graph_id)
 
 
 @dataclass(frozen=True)
@@ -45,6 +52,11 @@ class SpanRow:
     end_time: datetime
     attributes: str  # raw JSON attributes payload
     status_code: str
+    # Flattened OTLP resource attributes (JSON object). Stored so the
+    # finalization re-map can rebuild the exact map_spans input — without it,
+    # re-mapped runs would lose resource-derived identity (agent name,
+    # service.name graph_type, model).
+    resource_attributes: str = "{}"
 
 
 @dataclass(frozen=True)
@@ -62,6 +74,10 @@ class GraphRow:
     graph_id: UUID
     started_at: datetime | None
     ended_at: datetime | None
+    # Cohort key (execution_graphs.graph_type): the OTLP resource service.name
+    # of the graph's runs, e.g. "generative-simon". None when the resource
+    # carried no service.name.
+    graph_type: str | None = None
 
 
 @dataclass(frozen=True)
@@ -77,6 +93,7 @@ class RunRow:
     tool_schema_hash: str | None  # agent_detective.tool_schema_hash identity attribute
     artifact_meta: str | None  # raw agent_detective.artifact_meta opener-span attribute
     tool_calls: str | None  # compact JSON digest of the run's TOOL spans (mapper-derived)
+    contract_params: str | None  # raw agent_detective.contract_params opener-span attribute
     trace_id: str
     status: str  # 'ok' | 'failed' (schema also allows 'degraded', set downstream)
     input_inline: str | None

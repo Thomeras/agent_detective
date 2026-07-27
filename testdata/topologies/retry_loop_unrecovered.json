@@ -1,0 +1,253 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "topology-corpus"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "detective_sdk.otel"
+          },
+          "spans": [
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "orchestrator"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"goal\": \"Draft and revise the launch note\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000009000000000",
+              "kind": 1,
+              "name": "orchestrator",
+              "parentSpanId": "",
+              "spanId": "0000000000000001",
+              "startTimeUnixNano": "1752000000000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "draft"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"goal\": \"Draft and revise the launch note\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"text\": \"# Launch note\\n\\nFirst pass, thin on detail.\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000002000000000",
+              "kind": 1,
+              "name": "draft",
+              "parentSpanId": "0000000000000001",
+              "spanId": "0000000000000002",
+              "startTimeUnixNano": "1752000001000000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "qa"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"text\": \"# Launch note\\n\\nFirst pass, thin on detail.\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"notes\": \"Needs the availability paragraph and a closing line.\", \"verdict\": \"reject\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000003000000000",
+              "kind": 1,
+              "name": "qa",
+              "parentSpanId": "0000000000000002",
+              "spanId": "0000000000000003",
+              "startTimeUnixNano": "1752000002100000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "revise"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"markdown\", \"notes\": \"Needs the availability paragraph and a closing line.\", \"verdict\": \"reject\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"html\", \"text\": \"<h1>Launch note</h1><p>Second pass with availability.</p>\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000004000000000",
+              "kind": 1,
+              "name": "revise",
+              "parentSpanId": "0000000000000003",
+              "spanId": "0000000000000004",
+              "startTimeUnixNano": "1752000003100000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "handoff_revise"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "revise"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"target\": \"revise\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000001600000000",
+              "kind": 1,
+              "name": "handoff_revise",
+              "parentSpanId": "0000000000000002",
+              "spanId": "0000000000000005",
+              "startTimeUnixNano": "1752000001500000000",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            },
+            {
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "publish"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "{\"format\": \"html\", \"text\": \"<h1>Launch note</h1><p>Second pass with availability.</p>\"}"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "{\"channel\": \"blog\", \"document\": \"<h1>Launch note</h1><p>Second pass with availability.</p>\"}"
+                  }
+                }
+              ],
+              "endTimeUnixNano": "1752000005000000000",
+              "kind": 1,
+              "name": "publish",
+              "parentSpanId": "0000000000000004",
+              "spanId": "0000000000000006",
+              "startTimeUnixNano": "1752000004099999999",
+              "status": {
+                "code": 1
+              },
+              "traceId": "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

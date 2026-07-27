@@ -6,6 +6,7 @@ accepted input shapes, run/edge keying, and the correlation-header
 limitation.
 """
 
+from .ids import graph_id_from_str, run_id_from_key
 from .mapper import flatten_export_request, map_spans
 from .types import AgentRunCandidate, EdgeCandidate, EdgeType, MappingResult
 
@@ -17,6 +18,8 @@ __all__ = [
     "EdgeType",
     "MappingResult",
     "flatten_export_request",
+    "graph_id_from_str",
     "map_spans",
+    "run_id_from_key",
     "__version__",
 ]

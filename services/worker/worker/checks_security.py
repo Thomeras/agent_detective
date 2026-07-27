@@ -18,6 +18,7 @@ import json
 import math
 import re
 from urllib.parse import parse_qsl, urlsplit
+from .narrative import signal
 
 SIGNAL_SENSITIVE_DATA_EXPOSURE = "sensitive_data_exposure"
 SIGNAL_PROMPT_INJECTION_SIGNATURE = "prompt_injection_signature"
@@ -125,15 +126,10 @@ def sensitive_data_signals(text: str | None) -> list[dict]:
             record("high-entropy token (possible secret)", token)
 
     return [
-        {
-            "name": SIGNAL_SENSITIVE_DATA_EXPOSURE,
-            "severity": "warn",
-            "detail": f"{kind} detected",
-            "basis": (
-                f"{kind} pattern match; value REDACTED "
-                f"(first 4 chars '{value[:4]}…')"
-            ),
-        }
+        signal(
+            SIGNAL_SENSITIVE_DATA_EXPOSURE, "warn", "sensitive_data",
+            kind=kind, prefix=value[:4],
+        )
         for kind, value in hits.items()
     ]
 
@@ -194,11 +190,9 @@ def injection_signature_signals(text: str | None) -> list[dict]:
             break
 
     return [
-        {
-            "name": SIGNAL_PROMPT_INJECTION_SIGNATURE,
-            "severity": "warn",
-            "detail": f"injection signature '{signature}' present",
-            "basis": "literal/unicode pattern match",
-        }
+        signal(
+            SIGNAL_PROMPT_INJECTION_SIGNATURE, "warn", "prompt_injection",
+            signature=signature,
+        )
         for signature in matched
     ]

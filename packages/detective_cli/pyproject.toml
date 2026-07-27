@@ -1,0 +1,67 @@
+[project]
+name = "agent-detective"
+version = "0.1.0"
+description = "Blame analysis for multi-agent runs: read an OTEL trace, name where quality broke"
+authors = [{ name = "Tomáš Jeřábek" }]
+readme = "README.md"
+requires-python = ">=3.12"
+# BUSL-1.1 is the SPDX identifier for the Business Source License 1.1 (BSL-1.0
+# is Boost's, an entirely different licence — do not "fix" this to BSL).
+license = "BUSL-1.1"
+license-files = ["LICENSE"]
+keywords = ["otel", "opentelemetry", "llm", "agents", "observability", "blame", "tracing"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Topic :: Software Development :: Quality Assurance",
+    "Topic :: System :: Monitoring",
+]
+# No database, no broker, no object store: the pipeline runs in-process against
+# worker.memory. `worker` core is deliberately installed WITHOUT its [server]
+# extra — see services/worker/pyproject.toml.
+dependencies = [
+    "blame-engine",
+    "otel-mapper",
+    # The tier1/tier2 processors, without the [server] extra: no database, no
+    # broker, no object store (see services/worker/pyproject.toml).
+    "agent-detective-worker",
+    # Instrumentation helpers. Strictly the AGENT side, not the analysis side —
+    # but shipping it here means `pip install agent-detective` covers the whole
+    # quickstart (instrument a run, then analyse it) with one install. It is
+    # pure stdlib, so it costs the CLI nothing.
+    "detective-sdk",
+]
+
+[project.scripts]
+detective = "detective_cli.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/Thomeras/agent_detective"
+
+[tool.uv.sources]
+blame-engine = { workspace = true }
+otel-mapper = { workspace = true }
+agent-detective-worker = { workspace = true }
+detective-sdk = { workspace = true }
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+# The distribution is `agent-detective` (what users install) but the import
+# package is `detective_cli` (what they import), so hatchling cannot infer it.
+[tool.hatch.build.targets.wheel]
+packages = ["detective_cli"]
+
+[tool.hatch.build.targets.sdist]
+include = ["detective_cli", "tests", "README.md", "LICENSE"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]

@@ -164,7 +164,12 @@ def load_fixture(path: str | Path) -> BlameInput:
         nodes=nodes,
         edges=[tuple(e) for e in data["edges"]],
         scores={n: _node_score(n, raw_scores.get(n)) for n in nodes},
-        node_costs={n: float(costs.get(n, 1.0)) for n in nodes},
+        # An explicit null means "cost was never instrumented" (distinct from a
+        # zero); float(None) would have crashed the fixture loader.
+        node_costs={
+            n: (None if costs.get(n, 1.0) is None else float(costs.get(n, 1.0)))
+            for n in nodes
+        },
         node_end_times={
             n: float(end_times.get(n, float(i))) for i, n in enumerate(nodes)
         },

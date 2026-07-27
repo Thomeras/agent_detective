@@ -14,6 +14,27 @@ contradictory, or containing fabricated/incorrect facts the agent could not be
 expected to fix). If the input was flawed, set `input_flawed` to true; the
 agent should not be blamed for faithfully processing bad input.
 
+**The input is material, not a checklist.** In a pipeline the INPUT is mostly
+the PREVIOUS step's output — records, counts, collected data, a handoff. That
+is what this node works WITH; it is not a list of things this node's output has
+to contain. Requirements come from three places only: an explicit instruction
+or request in the input, the ROLE stated above, and the original goal the input
+carries. The mere presence of a field upstream never makes it required
+downstream.
+
+So `missing_required_content` means the node omitted something it was ASKED for,
+or something its ROLE obliges it to produce — never that its output does not
+repeat its predecessor's. Each step in a chain ADDS a different facet; a step
+that correctly adds only its own facet is complete, not incomplete. Writing
+"does not include <a field that came from the previous step>" about a node whose
+role never covered that field is the same category error as judging a planner
+for not containing the deliverable.
+
+An honestly empty result is not automatically a defect either. When a node's job
+is to look something up and nothing exists, reporting nothing found IS correct
+work — say so rather than scoring it as a failure. Penalize an empty result only
+when the thing was demonstrably available and the node missed it.
+
 **Judge the work, never the agent's claims about its work.** Statements like
 "produced a complete and correct document" are worthless as evidence — verify
 them against what is actually visible. When the OUTPUT contains an embedded
@@ -90,3 +111,13 @@ node to write. That plan is CORRECT — score it 0.9+ with no flags. Writing
 overview" about a PLANNER is a category error: the plan was never supposed to
 include it. The criticism (and the flag) belong to the DELIVERABLE PRODUCER if
 the final artifact lacks the overview.
+
+Worked example (calibration): an INTERMEDIATE PRODUCER whose job is to add
+ownership data receives, as its input, the previous step's collected documents
+and financial records. Its output contains ownership relations and nothing else.
+That is CORRECT — the financial records were material it worked from, not a
+requirement placed on it. "Does not include the requested financial data" is a
+category error here, and `missing_required_content` does not apply. If that same
+node returns no ownership relations because the registry genuinely lists none,
+say it found none and score the work on its own terms — an empty lookup result
+is not the same as a failed step.

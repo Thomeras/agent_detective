@@ -7,6 +7,7 @@ the verdict.
 """
 
 from blame_engine import find_blame
+from conftest import note_of
 from blame_engine.topology import classify_topology
 
 
@@ -178,11 +179,7 @@ def test_find_blame_disconnected_note_without_verdict_change(mk) -> None:
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["b"]
     assert report.evidence.topology["primary"] == "disconnected"
-    note = next(
-        n for n in report.evidence.notes if n.startswith("topology:")
-    )
-    assert "2 weakly-connected components" in note
-    assert "Enable A2A detection or instrument SPAWN/TOOL edges" in note
+    assert note_of(report, "topology")["components"] == 2
 
 
 def test_find_blame_connected_graph_has_no_topology_note(mk) -> None:
@@ -194,4 +191,4 @@ def test_find_blame_connected_graph_has_no_topology_note(mk) -> None:
     report = find_blame(inp)
 
     assert report.evidence.topology["primary"] == "pipeline"
-    assert not any(n.startswith("topology:") for n in report.evidence.notes)
+    assert note_of(report, "topology") is None

@@ -38,6 +38,18 @@ jobs:
         working-directory: packages/otel_mapper
         run: uv run --package otel-mapper pytest tests
 
+      - name: detective_sdk
+        working-directory: packages/detective_sdk
+        run: uv run --package detective-sdk pytest tests
+
+      - name: detective_ci
+        working-directory: packages/detective_ci
+        run: uv run --package detective-ci pytest tests
+
+      - name: detective_cli (agent-detective, the pip distribution)
+        working-directory: packages/detective_cli
+        run: uv run --package agent-detective pytest tests
+
       - name: ingest
         working-directory: services/ingest
         run: uv run --package ingest pytest tests
@@ -48,7 +60,72 @@ jobs:
 
       - name: worker
         working-directory: services/worker
-        run: uv run --package worker pytest tests
+        run: uv run --package agent-detective-worker pytest tests
+
+  distribution:
+    name: pip distribution (build + clean install)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Build agent-detective and its workspace dependencies
+        run: |
+          set -e
+          for pkg in blame-engine otel-mapper agent-detective-worker agent-detective; do
+            uv build --package "$pkg"
+          done
+          ls -l dist/
+
+      # The regression this job exists for: `worker` (the old distribution
+      # name) is taken on PyPI by an unrelated project, and pip merges the
+      # index with --find-links, so a clean install silently resolved the
+      # dependency to a stranger's 2018 release. Installing WITHOUT --no-index
+      # is deliberate — it is the only way to catch that class of collision.
+      - name: Install into a clean environment
+        run: |
+          set -e
+          python -m venv /tmp/clean
+          /tmp/clean/bin/pip install --find-links dist agent-detective
+          /tmp/clean/bin/pip list --format=freeze | tee /tmp/installed.txt
+
+      - name: Assert no server-only dependency leaked into the local install
+        # Local mode must install without a database, broker or object store;
+        # if one of these appears, the worker's [server] extra has leaked into
+        # its core dependencies.
+        run: |
+          set -e
+          for forbidden in sqlalchemy asyncpg redis minio; do
+            if grep -qi "^${forbidden}==" /tmp/installed.txt; then
+              echo "::error::${forbidden} was installed into the local-mode environment"
+              exit 1
+            fi
+          done
+
+      - name: Analyse the recorded demo traces with the installed console script
+        run: |
+          set -e
+          /tmp/clean/bin/detective --version
+          # The faulted trace's injected fault is a hallucination, which only
+          # the judged channel can see; with no judge configured the honest
+          # answer is NOT VERIFIED, and --fail-on-unverified must say so.
+          /tmp/clean/bin/detective analyze testdata/demo_pipeline_faulted.json | tee /tmp/out.txt
+          grep -q "NOT VERIFIED" /tmp/out.txt
+          if /tmp/clean/bin/detective analyze testdata/demo_pipeline_faulted.json \
+               --fail-on-unverified > /dev/null; then
+            echo "::error::--fail-on-unverified should have exited non-zero"
+            exit 1
+          fi
+
+      - name: Upload distributions
+        uses: actions/upload-artifact@v4
+        with:
+          name: dist
+          path: dist/
 
   e2e:
     name: End-to-end acceptance

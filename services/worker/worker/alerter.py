@@ -14,7 +14,7 @@ from typing import Any, Protocol
 
 from .config import Settings
 from .repository import Repo
-from .streams import StreamConsumer
+from .streams import StreamConsumer, reclaim_pending_messages
 from .types import GROUP_ALERTERS, STREAM_INCIDENTS_CREATED, AlertContext
 
 logger = logging.getLogger(__name__)
@@ -122,6 +122,17 @@ async def run_alerter(
     """Consumer loop for ``ad.incidents.created`` (group ``alerters``)."""
     await consumer.ensure_group(STREAM_INCIDENTS_CREATED, GROUP_ALERTERS)
     while stop is None or not stop.is_set():
+        # Reclaim orphaned pending entries (worker killed before XACK) so a
+        # committed incident still gets its notification; alerting only fires on
+        # is_new, so replaying a reclaimed message does not re-notify.
+        reclaimed = await reclaim_pending_messages(
+            consumer,
+            STREAM_INCIDENTS_CREATED,
+            GROUP_ALERTERS,
+            settings.consumer_name,
+            settings.reaper_idle_ms,
+            settings.max_deliveries,
+        )
         messages = await consumer.read(
             STREAM_INCIDENTS_CREATED,
             GROUP_ALERTERS,
@@ -129,7 +140,7 @@ async def run_alerter(
             settings.stream_batch_size,
             settings.stream_block_ms,
         )
-        for message in messages:
+        for message in reclaimed + messages:
             try:
                 await alerter.process(message.data)
             except Exception:

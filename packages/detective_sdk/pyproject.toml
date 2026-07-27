@@ -2,8 +2,25 @@
 name = "detective-sdk"
 version = "0.1.0"
 description = "Universal, dependency-free instrumentation helpers for Agent Detective conventions"
+authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
+# BUSL-1.1 is the SPDX identifier for the Business Source License 1.1 (BSL-1.0
+# is Boost's, an entirely different licence — do not "fix" this to BSL).
+license = "BUSL-1.1"
+# Zero dependencies is a feature, not an oversight: instrumentation runs inside
+# the agent's own process, so it must not drag a judge, a database or the
+# OpenTelemetry SDK in with it.
 dependencies = []
+
+[project.urls]
+Homepage = "https://github.com/Thomeras/agent_detective"
+
+[project.optional-dependencies]
+# For `detective_sdk.otel.collect`, which attaches to an existing tracer
+# provider. Anyone who needs that bridge already has the SDK installed — the
+# extra just makes the requirement explicit. The module itself imports OTel
+# lazily and its transforms are testable without it.
+otel = ["opentelemetry-sdk>=1.20"]
 
 [dependency-groups]
 dev = [

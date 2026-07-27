@@ -212,3 +212,52 @@ async def reap_dead_letters(
             entry.delivery_count,
         )
     return moved
+
+
+async def reclaim_pending_messages(
+    consumer: StreamConsumer,
+    stream: str,
+    group: str,
+    consumer_name: str,
+    min_idle_ms: int,
+    max_deliveries: int,
+    count: int = 100,
+) -> list[StreamMessage]:
+    """Re-deliver this group's OWN orphaned pending entries for reprocessing.
+
+    The consumer loop reads only new (``>``) messages and ``reap_dead_letters``
+    only acts once an entry has been redelivered MORE than ``max_deliveries``
+    times. A message that was delivered exactly once and then abandoned — the
+    worker was killed after XREADGROUP but before XACK — therefore matches
+    NEITHER path and sits pending forever, leaving its graph ingested but never
+    analysed (the top "detective doesn't work" cause). This helper is pure
+    orchestration over the same XPENDING/XCLAIM primitives the reaper uses: it
+    claims each stale entry (idle >= ``min_idle_ms``) whose delivery count is
+    still within the reaper's budget back to ``consumer_name`` and returns it,
+    so the caller reprocesses it exactly like a freshly-read message — no fresh
+    XADD required.
+
+    Cooperates with the reaper by partitioning the pending set on delivery
+    count: entries OVER ``max_deliveries`` are left for the reaper to DLQ, and
+    XCLAIM bumps the delivery count on every reclaim, so a message that keeps
+    failing still escalates to the DLQ instead of being reclaimed forever.
+    Reprocessing is idempotent (tier1 upserts by graph_id, tier2 claims by
+    dedup_key), so replaying a reclaimed message is safe.
+    """
+    reclaimed: list[StreamMessage] = []
+    for entry in await consumer.pending(stream, group, min_idle_ms, count=count):
+        if entry.delivery_count > max_deliveries:
+            continue  # poison: the reaper owns it, not us
+        message = await consumer.claim(
+            stream, group, consumer_name, entry.id, min_idle_ms
+        )
+        if message is None:
+            continue  # entry vanished between XPENDING and XCLAIM
+        reclaimed.append(message)
+        logger.info(
+            "reclaimed orphaned pending %s from %s (delivery %d) for reprocessing",
+            entry.id,
+            stream,
+            entry.delivery_count,
+        )
+    return reclaimed
