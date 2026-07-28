@@ -391,6 +391,9 @@ use:
 
 **Production notes.**
 
+- **Alerting**: set `SLACK_WEBHOOK_URL` and every new incident is posted to
+  Slack with the verdict and the named culprit — this is the "PagerDuty"
+  part. Empty (the default) logs alerts to the worker console instead.
 - Set `AUDIT_HMAC_KEY` (api **and** worker, same value) — the default is
   `dev-insecure-key`.
 - `TIER2_SAMPLE_PCT` controls how many un-flagged graphs get full per-node

@@ -151,6 +151,17 @@ capped, split confidence (observation × attribution). What the trace did not
 capture, no analysis can manufacture — absent evidence renders `unverified`,
 never `ok`.
 
+## Runtime vs. analysis — how the pieces fit
+
+Your agent's process needs only **`detective-sdk`** (25 KiB, zero
+dependencies): it emits the trace and never computes anything. The verdict
+happens wherever **`agent-detective`** is installed — your laptop, CI, or the
+deployed stack — and that one install brings the whole analysis side with it
+(`otel-mapper` span mapping, `agent-detective-worker` pipeline,
+`blame-engine` verdicts, the CLI). `detective-ci` is a separate, opt-in
+install because it registers a pytest plugin. Details per distribution:
+[docs/usage.md §4.4](docs/usage.md#44-packages-and-distributions).
+
 ## Repository layout
 
 ```

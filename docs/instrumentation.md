@@ -81,6 +81,26 @@ sure the exporter is the HTTP/JSON one (`http/json`), not gRPC or protobuf.
 That is the entire integration. Everything else — building the execution graph,
 scoring nodes, and blame analysis — happens server-side from the spans you send.
 
+### Already running an OpenTelemetry Collector?
+
+Fan the same spans out to Agent Detective without touching your apps — add one
+exporter to the collector config. Ingest accepts OTLP/HTTP in both wire
+formats, so the stock `otlphttp` exporter (protobuf) works as-is:
+
+```yaml
+exporters:
+  otlphttp/agent-detective:
+    endpoint: http://<ingest-host>:8001
+
+service:
+  pipelines:
+    traces:
+      exporters: [<your-existing-exporter>, otlphttp/agent-detective]
+```
+
+Your existing tracing backend keeps receiving everything it already does;
+Agent Detective just becomes one more consumer of the same stream.
+
 ## Nothing instrumented yet? `detective-sdk`
 
 Everything above assumes you already emit OTEL spans. If you do not, the
