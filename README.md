@@ -40,7 +40,6 @@ detective analyze trace.json
 | Understand the system design | [docs/architecture.md](docs/architecture.md) |
 | What it can and cannot claim today | [docs/capabilities.md](docs/capabilities.md), [docs/trace-requirements.md](docs/trace-requirements.md) |
 | The pip distribution's own manual | [packages/detective_cli/README.md](packages/detective_cli/README.md) |
-| Benchmark against Who&When failure attribution | [benchmarks/whoandwhen/README.md](benchmarks/whoandwhen/README.md) |
 
 ## Quickstart — one run, zero infrastructure
 

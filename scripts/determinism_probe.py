@@ -20,9 +20,9 @@ Usage:
 Exit codes: 0 = verdicts 100% stable, 1 = verdicts varied, 2 = inconclusive
 (no blame report ever landed / usage error).
 
-Stdlib-only on purpose, mirroring tests/e2e/test_acceptance.py and
-benchmarks/whoandwhen/adapter/client.py. The API base URL defaults to
-$E2E_API_URL (same env var as the e2e suite), then http://localhost:8000.
+Stdlib-only on purpose, mirroring tests/e2e/test_acceptance.py. The API base
+URL defaults to $E2E_API_URL (same env var as the e2e suite), then
+http://localhost:8000.
 """
 
 from __future__ import annotations
@@ -50,7 +50,7 @@ class ProbeError(RuntimeError):
     pass
 
 
-# --- HTTP (stdlib, same shape as benchmarks/whoandwhen/adapter/client.py) ---
+# --- HTTP (stdlib) ---
 
 
 def _request(method: str, url: str, body: dict[str, Any] | None = None, timeout: float = 30.0) -> Any:
