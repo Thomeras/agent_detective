@@ -7,10 +7,11 @@
 > ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
 > Self-hosting stays free. [**Watch releases →**](https://github.com/Thomeras/agent_detective/releases) to be first to know.
 
-**PagerDuty for multi-agent systems.** Ingest standard OpenTelemetry traces,
-rebuild the execution graph, and name the first node where quality broke —
-the culprit, the propagation path, and the downstream cost. OTEL-native:
-any OpenInference / OpenLLMetry instrumented agent works with no code change.
+**An eval framework for multi-agent systems that names the culprit.** Ingest
+standard OpenTelemetry traces, rebuild the execution graph, and find the
+first node where quality broke — the origin, the propagation path, and the
+downstream cost. OTEL-native: any OpenInference / OpenLLMetry instrumented
+agent works with no code change.
 
 ```bash
 pip install agent-detective
