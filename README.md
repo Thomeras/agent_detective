@@ -109,13 +109,14 @@ Deterministic signals
   fail contract_violation (marketing_writer) price: $12/user/month → from $5/user/month
 ```
 
-Point the same script at the full stack and the graph appears in the web UI:
+Point the same script at the full stack and the graph appears in the web UI —
+culprit ring on `marketing_writer`, propagation path into `press_editor`:
 
 ```bash
 AGENT_DETECTIVE_ENDPOINT=http://localhost:8001 python examples/diamond_eval.py --inject
 ```
 
-<!-- TODO(screenshot): web UI graph view of the injected diamond run -->
+![The injected diamond run in the web UI: culprit ring on marketing_writer, propagation path into press_editor](docs/img/diamond-eval-graph.png)
 
 ## Full stack — continuous ingest, inbox, history
 
