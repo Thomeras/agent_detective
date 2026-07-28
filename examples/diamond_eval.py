@@ -1,33 +1,14 @@
-"""Eval for a diamond topology: one shared ancestor, two branches, one join.
-
-    spec_extractor ──> tech_writer ──────┐
-                  └──> marketing_writer ─┴──> press_editor
-
-The topology mirrors `05_diamond` from the agent_topo_db catalog: a spec
-extractor feeds two independent writers whose sections a press editor merges.
-The agents here are deterministic stubs so the example runs offline — swap
-their bodies for real model calls; the instrumentation does not change.
-
-What the eval demonstrates, with no LLM judge involved:
-
-- each writer declares the facts it was handed as a *contract*
-  (`span.contract(...)`); the deterministic channel catches a silently
-  rewritten value and names the branch that rewrote it — not the editor who
-  merged it downstream;
-- the verdict is produced by the same `analyze()` the CLI runs, imported as a
-  library, and the process exit code gates CI.
-
-Run:
-
-    python examples/diamond_eval.py             # healthy run -> exit 0
-    python examples/diamond_eval.py --inject    # marketing rewrites the price
-                                                # -> cut_point, exit 1
-
-To see the graph in the web UI instead, point the SDK at a running stack:
-
-    AGENT_DETECTIVE_ENDPOINT=http://localhost:8001 \
-        python examples/diamond_eval.py --inject
-"""
+# Diamond-topology eval (05_diamond in the agent_topo_db catalog):
+#
+#   spec_extractor --> tech_writer ------+
+#                 \--> marketing_writer -+--> press_editor
+#
+#   python examples/diamond_eval.py             # healthy run -> exit 0
+#   python examples/diamond_eval.py --inject    # marketing rewrites the price -> exit 1
+#   AGENT_DETECTIVE_ENDPOINT=http://localhost:8001 python examples/diamond_eval.py --inject
+#
+# The agents are offline stubs — swap their bodies for real model calls,
+# the instrumentation stays the same.
 
 from __future__ import annotations
 
@@ -48,8 +29,6 @@ Pricing: Team $12/user/month, Enterprise on request.
 Availability: September 1, 2026, EU regions.
 """
 
-
-# -- the agents (deterministic stubs; replace with model calls) --------------- #
 
 def extract_facts(doc: str) -> dict:
     return {
@@ -74,8 +53,7 @@ def write_tech(facts: dict) -> dict:
 
 
 def write_marketing(facts: dict, inject: bool) -> dict:
-    # The injected fault: marketing "improves" the price on its own.
-    price = "from $5/user/month" if inject else facts["price"]
+    price = "from $5/user/month" if inject else facts["price"]  # the injected fault
     return {
         "section": (
             f"Say goodbye to sync conflicts: {facts['product']} keeps every team "
@@ -87,48 +65,43 @@ def write_marketing(facts: dict, inject: bool) -> dict:
 
 
 def edit_release(tech: dict, marketing: dict) -> dict:
-    # The editor trusts marketing's pricing line — the breach ships.
     return {
         "title": "Atlas Sync 2.0: two-way sync, 20x faster",
         "release": f"{marketing['section']}\n\n{tech['section']}",
-        "price": marketing["price"],
+        "price": marketing["price"],  # the editor trusts marketing — the breach ships
         "availability": tech["availability"],
     }
 
 
-# -- the instrumented run ----------------------------------------------------- #
-
 def run_pipeline(inject: bool, trace_file: str | None) -> None:
-    with run("press-diamond", task=TASK, trace_file=trace_file) as r:
-        with r.step("spec_extractor", input=PRODUCT_DOC) as s:
+    with run("press-diamond", task=TASK, trace_file=trace_file) as r:  # root carries the original ask
+        with r.step("spec_extractor", input=PRODUCT_DOC) as s:  # pipeline node
             facts = extract_facts(PRODUCT_DOC)
-            s.output = facts
+            s.output = facts  # the work, not {"ok": true}
             s.cost(usd=0.004, tokens_in=1_200, tokens_out=150, model="gpt-4o-mini")
 
         arms = []
-        with r.branch("tech_writer", input=facts) as s:
+        with r.branch("tech_writer", input=facts) as s:  # fan-out arm
             tech = write_tech(facts)
-            s.contract(price=facts["price"], availability=facts["availability"])
+            s.contract(price=facts["price"], availability=facts["availability"])  # a silent rewrite = deterministic breach
             s.output = tech
             s.cost(usd=0.006, tokens_in=900, tokens_out=280, model="gpt-4o-mini")
             arms.append(s)
 
-        with r.branch("marketing_writer", input=facts) as s:
+        with r.branch("marketing_writer", input=facts) as s:  # fan-out arm
             marketing = write_marketing(facts, inject)
             s.contract(price=facts["price"], availability=facts["availability"])
             s.output = marketing
             s.cost(usd=0.006, tokens_in=900, tokens_out=310, model="gpt-4o-mini")
             arms.append(s)
 
-        with r.join("press_editor", arms) as s:
+        with r.join("press_editor", arms) as s:  # fan-in reading both arms
             s.output = edit_release(tech, marketing)
             s.cost(usd=0.03, tokens_in=2_400, tokens_out=600, model="gpt-4o")
 
 
-# -- the eval: same pipeline the CLI runs, as a library ----------------------- #
-
 def evaluate(trace_path: Path) -> int:
-    from detective_cli import analyze, bundles_from_exports, load_trace
+    from detective_cli import analyze, bundles_from_exports, load_trace  # same pipeline the CLI runs
 
     result = analyze(bundles_from_exports(load_trace(trace_path)))
     for graph in result.graphs:
@@ -137,23 +110,20 @@ def evaluate(trace_path: Path) -> int:
             graph.agent_names.get(str(rid), str(rid))
             for rid in report.get("culprit_run_ids", [])
         ]
-        print(f"graph {str(graph.graph_id)[:8]}: ", end="")
-        if graph.clean:
-            print("clean")
-        else:
-            print(f"{report.get('report_type')} — culprit: {', '.join(culprits)}")
-    return 0 if result.clean else 1
+        line = "clean" if graph.clean else f"{report.get('report_type')} — culprit: {', '.join(culprits)}"
+        print(f"graph {str(graph.graph_id)[:8]}: {line}")
+    return 0 if result.clean else 1  # exit 1 on incident = a CI gate
 
 
 def main() -> int:
-    parser = argparse.ArgumentParser(description=__doc__)
+    parser = argparse.ArgumentParser()
     parser.add_argument("--inject", action="store_true", help="marketing rewrites the price")
     args = parser.parse_args()
 
     endpoint = os.environ.get("AGENT_DETECTIVE_ENDPOINT")
     trace_file = os.environ.get("AGENT_DETECTIVE_TRACE_FILE")
     if not endpoint and not trace_file:
-        trace_file = "diamond_run.json"  # default: self-contained local eval
+        trace_file = "diamond_run.json"
 
     run_pipeline(args.inject, trace_file)
 
