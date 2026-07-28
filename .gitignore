@@ -34,3 +34,6 @@ docs/verdict-refactor-plan.md
 harnesses/
 
 # NOTE: uv.lock is intentionally committed for reproducible builds.
+
+# Interni pracovni poznamky (pokracovani)
+speed_upgrade.md
