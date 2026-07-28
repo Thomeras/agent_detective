@@ -4,6 +4,9 @@
 [![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
 
+> ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
+> Self-hosting stays free. [**Watch releases →**](https://github.com/Thomeras/agent_detective/releases) to be first to know.
+
 **PagerDuty for multi-agent systems.** Ingest standard OpenTelemetry traces,
 rebuild the execution graph, and name the first node where quality broke —
 the culprit, the propagation path, and the downstream cost. OTEL-native:
