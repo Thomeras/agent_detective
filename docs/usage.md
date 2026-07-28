@@ -291,12 +291,29 @@ To analyze a run that has not been captured yet, use `detective capture`
 ### 2.2 Turning on the per-node judge
 
 The deterministic channel is always on. The judged channel needs a model —
-any OpenAI-compatible endpoint:
+any OpenAI-compatible `/v1` endpoint works, so pick your provider and model:
+
+| Provider | `JUDGE_BASE_URL` | `JUDGE_MODEL` | `JUDGE_API_KEY` |
+|---|---|---|---|
+| OpenAI | `https://api.openai.com/v1` | `gpt-4o-mini` (any) | `sk-…` |
+| OpenRouter | `https://openrouter.ai/api/v1` | `openai/gpt-4o-mini` (any model id) | `sk-or-…` |
+| Ollama (local, free) | `http://localhost:11434/v1` | `qwen2.5`, `llama3.1:8b`, … | not needed |
+| Bundled mock (compose) | `http://mock-llm:8080/v1` | `mock` | not needed |
 
 ```bash
+# hosted model:
+JUDGE_BASE_URL=https://api.openai.com/v1 JUDGE_MODEL=gpt-4o-mini \
+  JUDGE_API_KEY=sk-... detective analyze run.json
+
+# local Ollama, no API key:
 JUDGE_BASE_URL=http://localhost:11434/v1 JUDGE_MODEL=qwen2.5 \
-  detective analyze run.json            # e.g. local Ollama
+  detective analyze run.json
 ```
+
+For the **full stack**, put the same three variables into `.env` next to
+`docker-compose.yml` (start from `.env.example`) and restart the worker
+(`docker compose up -d worker`) — the deployed judge is configured the same
+way as the local one.
 
 With no judge configured, nodes report **unscored** rather than passing, and
 the report says plainly that the judged channel was off. `--no-judge` forces

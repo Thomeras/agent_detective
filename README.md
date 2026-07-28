@@ -71,8 +71,10 @@ with run("intel", task=user_request) as r:
 
 No database, no broker, and by default no LLM: the deterministic evidence
 channel needs nothing but the trace. Set `JUDGE_BASE_URL` / `JUDGE_MODEL`
-(any OpenAI-compatible endpoint) to also turn on the per-node quality judge —
-without it, nodes report *unscored*, never silently "fine".
+(any OpenAI-compatible endpoint — OpenAI, OpenRouter, local Ollama; concrete
+configs in [docs/usage.md](docs/usage.md#22-turning-on-the-per-node-judge)) to
+also turn on the per-node quality judge — without it, nodes report *unscored*,
+never silently "fine".
 
 ## Example: catch a fault in a diamond topology
 
