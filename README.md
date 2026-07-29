@@ -7,14 +7,8 @@
 > ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
 > Self-hosting stays free. [**Watch releases →**](https://github.com/Thomeras/agent_detective/releases) to be first to know.
 
-> ### 🧪 Beta — the analysis is real, the verdicts are not frozen
-> Everything documented here works and is tested. What is not yet stable is the
-> **wording of the answer**: classifications and report shapes still change
-> between minor versions. 0.2.0 reclassified a run that 0.1.0 had called
-> `loop_detected` — same trace, different verdict, because the loop check had
-> been counting the wrong thing. Gate CI on the **exit code** (`0` clean, `1`
-> incident, `2` could not run), which is stable, rather than on an exact
-> `report_type`, until this notice goes away. See [CHANGELOG.md](CHANGELOG.md).
+> ### 🧪 Beta — the analysis is real, its wording is not frozen
+> Classifications still move between minor versions ([0.2.0 reclassified what 0.1.0 called `loop_detected`](CHANGELOG.md)), so gate CI on the **exit code** — `0` clean, `1` incident, `2` could not run — never on an exact `report_type`.
 
 **An eval framework for multi-agent systems that names the culprit.** Ingest
 standard OpenTelemetry traces, rebuild the execution graph, and find the
