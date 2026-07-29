@@ -1,0 +1,11 @@
+{
+  "topology": "12_supervisor_multi_subagents",
+  "task": "Priprav release notes pro verzi 4.2.",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": null,
+  "target_agent": null,
+  "injections_applied": 0,
+  "expect_incident": false,
+  "recorded_at": "2026-07-29T10:45:42+00:00"
+}

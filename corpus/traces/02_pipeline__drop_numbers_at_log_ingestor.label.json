@@ -1,0 +1,11 @@
+{
+  "topology": "02_pipeline",
+  "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": "drop_numbers",
+  "target_agent": "log_ingestor",
+  "injections_applied": 1,
+  "expect_incident": true,
+  "recorded_at": "2026-07-29T10:46:16+00:00"
+}

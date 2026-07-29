@@ -6,6 +6,10 @@
   "fault": null,
   "target_agent": null,
   "injections_applied": 0,
-  "expect_incident": false,
-  "recorded_at": "2026-07-29T09:17:16+00:00"
+  "expect_incident": true,
+  "recorded_at": "2026-07-29T09:17:16+00:00",
+  "fault_origin": "not injected — produced live by the topology itself",
+  "ground_truth_origin": "partner_feed_adapter",
+  "verified_by": "arithmetic against the source feed in topologies/22_join_external_adapter/main.py",
+  "note": "partner_feed_adapter ran the PERCENTAGES through the exchange rate: 340 bp is 3.40% and it emitted 1.38 (= 3.40/2.46); 180 bp is 1.80% and it emitted 0.73 (= 1.80/2.46). Revenue is wrong too — 184300 EUR x 24.6 is 4533780, it emitted 4538580. Nobody injected this; the model did it. A genuine unit cross-contamination at the boundary node, which is the exact failure this topology exists to produce."
 }

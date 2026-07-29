@@ -46,7 +46,11 @@ dev = [
     # `uv sync --no-dev` and have no business installing a test corpus — as a
     # runtime dependency it broke every image build, because their build context
     # does not include corpus/.
-    "agent-detective-corpus",
+    # [record] pulls the FOREIGN project's runtime (openai, dotenv), which the
+    # recorder drives in-process. Recording is a dev activity, so the dev group
+    # is what should carry its needs — without the extra here every `uv run`
+    # resync quietly removed openai and the recorder died on import.
+    "agent-detective-corpus[record]",
     # Needed to author and validate the migrations under db/.
     "alembic>=1.13",
     "sqlalchemy>=2.0",

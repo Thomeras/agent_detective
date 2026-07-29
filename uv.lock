@@ -130,7 +130,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
-    { name = "agent-detective-corpus" },
+    { name = "agent-detective-corpus", extra = ["record"] },
     { name = "alembic" },
     { name = "pytest" },
     { name = "sqlalchemy" },
@@ -150,7 +150,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
-    { name = "agent-detective-corpus", editable = "corpus" },
+    { name = "agent-detective-corpus", extras = ["record"], editable = "corpus" },
     { name = "alembic", specifier = ">=1.13" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "sqlalchemy", specifier = ">=2.0" },

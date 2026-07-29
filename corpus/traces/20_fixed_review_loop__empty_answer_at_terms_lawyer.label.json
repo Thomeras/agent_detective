@@ -1,0 +1,13 @@
+{
+  "topology": "20_fixed_review_loop",
+  "task": "Uprav text obchodnich podminek podle pripominek pravnika.",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": "empty_answer",
+  "target_agent": "terms_lawyer",
+  "injections_applied": 2,
+  "expect_incident": true,
+  "expect_signal": "empty_output",
+  "expect_origin": "terms_lawyer",
+  "recorded_at": "2026-07-29T10:47:00+00:00"
+}

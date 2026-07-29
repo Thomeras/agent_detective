@@ -12,12 +12,137 @@
         "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
         "topology": "02_pipeline"
       },
-      "verdict": {
-        "confidence": 0.0,
-        "culprits": [],
-        "incident": false,
-        "report_type": null
-      }
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
+    },
+    "02_pipeline__drop_numbers_at_log_ingestor": {
+      "label": {
+        "expect_incident": true,
+        "fault": "drop_numbers",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:46:16+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "log_ingestor",
+        "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
+        "topology": "02_pipeline"
+      },
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
+    },
+    "02_pipeline__drop_numbers_at_report_writer": {
+      "label": {
+        "expect_incident": true,
+        "fault": "drop_numbers",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:46:37+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "report_writer",
+        "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
+        "topology": "02_pipeline"
+      },
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
     },
     "02_pipeline__empty_answer_at_normalizer": {
       "label": {
@@ -31,14 +156,51 @@
         "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
         "topology": "02_pipeline"
       },
-      "verdict": {
-        "confidence": 0.4,
-        "culprits": [
-          "normalizer"
-        ],
-        "incident": true,
-        "report_type": "composition_failure"
-      }
+      "report_types": {
+        "composition_failure": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "normalizer"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "normalizer"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "normalizer"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "normalizer"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "normalizer"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        }
+      ]
     },
     "02_pipeline__truncate_at_enricher": {
       "label": {
@@ -52,12 +214,41 @@
         "task": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu.",
         "topology": "02_pipeline"
       },
-      "verdict": {
-        "confidence": 0.0,
-        "culprits": [],
-        "incident": false,
-        "report_type": null
-      }
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
     },
     "05_diamond__clean": {
       "label": {
@@ -71,12 +262,51 @@
         "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
         "topology": "05_diamond"
       },
-      "verdict": {
-        "confidence": 0.0,
-        "culprits": [],
-        "incident": false,
-        "report_type": null
-      }
+      "report_types": {
+        "composition_failure": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        }
+      ]
     },
     "05_diamond__drop_numbers_at_spec_extractor": {
       "label": {
@@ -90,14 +320,51 @@
         "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
         "topology": "05_diamond"
       },
-      "verdict": {
-        "confidence": 0.39,
-        "culprits": [
-          "spec_extractor"
-        ],
-        "incident": true,
-        "report_type": "cut_point"
-      }
+      "report_types": {
+        "cut_point": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.39,
+          "culprits": [
+            "spec_extractor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.39,
+          "culprits": [
+            "spec_extractor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.39,
+          "culprits": [
+            "spec_extractor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.39,
+          "culprits": [
+            "spec_extractor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.39,
+          "culprits": [
+            "spec_extractor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        }
+      ]
     },
     "05_diamond__empty_answer_at_press_editor": {
       "label": {
@@ -113,14 +380,51 @@
         "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
         "topology": "05_diamond"
       },
-      "verdict": {
-        "confidence": 0.95,
-        "culprits": [
-          "press_editor"
-        ],
-        "incident": true,
-        "report_type": "cut_point"
-      }
+      "report_types": {
+        "cut_point": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "press_editor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "press_editor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "press_editor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "press_editor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "press_editor"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        }
+      ]
     },
     "05_diamond__hallucinate_at_marketing_writer": {
       "label": {
@@ -134,14 +438,265 @@
         "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
         "topology": "05_diamond"
       },
-      "verdict": {
-        "confidence": 0.4,
-        "culprits": [
-          "05_diamond"
-        ],
-        "incident": true,
-        "report_type": "composition_failure"
-      }
+      "report_types": {
+        "composition_failure": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        }
+      ]
+    },
+    "12_supervisor_multi_subagents__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:45:42+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "task": "Priprav release notes pro verzi 4.2.",
+        "topology": "12_supervisor_multi_subagents"
+      },
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
+    },
+    "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent": {
+      "label": {
+        "expect_incident": true,
+        "fault": "drop_numbers",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:47:18+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "changelog_agent",
+        "task": "Priprav release notes pro verzi 4.2.",
+        "topology": "12_supervisor_multi_subagents"
+      },
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
+    },
+    "20_fixed_review_loop__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:45:19+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "task": "Uprav text obchodnich podminek podle pripominek pravnika.",
+        "topology": "20_fixed_review_loop"
+      },
+      "report_types": {
+        "clean": 3,
+        "composition_failure": 2
+      },
+      "verdicts": [
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "20_fixed_review_loop"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "20_fixed_review_loop"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
+    },
+    "20_fixed_review_loop__empty_answer_at_terms_lawyer": {
+      "label": {
+        "expect_incident": true,
+        "expect_origin": "terms_lawyer",
+        "expect_signal": "empty_output",
+        "fault": "empty_answer",
+        "injections_applied": 2,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T10:47:00+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "terms_lawyer",
+        "task": "Uprav text obchodnich podminek podle pripominek pravnika.",
+        "topology": "20_fixed_review_loop"
+      },
+      "report_types": {
+        "multi_culprit": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [
+            "terms_lawyer",
+            "terms_lawyer#2"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [
+            "terms_lawyer",
+            "terms_lawyer#2"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [
+            "terms_lawyer",
+            "terms_lawyer#2"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [
+            "terms_lawyer",
+            "terms_lawyer#2"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [
+            "terms_lawyer",
+            "terms_lawyer#2"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        }
+      ]
     },
     "21_fan_in_join__clean": {
       "label": {
@@ -155,12 +710,41 @@
         "task": "Priprav mesicni prehled vykonu: interni metriky + zpetna vazba zakazniku.",
         "topology": "21_fan_in_join"
       },
-      "verdict": {
-        "confidence": 0.0,
-        "culprits": [],
-        "incident": false,
-        "report_type": null
-      }
+      "report_types": {
+        "clean": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
     },
     "21_fan_in_join__drop_numbers_at_metrics_analyst": {
       "label": {
@@ -174,12 +758,46 @@
         "task": "Priprav mesicni prehled vykonu: interni metriky + zpetna vazba zakazniku.",
         "topology": "21_fan_in_join"
       },
-      "verdict": {
-        "confidence": 0.0,
-        "culprits": [],
-        "incident": false,
-        "report_type": null
-      }
+      "report_types": {
+        "clean": 3,
+        "composition_failure": 2
+      },
+      "verdicts": [
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "21_fan_in_join"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "21_fan_in_join"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        }
+      ]
     },
     "21_fan_in_join__empty_answer_at_performance_join": {
       "label": {
@@ -195,35 +813,113 @@
         "task": "Priprav mesicni prehled vykonu: interni metriky + zpetna vazba zakazniku.",
         "topology": "21_fan_in_join"
       },
-      "verdict": {
-        "confidence": 0.95,
-        "culprits": [
-          "performance_join"
-        ],
-        "incident": true,
-        "report_type": "cut_point"
-      }
+      "report_types": {
+        "cut_point": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        }
+      ]
     },
     "22_join_external_adapter__clean": {
       "label": {
-        "expect_incident": false,
+        "expect_incident": true,
         "fault": null,
+        "fault_origin": "not injected — produced live by the topology itself",
+        "ground_truth_origin": "partner_feed_adapter",
         "injections_applied": 0,
         "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "note": "partner_feed_adapter ran the PERCENTAGES through the exchange rate: 340 bp is 3.40% and it emitted 1.38 (= 3.40/2.46); 180 bp is 1.80% and it emitted 0.73 (= 1.80/2.46). Revenue is wrong too — 184300 EUR x 24.6 is 4533780, it emitted 4538580. Nobody injected this; the model did it. A genuine unit cross-contamination at the boundary node, which is the exact failure this topology exists to produce.",
         "recorded_at": "2026-07-29T09:17:16+00:00",
         "source": "agent_topo_db",
         "target_agent": null,
         "task": "Priprav mesicni prehled vykonu: interni metriky + data od partnera.",
-        "topology": "22_join_external_adapter"
+        "topology": "22_join_external_adapter",
+        "verified_by": "arithmetic against the source feed in topologies/22_join_external_adapter/main.py"
       },
-      "verdict": {
-        "confidence": 0.425,
-        "culprits": [
-          "performance_join"
-        ],
-        "incident": true,
-        "report_type": "cut_point"
-      }
+      "report_types": {
+        "cut_point": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.425,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.425,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.425,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.425,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        },
+        {
+          "confidence": 0.425,
+          "culprits": [
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "cut_point"
+        }
+      ]
     },
     "22_join_external_adapter__rewrite_currency_at_partner_feed_adapter": {
       "label": {
@@ -237,30 +933,102 @@
         "task": "Priprav mesicni prehled vykonu: interni metriky + data od partnera.",
         "topology": "22_join_external_adapter"
       },
-      "verdict": {
-        "confidence": 0.4,
-        "culprits": [
-          "22_join_external_adapter"
-        ],
-        "incident": true,
-        "report_type": "composition_failure"
-      }
+      "report_types": {
+        "composition_failure": 5
+      },
+      "verdicts": [
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "22_join_external_adapter"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "22_join_external_adapter"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "22_join_external_adapter"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "22_join_external_adapter"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.4,
+          "culprits": [
+            "22_join_external_adapter"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        }
+      ]
     }
   },
+  "repeats": 5,
   "summary": {
+    "attribution_accuracy": 0.385,
+    "attribution_cells": 13,
+    "attribution_ci_over_cells": [
+      0.177,
+      0.645
+    ],
     "blind_cells": [
+      "02_pipeline__drop_numbers_at_log_ingestor",
+      "02_pipeline__drop_numbers_at_report_writer",
       "02_pipeline__truncate_at_enricher",
+      "05_diamond__hallucinate_at_marketing_writer",
+      "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent",
       "21_fan_in_join__drop_numbers_at_metrics_analyst"
     ],
-    "cells_total": 12,
-    "controls": 4,
-    "discriminated": 6,
-    "discrimination_rate": 0.75,
-    "false_positive_cells": [
-      "22_join_external_adapter__clean"
+    "cells_total": 18,
+    "control_incident_rate": {
+      "02_pipeline__clean": 0.0,
+      "05_diamond__clean": 1.0,
+      "12_supervisor_multi_subagents__clean": 0.0,
+      "20_fixed_review_loop__clean": 0.4,
+      "21_fan_in_join__clean": 0.0
+    },
+    "controls": 5,
+    "discrimination_ci_over_cells": [
+      0.213,
+      0.72
     ],
-    "false_positive_rate": 0.25,
-    "false_positives": 1,
-    "faulted": 8
+    "discrimination_rate": 0.491,
+    "false_positive_ci_over_cells": [
+      0.118,
+      0.769
+    ],
+    "false_positive_rate": 0.28,
+    "faulted": 11,
+    "misattributed_cells": {
+      "02_pipeline__drop_numbers_at_log_ingestor": "log_ingestor",
+      "02_pipeline__drop_numbers_at_report_writer": "report_writer",
+      "02_pipeline__truncate_at_enricher": "enricher",
+      "05_diamond__hallucinate_at_marketing_writer": "marketing_writer",
+      "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent": "changelog_agent",
+      "21_fan_in_join__drop_numbers_at_metrics_analyst": "metrics_analyst",
+      "22_join_external_adapter__clean": "partner_feed_adapter",
+      "22_join_external_adapter__rewrite_currency_at_partner_feed_adapter": "partner_feed_adapter"
+    },
+    "unstable_cells": [
+      "20_fixed_review_loop__clean",
+      "21_fan_in_join__drop_numbers_at_metrics_analyst"
+    ]
   }
 }

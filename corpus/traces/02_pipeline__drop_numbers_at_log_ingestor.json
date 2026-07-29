@@ -1,0 +1,311 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/02_pipeline"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "8a378e4bf72aef89b4dcd1d0dfec0425",
+              "spanId": "0e7a483553b16fcc",
+              "parentSpanId": "bbb3b7f6896196e9",
+              "name": "log_ingestor",
+              "kind": 0,
+              "startTimeUnixNano": "1785321953369059000",
+              "endTimeUnixNano": "1785321958968736000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "log_ingestor"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- surove_logy ---\n2026-07-18 09:12 CET  billing   platba zamitnuta, kod 51        zakaznik: ACME (enterprise)\n2026-07-18 11:40 CET  login     2FA SMS nedorazila              zakaznik: Bez s.r.o. (small)\n2026-07-19 08:03 UTC  billing   dvojita platba                  zakaznik: Nordis (enterprise)\n2026-07-19 14:55 CET  export    CSV export skoncil timeoutem    zakaznik: ACME (enterprise)\n2026-07-20 07:31 UTC  login     2FA SMS nedorazila              zakaznik: Ferrum (mid)\n2026-07-21 16:02 CET  export    CSV export skoncil timeoutem    zakaznik: Nordis (enterprise)\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002724
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "288"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "382"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "- --| billing | platba zamitnuta, kod | zakaznik: ACME (enterprise)\n- --| login | FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- --| billing | dvojita platba | zakaznik: Nordis (enterprise)\n- --| export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- --| login | FA SMS nedorazila | zakaznik: Ferrum (mid)\n- --| export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)\n\n### Týdenní přehled nejčastějších problémů:\n\n**FA SMS nedorazila**\n   - Počet výskytů: - Dopad: Zákazníci (Bez s.r.o., Ferrum) nemohli přistupovat k účtům.\n\n**CSV export skončil timeoutem**\n   - Počet výskytů: - Dopad: Zákazníci (ACME, Nordis) nemohli úspěšně exportovat data.\n\n**Platba zamítnuta, kód **\n   - Počet výskytů: - Dopad: Zákazník (ACME) nemohl provést platbu.\n\n**Dvojitá platba**\n   - Počet výskytů: - Dopad: Zákazník (Nordis) měl problémy s fakturací."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "8a378e4bf72aef89b4dcd1d0dfec0425",
+              "spanId": "c0cac236b2305d96",
+              "parentSpanId": "0e7a483553b16fcc",
+              "name": "normalizer",
+              "kind": 0,
+              "startTimeUnixNano": "1785321958969125000",
+              "endTimeUnixNano": "1785321962885007000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "normalizer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- log_ingestor ---\n- --| billing | platba zamitnuta, kod | zakaznik: ACME (enterprise)\n- --| login | FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- --| billing | dvojita platba | zakaznik: Nordis (enterprise)\n- --| export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- --| login | FA SMS nedorazila | zakaznik: Ferrum (mid)\n- --| export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)\n\n### Týdenní přehled nejčastějších problémů:\n\n**FA SMS nedorazila**\n   - Počet výskytů: - Dopad: Zákazníci (Bez s.r.o., Ferrum) nemohli přistupovat k účtům.\n\n**CSV export skončil timeoutem**\n   - Počet výskytů: - Dopad: Zákazníci (ACME, Nordis) nemohli úspěšně exportovat data.\n\n**Platba zamítnuta, kód **\n   - Počet výskytů: - Dopad: Zákazník (ACME) nemohl provést platbu.\n\n**Dvojitá platba**\n   - Počet výskytů: - Dopad: Zákazník (Nordis) měl problémy s fakturací."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002013
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "394"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "237"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Zde jsou znormalizované události:\n\n```yaml\n- event: billing\n  description: platba zamitnuta, kod\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: small\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: billing\n  description: dvojita platba\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: mid\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n```\n\nPoznámka: `<UTC_time_placeholder>` je místo, kde by měly být vloženy skutečné časy událostí převedené do UTC."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "8a378e4bf72aef89b4dcd1d0dfec0425",
+              "spanId": "94d5f84fcbc1747b",
+              "parentSpanId": "c0cac236b2305d96",
+              "name": "enricher",
+              "kind": 0,
+              "startTimeUnixNano": "1785321962885077000",
+              "endTimeUnixNano": "1785321970771313000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "enricher"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- normalizer ---\nZde jsou znormalizované události:\n\n```yaml\n- event: billing\n  description: platba zamitnuta, kod\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: small\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: billing\n  description: dvojita platba\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: mid\n  timestamp_utc: <UTC_time_placeholder>\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n```\n\nPoznámka: `<UTC_time_placeholder>` je místo, kde by měly být vloženy skutečné časy událostí převedené do UTC."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00036975
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "321"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "536"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Zde jsou doplněné odhady dopadu pro jednotlivé události:\n\n```yaml\n- event: billing\n  description: platba zamitnuta, kod\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: vysoky\n  justification: U segmentu enterprise může mít zamítnutí platby vážné důsledky na cash flow a provozní činnost, což může vést k vysokému dopadu.\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: small\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Pro malé zákazníky může být problém s přihlášením středně závažný, protože ovlivňuje jejich schopnost přístupu k službám, ale obvykle mají alternativní metody přihlášení.\n\n- event: billing\n  description: dvojita platba\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: vysoky\n  justification: Dvojitá platba může vést k významným finančním ztrátám a komplikacím v účetnictví pro enterprise zákazníky, což zvyšuje dopad.\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Timeout při exportu může zpomalit pracovní procesy a analýzy dat, což je pro enterprise zákazníky středně závažný problém, ale obvykle neohrožuje jejich základní operace.\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: mid\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: U středně velkých zákazníků může být problém s přihlášením také středně závažný, ovlivňuje jejich produktivitu, ale obvykle mají další možnosti pro přístup.\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Opakující se problém s timeoutem může mít vliv na efektivitu práce, ale není to kritický problém, pokud existují alternativní metody exportu.\n```"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "8a378e4bf72aef89b4dcd1d0dfec0425",
+              "spanId": "f62d9c61654beb57",
+              "parentSpanId": "94d5f84fcbc1747b",
+              "name": "report_writer",
+              "kind": 0,
+              "startTimeUnixNano": "1785321970771526000",
+              "endTimeUnixNano": "1785321976070237000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "report_writer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- enricher ---\nZde jsou doplněné odhady dopadu pro jednotlivé události:\n\n```yaml\n- event: billing\n  description: platba zamitnuta, kod\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: vysoky\n  justification: U segmentu enterprise může mít zamítnutí platby vážné důsledky na cash flow a provozní činnost, což může vést k vysokému dopadu.\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: small\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Pro malé zákazníky může být problém s přihlášením středně závažný, protože ovlivňuje jejich schopnost přístupu k službám, ale obvykle mají alternativní metody přihlášení.\n\n- event: billing\n  description: dvojita platba\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: vysoky\n  justification: Dvojitá platba může vést k významným finančním ztrátám a komplikacím v účetnictví pro enterprise zákazníky, což zvyšuje dopad.\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Timeout při exportu může zpomalit pracovní procesy a analýzy dat, což je pro enterprise zákazníky středně závažný problém, ale obvykle neohrožuje jejich základní operace.\n\n- event: login\n  description: fa sms nedorazila\n  customer_segment: mid\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: U středně velkých zákazníků může být problém s přihlášením také středně závažný, ovlivňuje jejich produktivitu, ale obvykle mají další možnosti pro přístup.\n\n- event: export\n  description: csv export skoncil timeoutem\n  customer_segment: enterprise\n  timestamp_utc: <UTC_time_placeholder>\n  impact_estimate: stredni\n  justification: Opakující se problém s timeoutem může mít vliv na efektivitu práce, ale není to kritický problém, pokud existují alternativní metody exportu.\n```"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0003174
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "616"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "375"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "### Týdenní přehled pro vedení\n\n1. **Dvojitá platba (enterprise)**  \n   Dopad: Vysoký  \n   Doporučení: Okamžitě prověřit a vyřešit příčiny dvojitých plateb, aby se minimalizovaly finanční ztráty a komplikace v účetnictví.\n\n2. **Zamítnutí platby (enterprise)**  \n   Dopad: Vysoký  \n   Doporučení: Analyzovat důvody zamítnutí plateb a implementovat opatření k zajištění plynulosti cash flow pro enterprise zákazníky.\n\n3. **Timeout při CSV exportu (enterprise)**  \n   Dopad: Střední  \n   Doporučení: Zlepšit výkon exportních funkcí a zvážit optimalizaci serverových zdrojů pro zajištění hladkého procesu exportu.\n\n4. **Zamítnutí přihlášení (small)**  \n   Dopad: Střední  \n   Doporučení: Zajistit alternativní metody přihlášení a zlepšit doručování SMS pro ověření identity.\n\n5. **Zamítnutí přihlášení (mid)**  \n   Dopad: Střední  \n   Doporučení: Podobně jako u malých zákazníků, posílit alternativní přihlašovací metody a zlepšit spolehlivost SMS notifikací.\n\n6. **Opakující se timeout při CSV exportu (enterprise)**  \n   Dopad: Střední  \n   Doporučení: Monitorovat a analyzovat frekvenci timeoutů, aby se identifikovaly vzorce a možné technické problémy."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "8a378e4bf72aef89b4dcd1d0dfec0425",
+              "spanId": "bbb3b7f6896196e9",
+              "parentSpanId": "",
+              "name": "02_pipeline",
+              "kind": 0,
+              "startTimeUnixNano": "1785321952976308000",
+              "endTimeUnixNano": "1785321976070477000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "02_pipeline"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

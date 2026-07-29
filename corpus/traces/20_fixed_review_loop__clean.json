@@ -1,0 +1,429 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/20_fixed_review_loop"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "2b4e1c8921d8dc1b",
+              "parentSpanId": "e009f134d9e1da39",
+              "name": "terms_writer",
+              "kind": 0,
+              "startTimeUnixNano": "1785321894317408000",
+              "endTimeUnixNano": "1785321897771891000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_writer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- soucasne_zneni ---\n5. Odstoupeni od smlouvy\nZakaznik muze od smlouvy odstoupit kdykoliv. Poskytovatel vrati pomernou cast\npredplatneho. Poskytovatel muze smlouvu ukoncit pri poruseni podminek.\n6. Odpovednost\nPoskytovatel neodpovida za skodu vzniklou vypadkem sluzby.\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00012315
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "173"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "162"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "80ecd7c3096cec0d",
+              "parentSpanId": "2b4e1c8921d8dc1b",
+              "name": "terms_lawyer",
+              "kind": 0,
+              "startTimeUnixNano": "1785321897772253000",
+              "endTimeUnixNano": "1785321903020742000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_lawyer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002226
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "248"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "309"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Zkontroloval jsem znění podmínek a zde jsou mé připomínky:\n\n5. Odstoupení od smlouvy  \n- V souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.) by mělo být uvedeno, že zákazník má právo odstoupit od smlouvy v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Doporučuji doplnit tuto informaci, aby bylo zřejmé, za jakých podmínek může zákazník odstoupit od smlouvy. \n\n6. Odpovědnost  \n- Ustanovení o odpovědnosti by mělo být v souladu s § 2910 občanského zákoníku, který stanoví, že odpovědnost za škodu nelze vyloučit nebo omezit, pokud to není výslovně povoleno zákonem. Doporučuji přehodnotit formulaci, aby bylo jasné, že odpovědnost za škodu může být omezena pouze v zákonem stanovených případech.\n\nCelkově je znění podmínek v podstatě v pořádku, ale doporučuji provést tyto úpravy pro zajištění souladu s platnými právními předpisy."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "9fa30f60d9865895",
+              "parentSpanId": "80ecd7c3096cec0d",
+              "name": "terms_writer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785321903021048000",
+              "endTimeUnixNano": "1785321907558370000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_writer#2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- soucasne_zneni ---\n--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele.\n\n--- terms_lawyer ---\nZkontroloval jsem znění podmínek a zde jsou mé připomínky:\n\n5. Odstoupení od smlouvy  \n- V souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.) by mělo být uvedeno, že zákazník má právo odstoupit od smlouvy v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Doporučuji doplnit tuto informaci, aby bylo zřejmé, za jakých podmínek může zákazník odstoupit od smlouvy. \n\n6. Odpovědnost  \n- Ustanovení o odpovědnosti by mělo být v souladu s § 2910 občanského zákoníku, který stanoví, že odpovědnost za škodu nelze vyloučit nebo omezit, pokud to není výslovně povoleno zákonem. Doporučuji přehodnotit formulaci, aby bylo jasné, že odpovědnost za škodu může být omezena pouze v zákonem stanovených případech.\n\nCelkově je znění podmínek v podstatě v pořádku, ale doporučuji provést tyto úpravy pro zajištění souladu s platnými právními předpisy."
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt_of",
+                  "value": {
+                    "stringValue": "terms_writer"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002532
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "552"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "284"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy, zejména v souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.). Zákazník má právo odstoupit od smlouvy v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Odpovědnost za škodu může být omezena pouze v případech výslovně povolených zákonem, v souladu s § 2910 občanského zákoníku."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "15fedcd1a5913928",
+              "parentSpanId": "9fa30f60d9865895",
+              "name": "terms_lawyer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785321907558595000",
+              "endTimeUnixNano": "1785321911742660000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_lawyer#2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy, zejména v souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.). Zákazník má právo odstoupit od smlouvy v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Odpovědnost za škodu může být omezena pouze v případech výslovně povolených zákonem, v souladu s § 2910 občanského zákoníku."
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt_of",
+                  "value": {
+                    "stringValue": "terms_lawyer"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00026025
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "371"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "341"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Zde jsou mé připomínky k znění podmínek:\n\n5. Odstoupení od smlouvy  \n- V odstavci je uvedeno, že zákazník může od smlouvy odstoupit kdykoliv, avšak je důležité specifikovat, že právo na odstoupení od smlouvy má zákazník v souladu s § 1820 a násl. občanského zákoníku, což se vztahuje pouze na smlouvy uzavřené distančně nebo mimo obchodní prostory. Doporučuji upřesnit, že odstoupení od smlouvy se vztahuje pouze na tyto typy smluv. \n- Dále je třeba uvést, že zákazník musí odstoupení od smlouvy oznámit poskytovateli, což je v souladu s § 1820 odst. 1 občanského zákoníku.\n\n6. Odpovědnost  \n- Uvedená formulace je v souladu s § 2910 občanského zákoníku, avšak doporučuji doplnit, že poskytovatel neodpovídá za škodu, pokud zákazník neprokáže, že škoda vznikla v důsledku porušení povinností poskytovatele. Tím se zajistí jasnost ohledně důkazního břemene.\n\nCelkově je znění podmínek v podstatě v pořádku, ale doporučuji provést uvedené úpravy pro zajištění právní přesnosti a jasnosti."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "de2ba2c2564c2888",
+              "parentSpanId": "f06edfafbcdac2cc",
+              "name": "read:terms_lawyer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785321919496953000",
+              "endTimeUnixNano": "1785321919496968000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "read:terms_lawyer#2"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "terms_lawyer#2"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "f06edfafbcdac2cc",
+              "parentSpanId": "9fa30f60d9865895",
+              "name": "terms_publisher",
+              "kind": 0,
+              "startTimeUnixNano": "1785321911742860000",
+              "endTimeUnixNano": "1785321919497010000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_publisher"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy, zejména v souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.). Zákazník má právo odstoupit od smlouvy v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Odpovědnost za škodu může být omezena pouze v případech výslovně povolených zákonem, v souladu s § 2910 občanského zákoníku.\n\n--- terms_lawyer ---\nZde jsou mé připomínky k znění podmínek:\n\n5. Odstoupení od smlouvy  \n- V odstavci je uvedeno, že zákazník může od smlouvy odstoupit kdykoliv, avšak je důležité specifikovat, že právo na odstoupení od smlouvy má zákazník v souladu s § 1820 a násl. občanského zákoníku, což se vztahuje pouze na smlouvy uzavřené distančně nebo mimo obchodní prostory. Doporučuji upřesnit, že odstoupení od smlouvy se vztahuje pouze na tyto typy smluv. \n- Dále je třeba uvést, že zákazník musí odstoupení od smlouvy oznámit poskytovateli, což je v souladu s § 1820 odst. 1 občanského zákoníku.\n\n6. Odpovědnost  \n- Uvedená formulace je v souladu s § 2910 občanského zákoníku, avšak doporučuji doplnit, že poskytovatel neodpovídá za škodu, pokud zákazník neprokáže, že škoda vznikla v důsledku porušení povinností poskytovatele. Tím se zajistí jasnost ohledně důkazního břemene.\n\nCelkově je znění podmínek v podstatě v pořádku, ale doporučuji provést uvedené úpravy pro zajištění právní přesnosti a jasnosti."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.000468
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "696"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "606"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "**Znění podmínek k publikaci**\n\n**1. Účinnost**  \nToto znění podmínek nabývá účinnosti dne [datum účinnosti].\n\n**2. Cílová skupina**  \nPodmínky se vztahují na všechny zákazníky, kteří uzavřeli smlouvu s poskytovatelem.\n\n**3. Seznam změn**  \n- **Odstavec 5 - Odstoupení od smlouvy**:  \n  - Upřesnění, že právo na odstoupení od smlouvy se vztahuje pouze na smlouvy uzavřené distančně nebo mimo obchodní prostory.  \n  - Doplnění informace, že zákazník musí odstoupení od smlouvy oznámit poskytovateli v souladu s § 1820 odst. 1 občanského zákoníku.  \n\n- **Odstavec 6 - Odpovědnost**:  \n  - Doplnění, že poskytovatel neodpovídá za škodu, pokud zákazník neprokáže, že škoda vznikla v důsledku porušení povinností poskytovatele.\n\n**4. Znění podmínek**  \n\n**5. Odstoupení od smlouvy**  \nZákazník může od smlouvy odstoupit kdykoliv, avšak pouze v souladu s platnými právními předpisy, zejména v souladu s § 1820 a násl. občanského zákoníku (zákon č. 89/2012 Sb.). Právo odstoupit od smlouvy má zákazník pouze v případě, že se jedná o smlouvu uzavřenou distančně nebo mimo obchodní prostory poskytovatele. Zákazník musí odstoupení od smlouvy oznámit poskytovateli. Poskytovatel vrátí poměrnou část předplatného za nevyužité období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n**6. Odpovědnost**  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Odpovědnost za škodu může být omezena pouze v případech výslovně povolených zákonem, v souladu s § 2910 občanského zákoníku. Poskytovatel neodpovídá za škodu, pokud zákazník neprokáže, že škoda vznikla v důsledku porušení povinností poskytovatele."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "a83e956d0df8d5ef2959ec630dbea12e",
+              "spanId": "e009f134d9e1da39",
+              "parentSpanId": "",
+              "name": "20_fixed_review_loop",
+              "kind": 0,
+              "startTimeUnixNano": "1785321893479860000",
+              "endTimeUnixNano": "1785321919497061000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "20_fixed_review_loop"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Uprav text obchodnich podminek podle pripominek pravnika."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

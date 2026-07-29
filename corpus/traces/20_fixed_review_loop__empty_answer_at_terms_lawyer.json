@@ -1,0 +1,429 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/20_fixed_review_loop"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "e828659c703aaac3",
+              "parentSpanId": "e5acf542c7df9b69",
+              "name": "terms_writer",
+              "kind": 0,
+              "startTimeUnixNano": "1785321997903772000",
+              "endTimeUnixNano": "1785322000667129000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_writer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- soucasne_zneni ---\n5. Odstoupeni od smlouvy\nZakaznik muze od smlouvy odstoupit kdykoliv. Poskytovatel vrati pomernou cast\npredplatneho. Poskytovatel muze smlouvu ukoncit pri poruseni podminek.\n6. Odpovednost\nPoskytovatel neodpovida za skodu vzniklou vypadkem sluzby.\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00011835
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "173"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "154"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "aa6242bf7b22053a",
+              "parentSpanId": "e828659c703aaac3",
+              "name": "terms_lawyer",
+              "kind": 0,
+              "startTimeUnixNano": "1785322000667580000",
+              "endTimeUnixNano": "1785322006833073000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_lawyer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0003198
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "240"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "473"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "9a3a485cd2c8d594",
+              "parentSpanId": "e5acf542c7df9b69",
+              "name": "terms_writer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785322006833360000",
+              "endTimeUnixNano": "1785322009792609000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_writer#2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- soucasne_zneni ---\n--- aktualni_zneni ---\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele."
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt_of",
+                  "value": {
+                    "stringValue": "terms_writer"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00016155
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "237"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "210"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka, a to s okamžitou účinností.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Poskytovatel rovněž neodpovídá za škody způsobené třetími stranami nebo za nepřímé škody, ušlý zisk či jiné následné škody."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "4755bd1bbd5159d9",
+              "parentSpanId": "9a3a485cd2c8d594",
+              "name": "terms_lawyer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785322009792696000",
+              "endTimeUnixNano": "1785322015889030000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_lawyer#2"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka, a to s okamžitou účinností.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Poskytovatel rovněž neodpovídá za škody způsobené třetími stranami nebo za nepřímé škody, ušlý zisk či jiné následné škody."
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt",
+                  "value": {
+                    "intValue": "2"
+                  }
+                },
+                {
+                  "key": "agent_detective.attempt_of",
+                  "value": {
+                    "stringValue": "terms_lawyer"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002862
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "296"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "403"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "12cf71992fcc1a99",
+              "parentSpanId": "6bbd1bba68efc180",
+              "name": "read:terms_lawyer#2",
+              "kind": 0,
+              "startTimeUnixNano": "1785322020450058000",
+              "endTimeUnixNano": "1785322020450095000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "read:terms_lawyer#2"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "terms_lawyer#2"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "6bbd1bba68efc180",
+              "parentSpanId": "9a3a485cd2c8d594",
+              "name": "terms_publisher",
+              "kind": 0,
+              "startTimeUnixNano": "1785322015889255000",
+              "endTimeUnixNano": "1785322020450192000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "terms_publisher"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- terms_writer ---\n--- aktualni_zneni ---\n\n5. Odstoupení od smlouvy  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka, a to s okamžitou účinností.\n\n6. Odpovědnost  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Poskytovatel rovněž neodpovídá za škody způsobené třetími stranami nebo za nepřímé škody, ušlý zisk či jiné následné škody.\n\n--- terms_lawyer ---\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0002532
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "280"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "352"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "**Schválené znění k publikaci**\n\n**1. Číslování**  \n1. Odstoupení od smlouvy  \n2. Odpovědnost  \n\n**2. Účinnost**  \nToto znění nabývá účinnosti dnem jeho publikace.\n\n**3. Seznam změn**  \n- 5. Odstoupení od smlouvy: Upravena formulace pro jasnost podmínek odstoupení a vrácení předplatného.  \n- 6. Odpovědnost: Upřesněna odpovědnost poskytovatele za škody a výpadky služby.  \n\n**Text:**\n\n**5. Odstoupení od smlouvy**  \nZákazník může od smlouvy odstoupit kdykoliv, a to bez udání důvodu. Poskytovatel vrátí poměrnou část předplatného za nevyčerpané období. Poskytovatel si vyhrazuje právo smlouvu ukončit v případě porušení podmínek ze strany zákazníka, a to s okamžitou účinností.\n\n**6. Odpovědnost**  \nPoskytovatel neodpovídá za škodu vzniklou v důsledku výpadku služby, pokud tento výpadek nebyl způsoben hrubou nedbalostí nebo úmyslným jednáním poskytovatele. Poskytovatel rovněž neodpovídá za škody způsobené třetími stranami nebo za nepřímé škody, ušlý zisk či jiné následné škody."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "b6b8611d53c662c513d2b4eab654a697",
+              "spanId": "e5acf542c7df9b69",
+              "parentSpanId": "",
+              "name": "20_fixed_review_loop",
+              "kind": 0,
+              "startTimeUnixNano": "1785321997506635000",
+              "endTimeUnixNano": "1785322020450304000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "20_fixed_review_loop"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "Uprav text obchodnich podminek podle pripominek pravnika."
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
