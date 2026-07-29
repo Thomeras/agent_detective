@@ -1,6 +1,6 @@
 [project]
 name = "agent-detective"
-version = "0.2.0"
+version = "0.2.1"
 description = "Blame analysis for multi-agent runs: read an OTEL trace, name where quality broke"
 authors = [{ name = "Tomáš Jeřábek" }]
 readme = "README.md"

@@ -7,6 +7,15 @@
 > ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
 > Self-hosting stays free. [**Watch releases →**](https://github.com/Thomeras/agent_detective/releases) to be first to know.
 
+> ### 🧪 Beta — the analysis is real, the verdicts are not frozen
+> Everything documented here works and is tested. What is not yet stable is the
+> **wording of the answer**: classifications and report shapes still change
+> between minor versions. 0.2.0 reclassified a run that 0.1.0 had called
+> `loop_detected` — same trace, different verdict, because the loop check had
+> been counting the wrong thing. Gate CI on the **exit code** (`0` clean, `1`
+> incident, `2` could not run), which is stable, rather than on an exact
+> `report_type`, until this notice goes away. See [CHANGELOG.md](CHANGELOG.md).
+
 **An eval framework for multi-agent systems that names the culprit.** Ingest
 standard OpenTelemetry traces, rebuild the execution graph, and find the
 first node where quality broke — the origin, the propagation path, and the
@@ -133,6 +142,13 @@ docker compose up --build                 # infra + ingest + worker + api + web
 
 Web UI at `:5173`, read API at `:8000`, ingest at `:8001`; the bundled mock
 LLM judges, so no external API keys are needed.
+
+> **The self-hosted stack has no authentication yet**, and compose publishes
+> those ports on every interface. What sits behind them is your traces'
+> payloads — agent inputs and outputs verbatim, which is exactly the material
+> you would not want public. Keep it on a trusted network, or bind the ports to
+> loopback (`WEB_PORT=127.0.0.1:5173`) before putting it on a host that has one.
+> Auth and multi-tenancy are what Cloud is being built for.
 
 ```mermaid
 flowchart LR

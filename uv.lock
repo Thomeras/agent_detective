@@ -21,7 +21,7 @@ members = [
 
 [[package]]
 name = "agent-detective"
-version = "0.2.0"
+version = "0.2.1"
 source = { editable = "packages/detective_cli" }
 dependencies = [
     { name = "agent-detective-worker" },

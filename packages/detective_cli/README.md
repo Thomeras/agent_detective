@@ -9,6 +9,14 @@ pip install agent-detective
 detective analyze trace.json
 ```
 
+> **🧪 Beta — the analysis is real, the verdicts are not frozen.** Everything
+> documented here works and is tested. What is not yet stable is the wording of
+> the answer: classifications and report shapes still change between minor
+> versions. 0.2.0 reclassified a run that 0.1.0 had called `loop_detected` —
+> same trace, different verdict, because the loop check had been counting the
+> wrong thing. Gate CI on the **exit code** (see below), which is stable, rather
+> than on an exact `report_type`, until this notice goes away.
+
 No database, no broker, no object store, and by default no LLM. The command
 runs the same two-tier pipeline the deployed service runs (the processors are
 imported, not reimplemented) against in-memory implementations of its
