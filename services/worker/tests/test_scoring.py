@@ -1010,3 +1010,12 @@ def test_absent_output_is_never_the_agents_defect():
     result = _score(run, None, FakeJudge())
     assert result.unscored_reason == "payload_missing"
     assert result.deterministic_signals == ()
+
+
+def test_empty_output_signal_claims_observed_origination():
+    """The node was invoked, it spent, it emitted nothing: that is its own act,
+    whatever reached its input. The marker is what earns the deterministic
+    attribution headline — signals that cannot say it leave the key off."""
+    run = make_run(1, "validator", output_inline="", tokens_out=1200)
+    signal = _score(run, "", FakeJudge()).deterministic_signals[0]
+    assert signal["originates"] is True

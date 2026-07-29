@@ -1,0 +1,405 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/22_join_external_adapter"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "757ddd6cda5b6322",
+              "parentSpanId": "ba040235b65ead04",
+              "name": "partner_feed_adapter",
+              "kind": 0,
+              "startTimeUnixNano": "1785315159626104000",
+              "endTimeUnixNano": "1785315161610471000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "partner_feed_adapter"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- partnersky_feed ---\nperiod;active_seats;cancel_rate_bp;satisfaction_0_10;currency;revenue\n07/2026;3980;340;7.6;EUR;184300\n06/2026;4010;180;8.1;EUR;187900\n\n\n--- interni_model ---\nmesic (YYYY-MM), aktivni_uzivatele (int), churn_pct (float, procenta),\nnps (int, -100..100), trzby_czk (int)\nKurz: 1 EUR = 24.6 CZK\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 7.08e-05
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "220"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "63"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4619740"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "bcfd5075640269b7",
+              "parentSpanId": "ba040235b65ead04",
+              "name": "metrics_source",
+              "kind": 0,
+              "startTimeUnixNano": "1785315159626022000",
+              "endTimeUnixNano": "1785315163130146000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "metrics_source"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metriky ---\nmesic,aktivni_uzivatele,churn_pct,nps\n2026-06,4380,1.8,44\n2026-07,4290,3.4,38\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00019725
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "119"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "299"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Zde je měsíční přehled výkonu na základě poskytnutých interních metrik:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn (%) | NPS |\n|-----------|-------------------|-----------|-----|\n| 2026-06   | 4380              | 1.8       | 44  |\n| 2026-07   | 4290              | 3.4       | 38  |\n\n### Pozorování:\n1. **Aktivní uživatelé**: Došlo k poklesu počtu aktivních uživatelů z 4380 v červnu na 4290 v červenci.\n2. **Churn rate**: Churn procento vzrostlo z 1.8% na 3.4%, což naznačuje, že více uživatelů opustilo službu.\n3. **NPS (Net Promoter Score)**: NPS kleslo z 44 na 38, což může znamenat nižší spokojenost uživatelů.\n\nTento přehled ukazuje na potřebu zaměřit se na udržení uživatelů a zlepšení celkové spokojenosti. Doporučuje se provést další analýzu a zjistit příčiny poklesu metrik."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "c0f1f4dbd15204b0",
+              "parentSpanId": "757ddd6cda5b6322",
+              "name": "partner_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785315161610785000",
+              "endTimeUnixNano": "1785315171894562000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "partner_analyst"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- partner_feed_adapter ---\n--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4619740"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0003591
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "138"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "564"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Na základě poskytnutých dat lze provést analýzu a identifikovat případné odchylky.\n\n### Poskytnutá data:\n| Měsíc     | Aktivní uživatelé | Churn % | NPS | Tržby (CZK) |\n|-----------|-------------------|---------|-----|-------------|\n| 2026-07   | 3980              | 1.38    | 76  | 4538580     |\n| 2026-06   | 4010              | 0.73    | 81  | 4619740     |\n\n### Analýza:\n1. **Aktivní uživatelé**:\n   - V červenci 2026 došlo k poklesu počtu aktivních uživatelů z 4010 na 3980, což představuje pokles o 0.75%. Tento pokles může naznačovat ztrátu zájmu o službu nebo problémy s udržením uživatelů.\n\n2. **Churn %**:\n   - Churn rate vzrostl z 0.73% v červnu na 1.38% v červenci. Tento nárůst o 0.65 procentního bodu je významný a může signalizovat, že více uživatelů odchází, což je negativní trend.\n\n3. **NPS (Net Promoter Score)**:\n   - NPS klesl z 81 na 76. Tento pokles o 5 bodů může naznačovat, že uživatelé jsou méně spokojeni se službami, což může být spojeno s vyšším churn rate.\n\n4. **Tržby**:\n   - Tržby se snížily z 4,619,740 CZK na 4,538,580 CZK, což představuje pokles o přibližně 1.75%. Tento pokles může být důsledkem nižšího počtu aktivních uživatelů a vyššího churn rate.\n\n### Závěr:\n- Všechna sledovaná metrika (aktivní uživatelé, churn %, NPS a tržby) vykazuje negativní trend mezi červnem a červencem 2026.\n- Doporučuje se provést hloubkovou analýzu příčin těchto odchylek, například zkoumáním zpětné vazby od uživatelů, analýzou konkurence nebo hodnocením změn v produktu/službě, které mohly ovlivnit uživatelskou zkušenost."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "0746f055dc15d2d5",
+              "parentSpanId": "bcfd5075640269b7",
+              "name": "metrics_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785315163130201000",
+              "endTimeUnixNano": "1785315173826611000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "metrics_analyst"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metrics_source ---\nZde je měsíční přehled výkonu na základě poskytnutých interních metrik:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn (%) | NPS |\n|-----------|-------------------|-----------|-----|\n| 2026-06   | 4380              | 1.8       | 44  |\n| 2026-07   | 4290              | 3.4       | 38  |\n\n### Pozorování:\n1. **Aktivní uživatelé**: Došlo k poklesu počtu aktivních uživatelů z 4380 v červnu na 4290 v červenci.\n2. **Churn rate**: Churn procento vzrostlo z 1.8% na 3.4%, což naznačuje, že více uživatelů opustilo službu.\n3. **NPS (Net Promoter Score)**: NPS kleslo z 44 na 38, což může znamenat nižší spokojenost uživatelů.\n\nTento přehled ukazuje na potřebu zaměřit se na udržení uživatelů a zlepšení celkové spokojenosti. Doporučuje se provést další analýzu a zjistit příčiny poklesu metrik."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00047625
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "355"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "705"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Na základě poskytnutých interních metrik a pozorování lze interpretovat následující trendy a jejich možné příčiny:\n\n### Trendy\n\n1. **Pokles aktivních uživatelů**:\n   - Snížení počtu aktivních uživatelů z 4380 na 4290 naznačuje, že služba ztrácí atraktivitu nebo že uživatelé nejsou dostatečně motivováni k dalšímu používání.\n\n2. **Zvýšení churn rate**:\n   - Churn rate vzrostl z 1.8% na 3.4%, což je významný nárůst. To může znamenat, že více uživatelů se rozhodlo službu opustit, což je alarmující signál pro udržení zákazníků.\n\n3. **Pokles NPS**:\n   - NPS klesl z 44 na 38, což naznačuje, že uživatelé jsou méně ochotni doporučit službu ostatním. To může být důsledkem zhoršení uživatelského zážitku nebo nespokojenosti s funkcionalitou služby.\n\n### Možné příčiny\n\n1. **Zhoršení uživatelského zážitku**:\n   - Pokud došlo k nějakým změnám v uživatelském rozhraní, funkcionalitě nebo výkonu služby, mohlo by to negativně ovlivnit spokojenost uživatelů.\n\n2. **Konkurence**:\n   - Zvýšení konkurence v daném segmentu může vést k tomu, že uživatelé hledají alternativy, které nabízejí lepší hodnotu nebo funkce.\n\n3. **Nedostatečná komunikace**:\n   - Pokud uživatelé nejsou dostatečně informováni o novinkách, vylepšeních nebo výhodách služby, mohou mít pocit, že služba stagnuje.\n\n4. **Změny v potřebách uživatelů**:\n   - Měnící se potřeby a preference uživatelů mohou znamenat, že služba již neodpovídá jejich očekáváním.\n\n### Doporučení\n\n1. **Provést hloubkovou analýzu**:\n   - Zjistit, proč uživatelé odcházejí, prostřednictvím dotazníků nebo rozhovorů.\n\n2. **Zlepšit uživatelský zážitek**:\n   - Zvážit úpravy na základě zpětné vazby od uživatelů a zaměřit se na zlepšení funkcionality a uživatelského rozhraní.\n\n3. **Zvýšit marketingové úsilí**:\n   - Zaměřit se na komunikaci hodnoty služby a novinky, které mohou přilákat nové uživatele a udržet stávající.\n\n4. **Monitorovat metriky**:\n   - Pokračovat v sledování těchto metrik a reagovat na jakékoli další negativní trendy, aby se předešlo dalšímu poklesu. \n\nCelkově je důležité reagovat na tyto trendy pro zajištění udržení uživatelů a zlepšení jejich spokojenosti."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "114810e79bdd3258",
+              "parentSpanId": "8cd0010e086dab44",
+              "name": "read:partner_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785315185424357000",
+              "endTimeUnixNano": "1785315185424388000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "read:partner_analyst"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "partner_analyst"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "8cd0010e086dab44",
+              "parentSpanId": "0746f055dc15d2d5",
+              "name": "performance_join",
+              "kind": 0,
+              "startTimeUnixNano": "1785315173827587000",
+              "endTimeUnixNano": "1785315185424449000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "performance_join"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metrics_analyst ---\nNa základě poskytnutých interních metrik a pozorování lze interpretovat následující trendy a jejich možné příčiny:\n\n### Trendy\n\n1. **Pokles aktivních uživatelů**:\n   - Snížení počtu aktivních uživatelů z 4380 na 4290 naznačuje, že služba ztrácí atraktivitu nebo že uživatelé nejsou dostatečně motivováni k dalšímu používání.\n\n2. **Zvýšení churn rate**:\n   - Churn rate vzrostl z 1.8% na 3.4%, což je významný nárůst. To může znamenat, že více uživatelů se rozhodlo službu opustit, což je alarmující signál pro udržení zákazníků.\n\n3. **Pokles NPS**:\n   - NPS klesl z 44 na 38, což naznačuje, že uživatelé jsou méně ochotni doporučit službu ostatním. To může být důsledkem zhoršení uživatelského zážitku nebo nespokojenosti s funkcionalitou služby.\n\n### Možné příčiny\n\n1. **Zhoršení uživatelského zážitku**:\n   - Pokud došlo k nějakým změnám v uživatelském rozhraní, funkcionalitě nebo výkonu služby, mohlo by to negativně ovlivnit spokojenost uživatelů.\n\n2. **Konkurence**:\n   - Zvýšení konkurence v daném segmentu může vést k tomu, že uživatelé hledají alternativy, které nabízejí lepší hodnotu nebo funkce.\n\n3. **Nedostatečná komunikace**:\n   - Pokud uživatelé nejsou dostatečně informováni o novinkách, vylepšeních nebo výhodách služby, mohou mít pocit, že služba stagnuje.\n\n4. **Změny v potřebách uživatelů**:\n   - Měnící se potřeby a preference uživatelů mohou znamenat, že služba již neodpovídá jejich očekáváním.\n\n### Doporučení\n\n1. **Provést hloubkovou analýzu**:\n   - Zjistit, proč uživatelé odcházejí, prostřednictvím dotazníků nebo rozhovorů.\n\n2. **Zlepšit uživatelský zážitek**:\n   - Zvážit úpravy na základě zpětné vazby od uživatelů a zaměřit se na zlepšení funkcionality a uživatelského rozhraní.\n\n3. **Zvýšit marketingové úsilí**:\n   - Zaměřit se na komunikaci hodnoty služby a novinky, které mohou přilákat nové uživatele a udržet stávající.\n\n4. **Monitorovat metriky**:\n   - Pokračovat v sledování těchto metrik a reagovat na jakékoli další negativní trendy, aby se předešlo dalšímu poklesu. \n\nCelkově je důležité reagovat na tyto trendy pro zajištění udržení uživatelů a zlepšení jejich spokojenosti.\n\n--- partner_analyst ---\nNa základě poskytnutých dat lze provést analýzu a identifikovat případné odchylky.\n\n### Poskytnutá data:\n| Měsíc     | Aktivní uživatelé | Churn % | NPS | Tržby (CZK) |\n|-----------|-------------------|---------|-----|-------------|\n| 2026-07   | 3980              | 1.38    | 76  | 4538580     |\n| 2026-06   | 4010              | 0.73    | 81  | 4619740     |\n\n### Analýza:\n1. **Aktivní uživatelé**:\n   - V červenci 2026 došlo k poklesu počtu aktivních uživatelů z 4010 na 3980, což představuje pokles o 0.75%. Tento pokles může naznačovat ztrátu zájmu o službu nebo problémy s udržením uživatelů.\n\n2. **Churn %**:\n   - Churn rate vzrostl z 0.73% v červnu na 1.38% v červenci. Tento nárůst o 0.65 procentního bodu je významný a může signalizovat, že více uživatelů odchází, což je negativní trend.\n\n3. **NPS (Net Promoter Score)**:\n   - NPS klesl z 81 na 76. Tento pokles o 5 bodů může naznačovat, že uživatelé jsou méně spokojeni se službami, což může být spojeno s vyšším churn rate.\n\n4. **Tržby**:\n   - Tržby se snížily z 4,619,740 CZK na 4,538,580 CZK, což představuje pokles o přibližně 1.75%. Tento pokles může být důsledkem nižšího počtu aktivních uživatelů a vyššího churn rate.\n\n### Závěr:\n- Všechna sledovaná metrika (aktivní uživatelé, churn %, NPS a tržby) vykazuje negativní trend mezi červnem a červencem 2026.\n- Doporučuje se provést hloubkovou analýzu příčin těchto odchylek, například zkoumáním zpětné vazby od uživatelů, analýzou konkurence nebo hodnocením změn v produktu/službě, které mohly ovlivnit uživatelskou zkušenost."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0006879
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "1358"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "807"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "### Měsíční přehled - červenec 2026\n\n#### Shrnutí interních metrik a partnerských dat\n\n1. **Aktivní uživatelé**:\n   - **Interní metriky**: Pokles z 4380 na 4290 (2.05%).\n   - **Partnerská data**: Pokles z 4010 na 3980 (0.75%).\n   - **Rozpor**: Interní metriky ukazují větší pokles než partnerská data. Je možné, že interní metriky zahrnují širší spektrum uživatelů, včetně těch, kteří nejsou pravidelně aktivní.\n   - **Doporučení**: Důvěřovat interním metrikám, které mohou lépe reflektovat celkovou situaci.\n\n2. **Churn rate**:\n   - **Interní metriky**: Nárůst z 1.8% na 3.4%.\n   - **Partnerská data**: Nárůst z 0.73% na 1.38%.\n   - **Rozpor**: Interní metriky ukazují mnohem vyšší churn rate. To může naznačovat, že interní metriky zahrnují více uživatelů, kteří odcházejí z různých důvodů.\n   - **Doporučení**: Důvěřovat interním metrikám pro analýzu churn rate, jelikož ukazují výraznější problém.\n\n3. **NPS (Net Promoter Score)**:\n   - **Interní metriky**: Pokles z 44 na 38.\n   - **Partnerská data**: Pokles z 81 na 76.\n   - **Rozpor**: Interní metriky vykazují mnohem nižší hodnoty NPS, což naznačuje, že uživatelé nejsou spokojeni. Partnerská data ukazují vyšší spokojenost, ale stále pokles.\n   - **Doporučení**: Důvěřovat interním metrikám, které mohou lépe reflektovat nespokojenost uživatelů.\n\n4. **Tržby**:\n   - **Interní metriky**: Není uvedeno.\n   - **Partnerská data**: Pokles z 4,619,740 CZK na 4,538,580 CZK (1.75%).\n   - **Rozpor**: Interní metriky neobsahují tržby, což ztěžuje porovnání.\n   - **Doporučení**: Zaměřit se na partnerská data pro analýzu tržeb, ale sledovat i interní metriky pro celkový obraz.\n\n### Závěr a doporučení\n\n- **Celkový trend**: Všechny sledované metriky vykazují negativní trend, což naznačuje potřebu urgentní reakce na ztrátu uživatelů a snížení spokojenosti.\n- **Doporučení**:\n  - Provést hloubkovou analýzu příčin odchodu uživatelů.\n  - Zlepšit uživatelský zážitek na základě zpětné vazby.\n  - Zaměřit se na marketing a komunikaci hodnoty služby.\n  - Monitorovat metriky a reagovat na negativní trendy.\n\nVzhledem k rozporům mezi interními a partnerskými daty je důležité zaměřit se na interní metriky pro detailnější analýzu uživatelské spokojenosti a churn rate, zatímco partnerská data mohou poskytnout užitečné informace o tržbách."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
+              "spanId": "ba040235b65ead04",
+              "parentSpanId": "",
+              "name": "22_join_external_adapter",
+              "kind": 0,
+              "startTimeUnixNano": "1785315159233194000",
+              "endTimeUnixNano": "1785315185424617000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "22_join_external_adapter"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "agent_topo_db topology 22_join_external_adapter"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

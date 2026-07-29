@@ -1,0 +1,10 @@
+{
+  "topology": "02_pipeline",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": "truncate",
+  "target_agent": "enricher",
+  "injections_applied": 1,
+  "expect_incident": true,
+  "recorded_at": "2026-07-29T08:54:39+00:00"
+}

@@ -113,13 +113,27 @@ def _violations(inp: BlameInput, run_id: str) -> list[dict]:
 
 
 def _has_deterministic_defect(inp: BlameInput, run_id: str) -> bool:
-    """A hard, reproducible signal that this node's output is defective — a
-    contract violation or an admitted content flag — as opposed to a graded judge
-    opinion. Drives observation_confidence to near-certain."""
+    """A hard, reproducible signal that this node's output is defective — as
+    opposed to a graded judge opinion. Drives observation_confidence to
+    near-certain.
+
+    Must agree with ``cutpoint._deterministic_defect``, which decides whether the
+    node gets localised at all. It did not: that one counts any fail-severity
+    deterministic signal, this one read only contract violations and a CLOSED SET
+    of three flag names. So a node localised by a fail signal outside that set
+    arrived here with no deterministic evidence and reported observation 0% —
+    while the report above it cited the very same finding at certainty 100%.
+    Found by the foreign corpus on ``empty_output``; the closed set would have
+    swallowed every signal added after it in the same way.
+    """
     ns = inp.scores.get(run_id)
     if ns is None:
         return False
-    return bool(ns.contract_violations) or bool(_CONTENT_FLAGS.intersection(ns.flags))
+    return (
+        bool(ns.contract_violations)
+        or bool(_CONTENT_FLAGS.intersection(ns.flags))
+        or any(s.get("severity") == "fail" for s in ns.deterministic_signals)
+    )
 
 
 # The attribution ceiling for a CONTENT defect at the OBSERVABILITY BOUNDARY
@@ -206,7 +220,20 @@ def _verdict_attribution(
     assumed baseline — and the note says the cap is scoped to that defect.
     """
     ns = inp.scores.get(run_id)
-    if ns is not None and ns.contract_violations:
+    # A deterministic check may also state that it OBSERVED origination rather
+    # than inferring it — `empty_output` does: the run was invoked, it spent, and
+    # it emitted nothing, which is its own act whatever reached its input. Such a
+    # signal earns the same headline as a contract violation. Without the marker
+    # the attribution stays inferred, because a signal like an injection
+    # signature says the output is bad and nothing about where it came from.
+    _observed_origination = ns is not None and (
+        bool(ns.contract_violations)
+        or any(
+            s.get("severity") == "fail" and s.get("originates")
+            for s in ns.deterministic_signals
+        )
+    )
+    if _observed_origination:
         if candidate.unknown_upstream:
             # The 0.95 above is earned by OBSERVED origination — the diff saw the
             # parameter arrive intact and leave rewritten. This candidate is the

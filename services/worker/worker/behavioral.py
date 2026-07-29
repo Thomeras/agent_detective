@@ -353,8 +353,16 @@ def empty_output_signals(output_text: str | None, tokens_out: int | None) -> lis
     if not isinstance(tokens_out, int) or isinstance(tokens_out, bool) or tokens_out <= 0:
         return []
     return [
-        signal(
-            SIGNAL_EMPTY_OUTPUT, "fail", "empty_output_with_spend",
-            tokens_out=tokens_out, chars=len(output_text),
-        )
+        {
+            **signal(
+                SIGNAL_EMPTY_OUTPUT, "fail", "empty_output_with_spend",
+                tokens_out=tokens_out, chars=len(output_text),
+            ),
+            # Origination is OBSERVED here, not inferred: this run was invoked,
+            # it spent, and it emitted nothing. Whatever reached its input, the
+            # absence of output is this node's own act. Signals that cannot say
+            # that — an injection signature may well have arrived from upstream
+            # — leave the key off and keep the inferred attribution.
+            "originates": True,
+        }
     ]

@@ -1,0 +1,311 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/02_pipeline"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "cf2538e8fa7c07378e647c0c4e100178",
+              "spanId": "bef6f02df1ba8d98",
+              "parentSpanId": "9f2e094905f47d68",
+              "name": "log_ingestor",
+              "kind": 0,
+              "startTimeUnixNano": "1785315240460952000",
+              "endTimeUnixNano": "1785315244193696000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "log_ingestor"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- surove_logy ---\n2026-07-18 09:12 CET  billing   platba zamitnuta, kod 51        zakaznik: ACME (enterprise)\n2026-07-18 11:40 CET  login     2FA SMS nedorazila              zakaznik: Bez s.r.o. (small)\n2026-07-19 08:03 UTC  billing   dvojita platba                  zakaznik: Nordis (enterprise)\n2026-07-19 14:55 CET  export    CSV export skoncil timeoutem    zakaznik: ACME (enterprise)\n2026-07-20 07:31 UTC  login     2FA SMS nedorazila              zakaznik: Ferrum (mid)\n2026-07-21 16:02 CET  export    CSV export skoncil timeoutem    zakaznik: Nordis (enterprise)\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0001464
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "288"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "172"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "- 2026-07-18 | billing | platba zamitnuta, kod 51 | zakaznik: ACME (enterprise)\n- 2026-07-18 | login | 2FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- 2026-07-19 | billing | dvojita platba | zakaznik: Nordis (enterprise)\n- 2026-07-19 | export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- 2026-07-20 | login | 2FA SMS nedorazila | zakaznik: Ferrum (mid)\n- 2026-07-21 | export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "cf2538e8fa7c07378e647c0c4e100178",
+              "spanId": "3a6bf70fdebacc1e",
+              "parentSpanId": "bef6f02df1ba8d98",
+              "name": "normalizer",
+              "kind": 0,
+              "startTimeUnixNano": "1785315244193970000",
+              "endTimeUnixNano": "1785315250060299000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "normalizer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- log_ingestor ---\n- 2026-07-18 | billing | platba zamitnuta, kod 51 | zakaznik: ACME (enterprise)\n- 2026-07-18 | login | 2FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- 2026-07-19 | billing | dvojita platba | zakaznik: Nordis (enterprise)\n- 2026-07-19 | export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- 2026-07-20 | login | 2FA SMS nedorazila | zakaznik: Ferrum (mid)\n- 2026-07-21 | export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00025935
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "253"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "369"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Znormalizované události:\n\n1. **datum**: 2026-07-18T00:00:00Z\n   **kategorie**: billing\n   **popis**: platba zamitnuta, kod 51\n   **zakaznik**: ACME\n   **segment**: enterprise\n\n2. **datum**: 2026-07-18T00:00:00Z\n   **kategorie**: login\n   **popis**: 2FA SMS nedorazila\n   **zakaznik**: Bez s.r.o.\n   **segment**: small\n\n3. **datum**: 2026-07-19T00:00:00Z\n   **kategorie**: billing\n   **popis**: dvojita platba\n   **zakaznik**: Nordis\n   **segment**: enterprise\n\n4. **datum**: 2026-07-19T00:00:00Z\n   **kategorie**: export\n   **popis**: CSV export skoncil timeoutem\n   **zakaznik**: ACME\n   **segment**: enterprise\n\n5. **datum**: 2026-07-20T00:00:00Z\n   **kategorie**: login\n   **popis**: 2FA SMS nedorazila\n   **zakaznik**: Ferrum\n   **segment**: mid\n\n6. **datum**: 2026-07-21T00:00:00Z\n   **kategorie**: export\n   **popis**: CSV export skoncil timeoutem\n   **zakaznik**: Nordis\n   **segment**: enterprise"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "cf2538e8fa7c07378e647c0c4e100178",
+              "spanId": "794f557ba7fbc11e",
+              "parentSpanId": "3a6bf70fdebacc1e",
+              "name": "enricher",
+              "kind": 0,
+              "startTimeUnixNano": "1785315250060529000",
+              "endTimeUnixNano": "1785315264821432000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "enricher"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- normalizer ---\nZnormalizované události:\n\n1. **datum**: 2026-07-18T00:00:00Z\n   **kategorie**: billing\n   **popis**: platba zamitnuta, kod 51\n   **zakaznik**: ACME\n   **segment**: enterprise\n\n2. **datum**: 2026-07-18T00:00:00Z\n   **kategorie**: login\n   **popis**: 2FA SMS nedorazila\n   **zakaznik**: Bez s.r.o.\n   **segment**: small\n\n3. **datum**: 2026-07-19T00:00:00Z\n   **kategorie**: billing\n   **popis**: dvojita platba\n   **zakaznik**: Nordis\n   **segment**: enterprise\n\n4. **datum**: 2026-07-19T00:00:00Z\n   **kategorie**: export\n   **popis**: CSV export skoncil timeoutem\n   **zakaznik**: ACME\n   **segment**: enterprise\n\n5. **datum**: 2026-07-20T00:00:00Z\n   **kategorie**: login\n   **popis**: 2FA SMS nedorazila\n   **zakaznik**: Ferrum\n   **segment**: mid\n\n6. **datum**: 2026-07-21T00:00:00Z\n   **kategorie**: export\n   **popis**: CSV export skoncil timeoutem\n   **zakaznik**: Nordis\n   **segment**: enterprise"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0005031
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "454"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "725"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "1. **datum**: 2026-07-18T00:00:00Z  \n   **kategorie**: billing  \n   **popis**: platba zamitnuta, kod 51  \n   **zakaznik**: ACME  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Jako enterprise zákazník má ACME pravděpodobně vysoké objemy transakcí a zamítnutí platby může mít vážné důsledky pro jejich cash flow a provoz.\n\n2. **datum**: 2026-07-18T00:00:00Z  \n   **kategorie**: login  \n   **popis**: 2FA SMS nedorazila  \n   **zakaznik**: Bez s.r.o.  \n   **segment**: small  \n   **dopad**: střední  \n   **zdůvodnění**: Pro malé firmy může být problém s přihlášením středně závažný, protože může bránit přístupu k důležitým informacím, ale není to kritické pro jejich operace.\n\n3. **datum**: 2026-07-19T00:00:00Z  \n   **kategorie**: billing  \n   **popis**: dvojita platba  \n   **zakaznik**: Nordis  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Dvojitá platba může vést k významným finančním ztrátám a komplikacím v účetnictví pro enterprise zákazníka.\n\n4. **datum**:"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "cf2538e8fa7c07378e647c0c4e100178",
+              "spanId": "ef95711ac2ad1be1",
+              "parentSpanId": "794f557ba7fbc11e",
+              "name": "report_writer",
+              "kind": 0,
+              "startTimeUnixNano": "1785315264821613000",
+              "endTimeUnixNano": "1785315279111250000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "report_writer"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- enricher ---\n1. **datum**: 2026-07-18T00:00:00Z  \n   **kategorie**: billing  \n   **popis**: platba zamitnuta, kod 51  \n   **zakaznik**: ACME  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Jako enterprise zákazník má ACME pravděpodobně vysoké objemy transakcí a zamítnutí platby může mít vážné důsledky pro jejich cash flow a provoz.\n\n2. **datum**: 2026-07-18T00:00:00Z  \n   **kategorie**: login  \n   **popis**: 2FA SMS nedorazila  \n   **zakaznik**: Bez s.r.o.  \n   **segment**: small  \n   **dopad**: střední  \n   **zdůvodnění**: Pro malé firmy může být problém s přihlášením středně závažný, protože může bránit přístupu k důležitým informacím, ale není to kritické pro jejich operace.\n\n3. **datum**: 2026-07-19T00:00:00Z  \n   **kategorie**: billing  \n   **popis**: dvojita platba  \n   **zakaznik**: Nordis  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Dvojitá platba může vést k významným finančním ztrátám a komplikacím v účetnictví pro enterprise zákazníka.\n\n4. **datum**:"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00049635
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "445"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "716"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "2026-07-19T00:00:00Z  \n   **kategorie**: support  \n   **popis**: dlouhá doba odezvy na tiket  \n   **zakaznik**: Tech Solutions  \n   **segment**: medium  \n   **dopad**: střední  \n   **zdůvodnění**: Dlouhá doba odezvy může ovlivnit spokojenost zákazníka a jeho důvěru v naše služby.\n\n5. **datum**: 2026-07-20T00:00:00Z  \n   **kategorie**: performance  \n   **popis**: výpadek serveru  \n   **zakaznik**: Global Corp  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Výpadek serveru pro enterprise zákazníka může způsobit značné ztráty a narušení provozu.\n\n6. **datum**: 2026-07-21T00:00:00Z  \n   **kategorie**: security  \n   **popis**: podezřelá aktivita na účtu  \n   **zakaznik**: Secure Inc.  \n   **segment**: enterprise  \n   **dopad**: vysoký  \n   **zdůvodnění**: Podezřelá aktivita může ohrozit bezpečnost dat a důvěru zákazníka.\n\n7. **datum**: 2026-07-22T00:00:00Z  \n   **kategorie**: feedback  \n   **popis**: negativní hodnocení služby  \n   **zakaznik**: Happy Clients  \n   **segment**: small  \n   **dopad**: nízký  \n   **zdůvodnění**: Negativní hodnocení může ovlivnit image firmy, ale neohrožuje bezprostředně operace.\n\n8. **datum**: 2026-07-23T00:00:00Z  \n   **kategorie**: billing  \n   **popis**: nejasnosti v fakturaci  \n   **zakaznik**: Retail Group  \n   **segment**: medium  \n   **dopad**: střední  \n   **zdůvodnění**: Nejasnosti mohou vést k nespokojenosti a zpoždění plateb.\n\n9. **datum**: 2026-07-24T00:00:00Z  \n   **kategorie**: update  \n   **popis**: plánovaná údržba systému  \n   **zakaznik**: All Users  \n   **segment**: all  \n   **dopad**: nízký  \n   **zdůvodnění**: Plánovaná údržba je nezbytná pro zajištění stability, ale může způsobit dočasné nepohodlí.\n\n10. **datum**: 2026-07-25T00:00:00Z  \n   **kategorie**: training  \n   **popis**: školení pro zaměstnance  \n   **zakaznik**: Internal  \n   **segment**: internal  \n   **dopad**: nízký  \n   **zdůvodnění**: Školení zvyšuje kompetence zaměstnanců, ale nemá okamžitý dopad na zákazníky."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "cf2538e8fa7c07378e647c0c4e100178",
+              "spanId": "9f2e094905f47d68",
+              "parentSpanId": "",
+              "name": "02_pipeline",
+              "kind": 0,
+              "startTimeUnixNano": "1785315240056513000",
+              "endTimeUnixNano": "1785315279111483000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "02_pipeline"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "agent_topo_db topology 02_pipeline"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

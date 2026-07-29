@@ -1,0 +1,10 @@
+{
+  "topology": "05_diamond",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": null,
+  "target_agent": null,
+  "injections_applied": 0,
+  "expect_incident": false,
+  "recorded_at": "2026-07-29T08:50:45+00:00"
+}

@@ -5,7 +5,7 @@ from dataclasses import replace
 
 import pytest
 
-from blame_engine import BlameConfig, Candidate, compute_confidence
+from blame_engine import BlameConfig, Candidate, NodeScore, compute_confidence, find_blame
 from blame_engine.confidence import (
     DETERMINISTIC_ATTRIBUTION,
     JUDGED_DEGRADATION_OBSERVATION,
@@ -135,3 +135,57 @@ def test_observation_ceiling_is_the_judged_finding_certainty() -> None:
     assert JUDGED_DEGRADATION_OBSERVATION == 0.7
     huge = _candidate(drop=5.0, score=0.5, base=1.0)
     assert compute_observation_confidence(huge, CFG) == pytest.approx(0.7)
+
+
+def test_fail_signal_that_observed_origination_carries_the_headline(mk):
+    """The bug the foreign corpus found: a node localised by a fail-severity
+    deterministic signal was scored as if no deterministic evidence existed,
+    because the confidence predicate read a CLOSED SET of three flag names while
+    the localisation predicate read any fail signal. The report then cited a
+    100%-certainty finding beside `confidence 0%`."""
+    empty = {
+        "name": "empty_output", "severity": "fail", "code": "empty_output_with_spend",
+        "params": {"tokens_out": 1200, "chars": 0},
+        "detail": "produced no output while spending 1200 output tokens",
+        "basis": "output.value recorded and empty", "originates": True,
+    }
+    inp = mk(
+        nodes=["src", "sink"],
+        edges=[("src", "sink")],
+        scores={
+            "src": 0.93,
+            "sink": NodeScore(
+                run_id="sink", score=None, components={}, input_flawed=None,
+                unscored_reason="empty_output", judge_note=None,
+                flags=("empty_output",), deterministic_signals=(empty,),
+            ),
+        },
+    )
+    report = find_blame(inp)
+
+    assert "sink" in report.culprit_run_ids
+    assert report.evidence.observation_confidence == pytest.approx(0.95)
+    assert report.evidence.attribution_confidence == pytest.approx(0.95)
+
+
+def test_fail_signal_without_the_marker_keeps_inferred_attribution(mk):
+    """An injection signature says the output is bad and nothing about where it
+    came from — it may well have arrived from upstream. No marker, no headline."""
+    unmarked = {
+        "name": "injection_signature", "severity": "fail", "code": "injection",
+        "params": {}, "detail": "d", "basis": "b",
+    }
+    inp = mk(
+        nodes=["src", "sink"],
+        edges=[("src", "sink")],
+        scores={
+            "src": 0.93,
+            "sink": NodeScore(
+                run_id="sink", score=None, components={}, input_flawed=None,
+                unscored_reason=None, judge_note=None,
+                flags=("injection_signature",), deterministic_signals=(unmarked,),
+            ),
+        },
+    )
+    report = find_blame(inp)
+    assert report.evidence.attribution_confidence < 0.95

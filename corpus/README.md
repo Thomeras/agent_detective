@@ -65,45 +65,77 @@ Assertions are **deterministic-channel only**. Asserting a judged verdict would
 put a model in CI, which costs money and stops being reproducible. The judged
 observations below are recorded as findings, not asserted as behaviour.
 
-## What it found on the first two cells
+## The scoreboard
 
-Written down because it is the point of the exercise, not because it is
-finished. Three of these are open.
+`uv run python -m corpus.scoreboard` (needs a judge; output committed as
+`scoreboard.json`). Two numbers, 11 cells across 4 topologies:
 
-**1. The graph reconstructs correctly from foreign spans.** Topology 21's
-fan-in came back exactly right — two parallel branches, the join reading both,
-sources on the root — derived from the context keys, through the stock SDK,
-across `ThreadPoolExecutor` boundaries. The mapper's `attempt`/`attempt_of`
-handling (added in 0.2.0) also works on spans it did not produce: the nested
-loops of topology 13 came back with correct per-agent attempt ordinals.
+| | |
+|---|---|
+| **false positive rate** | **1.00** — 4 of 4 clean controls reported an incident |
+| **discrimination** | **0.50** — 3 of 6 faulted cells produced a verdict differing from their own topology's clean baseline |
 
-**2. `empty_output` fires on a foreign trace and localises.** `performance_join`
-spent 2000 output tokens and returned nothing; the deterministic channel named
-it as origin with a 100%-certainty signal. Note the cause: `moonshotai/kimi-k2.6`
-spends its whole `max_tokens` budget on reasoning and returns empty content —
-reproduced at 1200 and again at 2000 tokens, on two unrelated topologies. Kept
-as its own labelled cell.
+Discrimination is measured against the PAIRED baseline, not against an absolute
+expectation. A verdict that fires on everything scores well on "did it report an
+incident" and is worth nothing; only the pairing makes that visible.
 
-**3. OPEN — the judge did not notice the injected defect.** Stripping *every
-number* out of `metrics_analyst`'s output changed nothing: clean and faulted
-both came back `composition_failure · 40%`, and **every node scored 0.93 in both
-runs**, including the one whose metrics analysis no longer contained a single
-figure. The judge is grading fluency, not substance. This is the calibration
-question the corpus exists to make measurable.
+Verdict distribution: `composition_failure` 7, `cut_point` 3, `multi_culprit` 1.
 
-**4. OPEN — a deterministic-only localisation reports 0% confidence.** The
-`empty_output` cell names an origin, cites a finding at `certainty 100%`, and
-prints `confidence 0% · observation 0% · attribution 0%`. Confidence appears to
-be derived from judged score movement, which does not exist when the node is
-unscored — so the honest-confidence claim reads as "no idea" precisely where the
-evidence is hardest.
+## What it found
 
-**5. OPEN — the structural root was named ORIGIN.** In the clean cell the
-culprit is `21_fan_in_join`, the payload-less run wrapper, which `cutpoint.py`
-elsewhere describes as a node that "can neither be a culprit nor hide one".
+**1. Every clean control fails. FPR is 1.00.** This is the number that decides
+whether anyone can gate a build on this tool, and right now it says nobody can.
+The cause is the terminal judge, not the engine: on an untouched run of
+`02_pipeline` it returns `bad` at 0.4 with
+
+> "lacks context regarding the overall performance of the system and does not
+> provide a comprehensive analysis of the pipeline's effectiveness, which is
+> essential for a complete report"
+
+That is not a defect report, it is a wish for a better document. The judge is
+grading against an ideal rather than against the request that was actually made.
+`composition_failure` then fires by construction — every node healthy, terminal
+bad — which is why it is 7 of 11 verdicts.
+
+**2. Half the injected faults are invisible.** Stripping *every number* out of a
+metrics analysis, appending a fabricated audit claim, and rewriting a currency
+unit at a boundary adapter all produced verdicts identical to their own clean
+baseline, down to the confidence. Per-node scores clustered at 0.93 regardless.
+The judge is grading fluency; none of these three faults damages fluency.
+
+**3. The two things that DO work are the deterministic channel and the graph.**
+`empty_output` localised at 95% on a foreign trace. `truncate` and `drop_numbers`
+at a pipeline head both localised as `cut_point`. And every graph reconstructed
+correctly from stock-SDK spans — topology 21's fan-in across `ThreadPoolExecutor`
+boundaries, topology 13's nested loops with correct per-agent attempt ordinals.
+The mapper is in better shape than the judged channel.
+
+**4. FIXED — a deterministic-only localisation reported 0% confidence.** The
+`empty_output` cell named an origin, cited a finding at `certainty 100%`, and
+printed `confidence 0%`. Two predicates for "this node has a hard deterministic
+defect" had drifted apart: `cutpoint._deterministic_defect` counts any
+fail-severity signal and decides whether the node is localised at all, while
+`blame._has_deterministic_defect` read only contract violations and a closed set
+of three flag names, and drives the confidence. Now 95/95, with the deterministic
+attribution headline earned by an explicit `originates` marker on the signal —
+blanket-granting it would over-claim for a signal like an injection signature,
+which says the output is bad and nothing about where it came from.
+
+**5. NOT A BUG — the run wrapper named as composition_failure suspect.** Called
+this one wrong on first reading. An orchestrator entry node and an SDK wrapper
+span are the SAME SHAPE in a trace — both are sources with no output of their
+own — so the engine cannot tell them apart, and
+`test_composition_failure_all_healthy_bad_terminal` deliberately pins blaming the
+entry node. Left alone.
 
 ## What is not here yet
 
-The injection matrix (topology × fault × site) this is the foundation for. Six
-faults are implemented; two cells are recorded. Metamorphic invariance,
-adversarial/degraded traces and the reliability diagram all need the grid first.
+11 cells over 4 of the 22 topologies, and no coverage yet of retry loops,
+supervisor hierarchies or wide fan-out. Injection SITE is not varied — every
+fault lands on a node picked by hand rather than early/middle/late and
+branch-vs-merge. Metamorphic invariance (span order, batch splits, node renames)
+and adversarial traces (orphaned spans, duplicate ids, clock skew) are not
+started; the reliability diagram needs enough cells to bin.
+
+None of that is the bottleneck. Finding 1 is: while the terminal judge rejects
+clean work, every additional cell measures the same miscalibration again.

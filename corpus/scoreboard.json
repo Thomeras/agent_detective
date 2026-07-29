@@ -1,0 +1,249 @@
+{
+  "cells": {
+    "02_pipeline__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:50:28+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "topology": "02_pipeline"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "02_pipeline"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "02_pipeline__empty_answer_at_normalizer": {
+      "label": {
+        "expect_incident": true,
+        "fault": "empty_answer",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:53:59+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "normalizer",
+        "topology": "02_pipeline"
+      },
+      "verdict": {
+        "confidence": 0.037,
+        "culprits": [
+          "enricher",
+          "normalizer"
+        ],
+        "incident": true,
+        "report_type": "multi_culprit"
+      }
+    },
+    "02_pipeline__truncate_at_enricher": {
+      "label": {
+        "expect_incident": true,
+        "fault": "truncate",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:54:39+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "enricher",
+        "topology": "02_pipeline"
+      },
+      "verdict": {
+        "confidence": 0.489,
+        "culprits": [
+          "report_writer"
+        ],
+        "incident": true,
+        "report_type": "cut_point"
+      }
+    },
+    "05_diamond__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:50:45+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "topology": "05_diamond"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "05_diamond"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "05_diamond__drop_numbers_at_spec_extractor": {
+      "label": {
+        "expect_incident": true,
+        "fault": "drop_numbers",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:55:23+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "spec_extractor",
+        "topology": "05_diamond"
+      },
+      "verdict": {
+        "confidence": 0.39,
+        "culprits": [
+          "spec_extractor"
+        ],
+        "incident": true,
+        "report_type": "cut_point"
+      }
+    },
+    "05_diamond__hallucinate_at_marketing_writer": {
+      "label": {
+        "expect_incident": true,
+        "fault": "hallucinate",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:55:02+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "marketing_writer",
+        "topology": "05_diamond"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "05_diamond"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "21_fan_in_join__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:21:55+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "topology": "21_fan_in_join"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "21_fan_in_join"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "21_fan_in_join__drop_numbers_at_metrics_analyst": {
+      "label": {
+        "expect_incident": true,
+        "fault": "drop_numbers",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:22:28+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "metrics_analyst",
+        "topology": "21_fan_in_join"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "21_fan_in_join"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "21_fan_in_join__empty_output_join": {
+      "label": {
+        "expect_incident": true,
+        "expect_origin": "performance_join",
+        "expect_signal": "empty_output",
+        "fault": null,
+        "fault_origin": "not injected — reproduced live",
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "note": "moonshotai/kimi-k2.6 spent its whole max_tokens budget on reasoning and returned empty content, at 1200 and again at 2000 tokens. The expensive terminal node shipped nothing. Kept as a labelled cell because it is the real-world shape the empty_output signal exists for.",
+        "recorded_at": "2026-07-29T08:19:42+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "topology": "21_fan_in_join"
+      },
+      "verdict": {
+        "confidence": 0.95,
+        "culprits": [
+          "performance_join"
+        ],
+        "incident": true,
+        "report_type": "cut_point"
+      }
+    },
+    "22_join_external_adapter__clean": {
+      "label": {
+        "expect_incident": false,
+        "fault": null,
+        "injections_applied": 0,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:51:19+00:00",
+        "source": "agent_topo_db",
+        "target_agent": null,
+        "topology": "22_join_external_adapter"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "22_join_external_adapter"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    },
+    "22_join_external_adapter__rewrite_currency_at_partner_feed_adapter": {
+      "label": {
+        "expect_incident": true,
+        "fault": "rewrite_currency",
+        "injections_applied": 1,
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "recorded_at": "2026-07-29T08:53:05+00:00",
+        "source": "agent_topo_db",
+        "target_agent": "partner_feed_adapter",
+        "topology": "22_join_external_adapter"
+      },
+      "verdict": {
+        "confidence": 0.4,
+        "culprits": [
+          "22_join_external_adapter"
+        ],
+        "incident": true,
+        "report_type": "composition_failure"
+      }
+    }
+  },
+  "summary": {
+    "blind_cells": [
+      "05_diamond__hallucinate_at_marketing_writer",
+      "21_fan_in_join__drop_numbers_at_metrics_analyst",
+      "22_join_external_adapter__rewrite_currency_at_partner_feed_adapter"
+    ],
+    "cells_total": 11,
+    "controls": 4,
+    "discriminated": 3,
+    "discrimination_rate": 0.5,
+    "false_positive_cells": [
+      "02_pipeline__clean",
+      "05_diamond__clean",
+      "21_fan_in_join__clean",
+      "22_join_external_adapter__clean"
+    ],
+    "false_positive_rate": 1.0,
+    "false_positives": 4,
+    "faulted": 6
+  }
+}

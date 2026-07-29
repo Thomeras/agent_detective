@@ -1,0 +1,10 @@
+{
+  "topology": "22_join_external_adapter",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": null,
+  "target_agent": null,
+  "injections_applied": 0,
+  "expect_incident": false,
+  "recorded_at": "2026-07-29T08:51:19+00:00"
+}
