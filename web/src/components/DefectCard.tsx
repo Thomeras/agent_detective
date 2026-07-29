@@ -11,6 +11,7 @@
 
 import type { Defect, DefectCaveat, Finding } from "../verdict/types";
 import { defectDescriptor, originPhrase } from "../verdict/descriptor";
+import { SPOKEN_KEYS, summarizeFinding } from "../verdict/findingSummary";
 import { Badge, Card, Chip, Disclosure, Meter } from "../ui/primitives";
 
 // Human labels for the structured caveat fields (§2.4). Typed kinds first, with
@@ -41,12 +42,25 @@ function CaveatChips({ caveats }: { caveats?: DefectCaveat[] }) {
 }
 
 // One evidencing Finding, resolved from the report's findings[] by index.
-function FindingRow({ finding }: { finding: Finding }) {
+//
+// States the fact as a sentence and quotes the reasoning behind it. The raw
+// payload stays one click away rather than being the primary view: a dump of
+// every key in `data` is what made a real report read as a memory listing.
+function FindingRow({
+  finding,
+  labelFor,
+}: {
+  finding: Finding;
+  labelFor?: (runId: string) => string;
+}) {
+  const summary = summarizeFinding(finding, labelFor);
   const subject =
     finding.subject.scope === "run" && finding.subject.run_id
-      ? `run ${finding.subject.run_id.slice(0, 8)}`
+      ? (labelFor?.(finding.subject.run_id) ?? `run ${finding.subject.run_id.slice(0, 8)}`)
       : finding.subject.scope;
-  const dataEntries = Object.entries(finding.data ?? {});
+  const rest = Object.entries(finding.data ?? {}).filter(
+    ([k]) => !SPOKEN_KEYS.has(k),
+  );
   return (
     <div className="finding-row">
       <div className="finding-head">
@@ -56,30 +70,57 @@ function FindingRow({ finding }: { finding: Finding }) {
         <Badge channel={finding.channel} title={`${finding.channel} basis`}>
           {finding.channel === "deterministic" ? "deterministic" : "assessment"}
         </Badge>
-        <span className="finding-kind mono">{finding.kind}</span>
         <span className="finding-subject dim">{subject}</span>
-        <span className="finding-certainty mono dim" title="certainty">
+        <span className="finding-certainty mono dim" title="certainty of this finding">
           {Math.round(finding.certainty * 100)}%
         </span>
       </div>
+
+      <p className="finding-headline">{summary.headline}</p>
+
+      {summary.tags.length > 0 && (
+        <div className="finding-tags">
+          {summary.tags.map((tag) => (
+            <span key={tag} className="finding-tag mono">
+              {tag}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {summary.reasoning && (
+        <blockquote className="finding-reasoning">{summary.reasoning}</blockquote>
+      )}
+
       {finding.provenance?.quote && (
         <blockquote className="finding-quote">“{finding.provenance.quote}”</blockquote>
       )}
-      {finding.provenance?.label && (
-        <div className="finding-basis dim small">
-          basis: <span className="mono">{finding.provenance.label}</span>
-          {finding.provenance.source ? ` · ${finding.provenance.source}` : ""}
-        </div>
-      )}
-      {dataEntries.length > 0 && (
-        <dl className="finding-data">
-          {dataEntries.map(([k, v]) => (
-            <div key={k} className="finding-data-row">
-              <dt className="mono">{k}</dt>
-              <dd className="mono">{renderValue(v)}</dd>
-            </div>
-          ))}
-        </dl>
+
+      <div className="finding-basis dim small">
+        {finding.provenance?.label ? (
+          <>
+            basis: <span className="mono">{finding.provenance.label}</span>
+            {finding.provenance.source ? ` · ${finding.provenance.source}` : ""}
+          </>
+        ) : (
+          <>
+            kind: <span className="mono">{finding.kind}</span>
+          </>
+        )}
+      </div>
+
+      {rest.length > 0 && (
+        <details className="finding-raw">
+          <summary className="small dim">raw payload ({rest.length})</summary>
+          <dl className="finding-data">
+            {rest.map(([k, v]) => (
+              <div key={k} className="finding-data-row">
+                <dt className="mono">{k}</dt>
+                <dd className="mono">{renderValue(v)}</dd>
+              </div>
+            ))}
+          </dl>
+        </details>
       )}
     </div>
   );
@@ -186,7 +227,11 @@ export default function DefectCard({
                   <div className="finding-group-label dim small">evidence for this defect</div>
                   <div className="finding-list">
                     {supporting.map((x, i) => (
-                      <FindingRow key={`s-${x.finding.kind}-${i}`} finding={x.finding} />
+                      <FindingRow
+                        key={`s-${x.finding.kind}-${i}`}
+                        finding={x.finding}
+                        labelFor={labelFor}
+                      />
                     ))}
                   </div>
                 </div>
@@ -198,7 +243,11 @@ export default function DefectCard({
                   </div>
                   <div className="finding-list">
                     {refuting.map((x, i) => (
-                      <FindingRow key={`r-${x.finding.kind}-${i}`} finding={x.finding} />
+                      <FindingRow
+                        key={`r-${x.finding.kind}-${i}`}
+                        finding={x.finding}
+                        labelFor={labelFor}
+                      />
                     ))}
                   </div>
                 </div>
@@ -208,7 +257,11 @@ export default function DefectCard({
                   <div className="finding-group-label dim small">context</div>
                   <div className="finding-list">
                     {context.map((x, i) => (
-                      <FindingRow key={`c-${x.finding.kind}-${i}`} finding={x.finding} />
+                      <FindingRow
+                        key={`c-${x.finding.kind}-${i}`}
+                        finding={x.finding}
+                        labelFor={labelFor}
+                      />
                     ))}
                   </div>
                 </div>

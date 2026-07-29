@@ -1308,6 +1308,49 @@ a:hover {
   margin-left: auto;
   font-size: 12px;
 }
+/* The fact itself: the one line a reader must be able to take in at a glance.
+   Everything else on the row is provenance for it. */
+.finding-headline {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+/* The judge's own words. Prose, so it reads as prose — it used to arrive as a
+   monospace key/value row indistinguishable from a numeric field. */
+.finding-reasoning {
+  margin: 0;
+  padding: 6px 10px;
+  border-left: 2px solid var(--accent, var(--border));
+  background: var(--surface-soft, transparent);
+  color: var(--text-dim);
+  font-size: 12px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.finding-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.finding-tag {
+  font-size: 11px;
+  padding: 1px 6px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  color: var(--text-dim);
+}
+/* Available, never the first thing you see. An evidence view that hides data is
+   one failure; one that shows only data is the other. */
+.finding-raw > summary {
+  cursor: pointer;
+  user-select: none;
+}
+.finding-raw[open] > summary {
+  margin-bottom: 6px;
+}
+
 .finding-quote {
   margin: 0;
   padding: 4px 10px;
