@@ -34,6 +34,15 @@ def _verdict(trace_path: Path) -> dict:
     run = analyze(bundles_from_exports(load_trace(trace_path)))
     graph = run.graphs[0]
     report = graph.blame_report
+    if report is None:
+        # A graph that came back clean carries no blame report at all — there
+        # was nothing to attribute. That is a PASS, not a missing measurement.
+        return {
+            "report_type": None,
+            "confidence": 0.0,
+            "incident": bool(graph.incident),
+            "culprits": [],
+        }
     names = {str(k): v for k, v in graph.agent_names.items()}
     return {
         "report_type": report.get("report_type"),
@@ -110,7 +119,7 @@ def main() -> int:
             print(f"  {c}")
     by_type: dict[str, int] = defaultdict(int)
     for cell in result["cells"].values():
-        by_type[cell["verdict"]["report_type"]] += 1
+        by_type[cell["verdict"]["report_type"] or "clean (no incident)"] += 1
     print("\nverdict distribution: " + ", ".join(f"{k}={v}" for k, v in sorted(by_type.items())))
     return 0
 

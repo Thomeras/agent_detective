@@ -18,13 +18,13 @@
           },
           "spans": [
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "42c803d4c5812f78",
-              "parentSpanId": "f79d5a765c8d8e9c",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "266d3455d40597eb",
+              "parentSpanId": "70f98e99efe6f3f4",
               "name": "feedback_source",
               "kind": 0,
-              "startTimeUnixNano": "1785313287164183000",
-              "endTimeUnixNano": "1785313289795819000",
+              "startTimeUnixNano": "1785316575899858000",
+              "endTimeUnixNano": "1785316578173512000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -53,7 +53,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00011175
+                    "doubleValue": 0.00010035
                   }
                 },
                 {
@@ -65,13 +65,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "148"
+                    "intValue": "129"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "ZPĚTNÁ VAZBA ROZŘAZENÁ PODLE TÉMAT A SEGMENTŮ:\n\n**1. Technické problémy**\n   - \"Export nam padal cely tyden, museli jsme to delat rucne.\" (enterprise)\n   - \"Podpora reaguje rychle, ale problem se opakuje.\" (enterprise)\n   - \"Chybi nam hromadny import.\" (small)\n\n**2. Vylepšení produktu**\n   - \"Nova synchronizace je konecne pouzitelna.\" (mid)\n\n**3. Ceny a konkurence**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\" (mid)"
+                    "stringValue": "### Třídění zpětné vazby podle témat a segmentů\n\n#### Téma: Technické problémy\n- \"Export nám padal celý týden, museli jsme to dělat ručně.\" (enterprise)\n- \"Podpora reaguje rychle, ale problém se opakuje.\" (enterprise)\n\n#### Téma: Funkcionalita\n- \"Nová synchronizace je konečně použitelná.\" (mid)\n- \"Chybí nám hromadný import.\" (small)\n\n#### Téma: Cena\n- \"Cena za Enterprise je proti konkurenci vysoká.\" (mid)"
                   }
                 }
               ],
@@ -80,13 +80,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "cba1160bee1c2bb8",
-              "parentSpanId": "42c803d4c5812f78",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "f0e6a896d3a347b0",
+              "parentSpanId": "266d3455d40597eb",
               "name": "feedback_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785313289796000000",
-              "endTimeUnixNano": "1785313293384236000",
+              "startTimeUnixNano": "1785316578173716000",
+              "endTimeUnixNano": "1785316581279125000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -103,7 +103,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- feedback_source ---\nZPĚTNÁ VAZBA ROZŘAZENÁ PODLE TÉMAT A SEGMENTŮ:\n\n**1. Technické problémy**\n   - \"Export nam padal cely tyden, museli jsme to delat rucne.\" (enterprise)\n   - \"Podpora reaguje rychle, ale problem se opakuje.\" (enterprise)\n   - \"Chybi nam hromadny import.\" (small)\n\n**2. Vylepšení produktu**\n   - \"Nova synchronizace je konecne pouzitelna.\" (mid)\n\n**3. Ceny a konkurence**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\" (mid)"
+                    "stringValue": "--- feedback_source ---\n### Třídění zpětné vazby podle témat a segmentů\n\n#### Téma: Technické problémy\n- \"Export nám padal celý týden, museli jsme to dělat ručně.\" (enterprise)\n- \"Podpora reaguje rychle, ale problém se opakuje.\" (enterprise)\n\n#### Téma: Funkcionalita\n- \"Nová synchronizace je konečně použitelná.\" (mid)\n- \"Chybí nám hromadný import.\" (small)\n\n#### Téma: Cena\n- \"Cena za Enterprise je proti konkurenci vysoká.\" (mid)"
                   }
                 },
                 {
@@ -115,25 +115,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0001419
+                    "doubleValue": 0.00011745
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "222"
+                    "intValue": "203"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "181"
+                    "intValue": "145"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Hlavní témata z poskytnuté zpětné vazby jsou:\n\n1. **Technické problémy**\n   - Problémy s exportem (enterprise)\n   - Opakující se problémy i přes rychlou podporu (enterprise)\n   - Chybějící funkce hromadného importu (small)\n\n2. **Vylepšení produktu**\n   - Zlepšení synchronizace (mid)\n\n3. **Ceny a konkurence**\n   - Vysoká cena za Enterprise ve srovnání s konkurencí (mid)\n\nNejvíce se tato témata týkají následujících segmentů:\n- **Enterprise**: technické problémy a cenová konkurence\n- **Mid**: vylepšení produktu a cenová konkurence\n- **Small**: technické problémy"
+                    "stringValue": "Hlavní témata ze zpětné vazby jsou:\n\n1. **Technické problémy**\n   - Týká se především segmentu **enterprise**.\n   - Příklady: problémy s exportem a opakující se technické potíže.\n\n2. **Funkcionalita**\n   - Týká se segmentů **mid** a **small**.\n   - Příklady: zlepšení synchronizace a potřeba hromadného importu.\n\n3. **Cena**\n   - Týká se segmentu **mid**.\n   - Příklad: vnímání ceny za Enterprise jako vysoké v porovnání s konkurencí."
                   }
                 }
               ],
@@ -142,13 +142,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "7c6e0b17eeba7d6a",
-              "parentSpanId": "f79d5a765c8d8e9c",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "95df49728b3a7d32",
+              "parentSpanId": "70f98e99efe6f3f4",
               "name": "metrics_source",
               "kind": 0,
-              "startTimeUnixNano": "1785313287163434000",
-              "endTimeUnixNano": "1785313293665962000",
+              "startTimeUnixNano": "1785316575899799000",
+              "endTimeUnixNano": "1785316583933734000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -177,7 +177,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00031005
+                    "doubleValue": 0.00031485
                   }
                 },
                 {
@@ -189,13 +189,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "477"
+                    "intValue": "485"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Na základě poskytnutých interních metrik za období od května do července 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu\n\n#### 1. Aktivní uživatelé\n- **Růst:** \n  - Červen: +260 uživatelů (z 4120 na 4380)\n- **Pokles:** \n  - Červenec: -90 uživatelů (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles:** \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst:** \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst:** \n  - Červen: +3 body (z 41 na 44)\n- **Pokles:** \n  - Červenec: -6 bodů (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles:** \n  - Červen: -25 tiketů (z 312 na 287)\n- **Růst:** \n  - Červenec: +114 tiketů (z 287 na 401)\n\n### Shrnutí\n- **Aktivní uživatelé** vykazují celkově mírný pokles v červenci po nárůstu v červnu.\n- **Churn rate** se zlepšil v červnu, avšak v červenci došlo k výraznému nárůstu.\n- **NPS** se zlepšil v červnu, ale v červenci došlo k poklesu, což může naznačovat zhoršení spokojenosti zákazníků.\n- **Počet tiketů** klesl v červnu, ale v červenci vzrostl, což může znamenat zvýšenou potřebu podpory.\n\nTento přehled může sloužit jako základ pro další analýzu a strategické plánování."
+                    "stringValue": "Na základě poskytnutých interních metrik za období od května do července 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu za období květen - červenec 2026\n\n#### 1. Aktivní uživatelé\n- **Růst**: \n  - Červen: +260 (z 4120 na 4380)\n- **Pokles**: \n  - Červenec: -90 (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles**: \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst**: \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst**: \n  - Červen: +3 (z 41 na 44)\n- **Pokles**: \n  - Červenec: -6 (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles**: \n  - Červen: -25 (z 312 na 287)\n- **Růst**: \n  - Červenec: +114 (z 287 na 401)\n\n### Shrnutí\n- **Aktivní uživatelé**: Růst v červnu, pokles v červenci.\n- **Churn rate**: Snížení v červnu, nárůst v červenci.\n- **NPS**: Zlepšení v červnu, zhoršení v červenci.\n- **Počet tiketů**: Pokles v červnu, výrazný nárůst v červenci.\n\nTento přehled ukazuje, že zatímco se aktivní uživatelé a NPS v červnu zlepšily, v červenci došlo k poklesu v těchto oblastech, což může naznačovat potřebu zaměřit se na zlepšení zákaznické zkušenosti a snížení churn rate."
                   }
                 }
               ],
@@ -204,13 +204,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "b8fd22adceac1e13",
-              "parentSpanId": "7c6e0b17eeba7d6a",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "1472c1fcc01ebe88",
+              "parentSpanId": "95df49728b3a7d32",
               "name": "metrics_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785313293666069000",
-              "endTimeUnixNano": "1785313303016782000",
+              "startTimeUnixNano": "1785316583933978000",
+              "endTimeUnixNano": "1785316595115003000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -227,7 +227,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- metrics_source ---\nNa základě poskytnutých interních metrik za období od května do července 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu\n\n#### 1. Aktivní uživatelé\n- **Růst:** \n  - Červen: +260 uživatelů (z 4120 na 4380)\n- **Pokles:** \n  - Červenec: -90 uživatelů (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles:** \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst:** \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst:** \n  - Červen: +3 body (z 41 na 44)\n- **Pokles:** \n  - Červenec: -6 bodů (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles:** \n  - Červen: -25 tiketů (z 312 na 287)\n- **Růst:** \n  - Červenec: +114 tiketů (z 287 na 401)\n\n### Shrnutí\n- **Aktivní uživatelé** vykazují celkově mírný pokles v červenci po nárůstu v červnu.\n- **Churn rate** se zlepšil v červnu, avšak v červenci došlo k výraznému nárůstu.\n- **NPS** se zlepšil v červnu, ale v červenci došlo k poklesu, což může naznačovat zhoršení spokojenosti zákazníků.\n- **Počet tiketů** klesl v červnu, ale v červenci vzrostl, což může znamenat zvýšenou potřebu podpory.\n\nTento přehled může sloužit jako základ pro další analýzu a strategické plánování."
+                    "stringValue": "--- metrics_source ---\nNa základě poskytnutých interních metrik za období od května do července 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu za období květen - červenec 2026\n\n#### 1. Aktivní uživatelé\n- **Růst**: \n  - Červen: +260 (z 4120 na 4380)\n- **Pokles**: \n  - Červenec: -90 (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles**: \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst**: \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst**: \n  - Červen: +3 (z 41 na 44)\n- **Pokles**: \n  - Červenec: -6 (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles**: \n  - Červen: -25 (z 312 na 287)\n- **Růst**: \n  - Červenec: +114 (z 287 na 401)\n\n### Shrnutí\n- **Aktivní uživatelé**: Růst v červnu, pokles v červenci.\n- **Churn rate**: Snížení v červnu, nárůst v červenci.\n- **NPS**: Zlepšení v červnu, zhoršení v červenci.\n- **Počet tiketů**: Pokles v červnu, výrazný nárůst v červenci.\n\nTento přehled ukazuje, že zatímco se aktivní uživatelé a NPS v červnu zlepšily, v červenci došlo k poklesu v těchto oblastech, což může naznačovat potřebu zaměřit se na zlepšení zákaznické zkušenosti a snížení churn rate."
                   }
                 },
                 {
@@ -239,25 +239,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0005181
+                    "doubleValue": 0.00052875
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "538"
+                    "intValue": "545"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "729"
+                    "intValue": "745"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Na základě poskytnutých interních metrik za období od května do července 2026 lze identifikovat několik klíčových trendů a jejich pravděpodobné příčiny:\n\n### 1. Aktivní uživatelé\n- **Trend:** V červnu došlo k nárůstu o 260 uživatelů, ale v červenci došlo k poklesu o 90 uživatelů.\n- **Možné příčiny:** Nárůst v červnu může být spojen s marketingovými aktivitami, promo akcemi nebo zlepšením produktu, které přilákaly nové uživatele. Pokles v červenci může naznačovat, že noví uživatelé nebyli dostatečně zapojeni nebo že existující uživatelé ztratili zájem, což může být důsledkem nedostatečné podpory nebo zhoršení uživatelské zkušenosti.\n\n### 2. Churn rate\n- **Trend:** Churn rate se v červnu snížil, ale v červenci výrazně vzrostl.\n- **Možné příčiny:** Snížení churn rate v červnu může být důsledkem úspěšných retenčních strategií nebo zlepšení v zákaznickém servisu. Naopak nárůst v červenci může naznačovat nespokojenost uživatelů, možná kvůli nedostatečné reakci na jejich potřeby nebo problémům s produktem, které vedly k odchodu uživatelů.\n\n### 3. NPS (Net Promoter Score)\n- **Trend:** NPS vzrostl v červnu, ale v červenci došlo k poklesu.\n- **Možné příčiny:** Růst NPS v červnu může být spojen s pozitivními změnami v produktu nebo službách, které uživatelé ocenili. Pokles v červenci může být důsledkem zhoršení kvality služeb, negativních zkušeností uživatelů nebo nedostatečné komunikace s uživateli, což vedlo k nižší spokojenosti.\n\n### 4. Počet tiketů\n- **Trend:** Počet tiketů klesl v červnu, ale v červenci vzrostl.\n- **Možné příčiny:** Pokles tiketů v červnu může naznačovat, že uživatelé měli méně problémů, nebo že se zlepšila kvalita produktu. Naopak nárůst v červenci může znamenat, že uživatelé čelili novým problémům, což by mohlo být spojeno s poklesem NPS a zvýšeným churn rate.\n\n### Závěr\nCelkově lze říci, že červen byl měsícem pozitivních trendů, zatímco červenec přinesl znepokojivé signály, které naznačují zhoršení spokojenosti uživatelů a zvýšenou potřebu podpory. Doporučuje se provést hloubkovou analýzu příčin poklesu aktivních uživatelů, zvýšení churn rate a poklesu NPS, aby bylo možné vyvinout účinné strategie pro zlepšení uživatelské zkušenosti a retence."
+                    "stringValue": "Na základě poskytnutých metrik za období květen až červenec 2026 lze identifikovat několik důležitých trendů a jejich pravděpodobné příčiny:\n\n### 1. Aktivní uživatelé\n- **Trend**: V červnu došlo k nárůstu o 260 aktivních uživatelů, zatímco v červenci došlo k poklesu o 90 uživatelů.\n- **Možné příčiny**: Nárůst v červnu může být výsledkem úspěšné marketingové kampaně, nových funkcí nebo zlepšení uživatelského zážitku. Pokles v červenci může naznačovat, že uživatelé nebyli dostatečně motivováni k udržení aktivního statusu, což může být důsledkem nedostatečné angažovanosti nebo konkurence.\n\n### 2. Churn rate\n- **Trend**: V červnu došlo k poklesu churn rate na 1.8 %, ale v červenci vzrostl na 3.4 %.\n- **Možné příčiny**: Pokles v červnu může být spojen s pozitivními změnami v produktu nebo službách, které vedly k větší spokojenosti uživatelů. Naopak nárůst v červenci může signalizovat nespokojenost s novými změnami, nedostatečnou podporu nebo problémy s uživatelským rozhraním, které vedly k odchodu uživatelů.\n\n### 3. NPS (Net Promoter Score)\n- **Trend**: NPS vzrostl v červnu na 44, ale v červenci klesl na 38.\n- **Možné příčiny**: Zlepšení NPS v červnu může být důsledkem pozitivních zkušeností uživatelů, zatímco pokles v červenci může naznačovat, že uživatelé byli nespokojeni s novými změnami, které byly implementovány, nebo s reakcí zákaznického servisu na jejich potřeby.\n\n### 4. Počet tiketů\n- **Trend**: Počet tiketů klesl v červnu, ale v červenci vzrostl o 114.\n- **Možné příčiny**: Pokles v červnu může znamenat, že uživatelé byli spokojeni a nepotřebovali pomoc. Nárůst v červenci může být důsledkem problémů, které uživatelé zažili, což vedlo k většímu počtu dotazů a stížností.\n\n### Shrnutí\nCelkově lze říci, že červen byl měsícem pozitivního vývoje, zatímco červenec přinesl několik varovných signálů. Je důležité zaměřit se na zlepšení zákaznické zkušenosti a analyzovat, co konkrétně vedlo k nárůstu churn rate a poklesu NPS. Zlepšení v těchto oblastech může pomoci stabilizovat a zvýšit počet aktivních uživatelů a snížit počet tiketů. Doporučuje se provést hloubkovou analýzu zpětné vazby od uživatelů a identifikovat konkrétní oblasti pro zlepšení."
                   }
                 }
               ],
@@ -266,13 +266,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "ad1a6e0e2c2574e4",
-              "parentSpanId": "eb8d9deca1f1d7d4",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "f295d2f62509d377",
+              "parentSpanId": "bfa2609f0689d6ba",
               "name": "read:feedback_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785313315182176000",
-              "endTimeUnixNano": "1785313315182188000",
+              "startTimeUnixNano": "1785316609262514000",
+              "endTimeUnixNano": "1785316609262553000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -298,13 +298,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "eb8d9deca1f1d7d4",
-              "parentSpanId": "b8fd22adceac1e13",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "bfa2609f0689d6ba",
+              "parentSpanId": "1472c1fcc01ebe88",
               "name": "performance_join",
               "kind": 0,
-              "startTimeUnixNano": "1785313303017341000",
-              "endTimeUnixNano": "1785313315182227000",
+              "startTimeUnixNano": "1785316595115343000",
+              "endTimeUnixNano": "1785316609262657000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -321,7 +321,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- metrics_analyst ---\nNa základě poskytnutých interních metrik za období od května do července 2026 lze identifikovat několik klíčových trendů a jejich pravděpodobné příčiny:\n\n### 1. Aktivní uživatelé\n- **Trend:** V červnu došlo k nárůstu o 260 uživatelů, ale v červenci došlo k poklesu o 90 uživatelů.\n- **Možné příčiny:** Nárůst v červnu může být spojen s marketingovými aktivitami, promo akcemi nebo zlepšením produktu, které přilákaly nové uživatele. Pokles v červenci může naznačovat, že noví uživatelé nebyli dostatečně zapojeni nebo že existující uživatelé ztratili zájem, což může být důsledkem nedostatečné podpory nebo zhoršení uživatelské zkušenosti.\n\n### 2. Churn rate\n- **Trend:** Churn rate se v červnu snížil, ale v červenci výrazně vzrostl.\n- **Možné příčiny:** Snížení churn rate v červnu může být důsledkem úspěšných retenčních strategií nebo zlepšení v zákaznickém servisu. Naopak nárůst v červenci může naznačovat nespokojenost uživatelů, možná kvůli nedostatečné reakci na jejich potřeby nebo problémům s produktem, které vedly k odchodu uživatelů.\n\n### 3. NPS (Net Promoter Score)\n- **Trend:** NPS vzrostl v červnu, ale v červenci došlo k poklesu.\n- **Možné příčiny:** Růst NPS v červnu může být spojen s pozitivními změnami v produktu nebo službách, které uživatelé ocenili. Pokles v červenci může být důsledkem zhoršení kvality služeb, negativních zkušeností uživatelů nebo nedostatečné komunikace s uživateli, což vedlo k nižší spokojenosti.\n\n### 4. Počet tiketů\n- **Trend:** Počet tiketů klesl v červnu, ale v červenci vzrostl.\n- **Možné příčiny:** Pokles tiketů v červnu může naznačovat, že uživatelé měli méně problémů, nebo že se zlepšila kvalita produktu. Naopak nárůst v červenci může znamenat, že uživatelé čelili novým problémům, což by mohlo být spojeno s poklesem NPS a zvýšeným churn rate.\n\n### Závěr\nCelkově lze říci, že červen byl měsícem pozitivních trendů, zatímco červenec přinesl znepokojivé signály, které naznačují zhoršení spokojenosti uživatelů a zvýšenou potřebu podpory. Doporučuje se provést hloubkovou analýzu příčin poklesu aktivních uživatelů, zvýšení churn rate a poklesu NPS, aby bylo možné vyvinout účinné strategie pro zlepšení uživatelské zkušenosti a retence.\n\n--- feedback_analyst ---\nHlavní témata z poskytnuté zpětné vazby jsou:\n\n1. **Technické problémy**\n   - Problémy s exportem (enterprise)\n   - Opakující se problémy i přes rychlou podporu (enterprise)\n   - Chybějící funkce hromadného importu (small)\n\n2. **Vylepšení produktu**\n   - Zlepšení synchronizace (mid)\n\n3. **Ceny a konkurence**\n   - Vysoká cena za Enterprise ve srovnání s konkurencí (mid)\n\nNejvíce se tato témata týkají následujících segmentů:\n- **Enterprise**: technické problémy a cenová konkurence\n- **Mid**: vylepšení produktu a cenová konkurence\n- **Small**: technické problémy"
+                    "stringValue": "--- metrics_analyst ---\nNa základě poskytnutých metrik za období květen až červenec 2026 lze identifikovat několik důležitých trendů a jejich pravděpodobné příčiny:\n\n### 1. Aktivní uživatelé\n- **Trend**: V červnu došlo k nárůstu o 260 aktivních uživatelů, zatímco v červenci došlo k poklesu o 90 uživatelů.\n- **Možné příčiny**: Nárůst v červnu může být výsledkem úspěšné marketingové kampaně, nových funkcí nebo zlepšení uživatelského zážitku. Pokles v červenci může naznačovat, že uživatelé nebyli dostatečně motivováni k udržení aktivního statusu, což může být důsledkem nedostatečné angažovanosti nebo konkurence.\n\n### 2. Churn rate\n- **Trend**: V červnu došlo k poklesu churn rate na 1.8 %, ale v červenci vzrostl na 3.4 %.\n- **Možné příčiny**: Pokles v červnu může být spojen s pozitivními změnami v produktu nebo službách, které vedly k větší spokojenosti uživatelů. Naopak nárůst v červenci může signalizovat nespokojenost s novými změnami, nedostatečnou podporu nebo problémy s uživatelským rozhraním, které vedly k odchodu uživatelů.\n\n### 3. NPS (Net Promoter Score)\n- **Trend**: NPS vzrostl v červnu na 44, ale v červenci klesl na 38.\n- **Možné příčiny**: Zlepšení NPS v červnu může být důsledkem pozitivních zkušeností uživatelů, zatímco pokles v červenci může naznačovat, že uživatelé byli nespokojeni s novými změnami, které byly implementovány, nebo s reakcí zákaznického servisu na jejich potřeby.\n\n### 4. Počet tiketů\n- **Trend**: Počet tiketů klesl v červnu, ale v červenci vzrostl o 114.\n- **Možné příčiny**: Pokles v červnu může znamenat, že uživatelé byli spokojeni a nepotřebovali pomoc. Nárůst v červenci může být důsledkem problémů, které uživatelé zažili, což vedlo k většímu počtu dotazů a stížností.\n\n### Shrnutí\nCelkově lze říci, že červen byl měsícem pozitivního vývoje, zatímco červenec přinesl několik varovných signálů. Je důležité zaměřit se na zlepšení zákaznické zkušenosti a analyzovat, co konkrétně vedlo k nárůstu churn rate a poklesu NPS. Zlepšení v těchto oblastech může pomoci stabilizovat a zvýšit počet aktivních uživatelů a snížit počet tiketů. Doporučuje se provést hloubkovou analýzu zpětné vazby od uživatelů a identifikovat konkrétní oblasti pro zlepšení.\n\n--- feedback_analyst ---\nHlavní témata ze zpětné vazby jsou:\n\n1. **Technické problémy**\n   - Týká se především segmentu **enterprise**.\n   - Příklady: problémy s exportem a opakující se technické potíže.\n\n2. **Funkcionalita**\n   - Týká se segmentů **mid** a **small**.\n   - Příklady: zlepšení synchronizace a potřeba hromadného importu.\n\n3. **Cena**\n   - Týká se segmentu **mid**.\n   - Příklad: vnímání ceny za Enterprise jako vysoké v porovnání s konkurencí."
                   }
                 },
                 {
@@ -333,25 +333,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00067485
+                    "doubleValue": 0.00059715
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "1007"
+                    "intValue": "985"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "873"
+                    "intValue": "749"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "### Měsíční přehled za červenec 2026\n\n#### 1. Shrnutí metrik\n- **Aktivní uživatelé:** Pokles o 90 uživatelů v červenci po nárůstu o 260 uživatelů v červnu.\n- **Churn rate:** Výrazný nárůst v červenci po snížení v červnu.\n- **NPS (Net Promoter Score):** Pokles v červenci po vzestupu v červnu.\n- **Počet tiketů:** Nárůst v červenci po poklesu v červnu.\n\n#### 2. Analýza trendů\n- **Aktivní uživatelé:** Nárůst v červnu může být přičítán úspěšným marketingovým aktivitám, zatímco pokles v červenci naznačuje možné problémy s angažovaností uživatelů.\n- **Churn rate:** Snížení churn rate v červnu ukazuje na úspěšné retenční strategie, ale nárůst v červenci může signalizovat nespokojenost uživatelů.\n- **NPS:** Růst v červnu byl pravděpodobně způsoben pozitivními změnami, zatímco pokles v červenci může být důsledkem zhoršení kvality služeb.\n- **Počet tiketů:** Nárůst tiketů v červenci naznačuje, že uživatelé čelili novým problémům, což může souviset s poklesem NPS a zvýšeným churn rate.\n\n#### 3. Zpětná vazba od uživatelů\n- **Technické problémy:** Uživatelé hlásí problémy s exportem a opakujícími se technickými problémy, což může přispět k nespokojenosti a zvýšenému churn rate.\n- **Vylepšení produktu:** Uživatelé vyjadřují potřebu zlepšení synchronizace a chybějící funkce hromadného importu, což může ovlivnit jejich spokojenost.\n- **Ceny a konkurence:** Vysoká cena za Enterprise ve srovnání s konkurencí může odradit potenciální uživatele a přispět k poklesu aktivních uživatelů.\n\n#### 4. Rozpor mezi metrikami a zpětnou vazbou\n- **Rozpor:** Metriky ukazují na pokles aktivních uživatelů a zvýšení churn rate, zatímco zpětná vazba od uživatelů se zaměřuje na technické problémy a cenovou konkurenci. Metriky naznačují, že uživatelé nejsou spokojeni s produktem, zatímco zpětná vazba ukazuje konkrétní oblasti, které je třeba zlepšit.\n- **Cemu věřit více:** V tomto případě je důležité věřit metrikám, protože poskytují kvantitativní data o chování uživatelů. Zpětná vazba je cenná pro identifikaci konkrétních problémů, ale metriky ukazují reálný dopad těchto problémů na angažovanost uživatelů.\n\n#### 5. Doporučení\n- **Hloubková analýza:** Doporučuje se provést podrobnou analýzu příčin poklesu aktivních uživatelů a zvýšení churn rate. \n- **Zlepšení produktu:** Zaměřit se na řešení technických problémů a implementaci požadovaných funkcí, jako je hromadný import.\n- **Cenová strategie:** Zvážit revizi cenové politiky pro segment Enterprise, aby se zvýšila konkurenceschopnost.\n\nTento přehled poskytuje komplexní pohled na aktuální situaci a doporučuje konkrétní kroky k zlepšení uživatelské zkušenosti a retence."
+                    "stringValue": "### Měsíční přehled za období květen - červenec 2026\n\n#### 1. Aktivní uživatelé\n- **Červen**: Nárůst o 260 uživatelů\n- **Červenec**: Pokles o 90 uživatelů\n- **Analýza**: Úspěšná marketingová kampaň a zlepšení uživatelského zážitku v červnu přispěly k nárůstu. Pokles v červenci může být způsoben nedostatečnou angažovaností uživatelů a konkurencí.\n\n#### 2. Churn rate\n- **Červen**: Pokles na 1.8 %\n- **Červenec**: Nárůst na 3.4 %\n- **Analýza**: Pozitivní změny v produktu vedly k poklesu churn rate v červnu. Nárůst v červenci může signalizovat nespokojenost s novými změnami, což je v souladu se zpětnou vazbou od uživatelů.\n\n#### 3. NPS (Net Promoter Score)\n- **Červen**: Nárůst na 44\n- **Červenec**: Pokles na 38\n- **Analýza**: Zlepšení NPS v červnu bylo pravděpodobně způsobeno pozitivními zkušenostmi uživatelů. Pokles v červenci může odrážet nespokojenost s novými funkcemi a reakcí zákaznického servisu.\n\n#### 4. Počet tiketů\n- **Červen**: Pokles\n- **Červenec**: Nárůst o 114 tiketů\n- **Analýza**: Pokles v červnu naznačuje spokojenost uživatelů, zatímco nárůst v červenci může být důsledkem technických problémů a nespokojenosti, což je potvrzeno zpětnou vazbou.\n\n### Shrnutí a rozpor\nCelkově červen přinesl pozitivní vývoj, zatímco červenec ukázal na několik varovných signálů. Zatímco metriky naznačují, že nárůst churn rate a pokles NPS v červenci jsou důsledkem nespokojenosti s novými změnami, zpětná vazba od uživatelů konkrétně poukazuje na technické problémy a potřebu zlepšení funkcionality.\n\n**Rozpor**: Metriky ukazují na obecnou nespokojenost, zatímco zpětná vazba specifikuje technické problémy a potřeby různých segmentů uživatelů. \n\n**Cemu věřit víc**: V tomto případě je důležité věnovat větší pozornost zpětné vazbě od uživatelů, protože poskytuje konkrétní informace o problémech, které mohou ovlivnit metriky. Metriky mohou ukazovat na trendy, ale zpětná vazba od uživatelů poskytuje cenné podrobnosti, které mohou vést k cíleným zlepšením. Doporučuje se provést hloubkovou analýzu těchto technických problémů a potřeb uživatelů, aby se zajistilo, že se situace v budoucnu zlepší."
                   }
                 }
               ],
@@ -360,13 +360,13 @@
               }
             },
             {
-              "traceId": "765e9333e086326379b7faa4d20504b3",
-              "spanId": "f79d5a765c8d8e9c",
+              "traceId": "f15f6eb6bdcdf2547ce93aacda8432fa",
+              "spanId": "70f98e99efe6f3f4",
               "parentSpanId": "",
               "name": "21_fan_in_join",
               "kind": 0,
-              "startTimeUnixNano": "1785313286730420000",
-              "endTimeUnixNano": "1785313315182303000",
+              "startTimeUnixNano": "1785316575476479000",
+              "endTimeUnixNano": "1785316609262865000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -383,7 +383,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "agent_topo_db topology 21_fan_in_join"
+                    "stringValue": "Priprav mesicni prehled vykonu: interni metriky + zpetna vazba zakazniku."
                   }
                 },
                 {

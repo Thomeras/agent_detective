@@ -12,6 +12,9 @@ dependencies = [
     "detective-sdk",
     "detective-ci",
     "agent-detective",
+    # Foreign-trace corpus (corpus/): a workspace member like the rest, so the
+    # dev env keeps it and its `record` extra instead of dropping them on sync.
+    "agent-detective-corpus",
     "ingest",
     # The deployed service wants the database/stream/object-store clients; the
     # core alone is what the local-mode CLI installs.
@@ -29,6 +32,7 @@ otel-mapper = { workspace = true }
 detective-sdk = { workspace = true }
 detective-ci = { workspace = true }
 agent-detective = { workspace = true }
+agent-detective-corpus = { workspace = true }
 ingest = { workspace = true }
 agent-detective-worker = { workspace = true }
 api = { workspace = true }

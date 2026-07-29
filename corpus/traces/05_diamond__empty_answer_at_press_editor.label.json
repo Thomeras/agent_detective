@@ -3,9 +3,11 @@
   "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
   "source": "agent_topo_db",
   "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
-  "fault": "hallucinate",
-  "target_agent": "marketing_writer",
+  "fault": "empty_answer",
+  "target_agent": "press_editor",
   "injections_applied": 1,
   "expect_incident": true,
-  "recorded_at": "2026-07-29T09:18:41+00:00"
+  "expect_signal": "empty_output",
+  "expect_origin": "press_editor",
+  "recorded_at": "2026-07-29T09:30:49+00:00"
 }

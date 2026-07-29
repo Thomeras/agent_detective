@@ -1,10 +1,11 @@
 {
   "topology": "05_diamond",
+  "task": "Priprav tiskovou zpravu k uvedeni noveho produktu.",
   "source": "agent_topo_db",
   "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
   "fault": "drop_numbers",
   "target_agent": "spec_extractor",
   "injections_applied": 1,
   "expect_incident": true,
-  "recorded_at": "2026-07-29T08:55:23+00:00"
+  "recorded_at": "2026-07-29T09:18:56+00:00"
 }

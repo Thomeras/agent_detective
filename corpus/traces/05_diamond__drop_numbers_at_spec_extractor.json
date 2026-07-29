@@ -18,13 +18,13 @@
           },
           "spans": [
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "7bd7aa1f0e6fa9f6",
-              "parentSpanId": "ebd9f9d815e9d5dd",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "16c2a30ce474e9c2",
+              "parentSpanId": "3d59a9e03b2979c6",
               "name": "spec_extractor",
               "kind": 0,
-              "startTimeUnixNano": "1785315302828656000",
-              "endTimeUnixNano": "1785315305725578000",
+              "startTimeUnixNano": "1785316722351355000",
+              "endTimeUnixNano": "1785316725235463000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -53,7 +53,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00010185
+                    "doubleValue": 0.00010305
                   }
                 },
                 {
@@ -65,13 +65,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "124"
+                    "intValue": "126"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena pro Team: Kč/uživatel/měsíc\n- Cena pro Enterprise: na vyžádání\n- Dostupnost: září - Regiony: EU"
+                    "stringValue": "- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena (Team): Kč/uživatel/měsíc\n- Cena (Enterprise): na vyžádání\n- Dostupnost: září - Region: EU regiony"
                   }
                 }
               ],
@@ -80,13 +80,13 @@
               }
             },
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "03bf14fadb528303",
-              "parentSpanId": "7bd7aa1f0e6fa9f6",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "8ba3cc7b7ab89fde",
+              "parentSpanId": "16c2a30ce474e9c2",
               "name": "tech_writer",
               "kind": 0,
-              "startTimeUnixNano": "1785315305726182000",
-              "endTimeUnixNano": "1785315309823651000",
+              "startTimeUnixNano": "1785316725235854000",
+              "endTimeUnixNano": "1785316730611960000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -103,7 +103,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- spec_extractor ---\n- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena pro Team: Kč/uživatel/měsíc\n- Cena pro Enterprise: na vyžádání\n- Dostupnost: září - Regiony: EU"
+                    "stringValue": "--- spec_extractor ---\n- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena (Team): Kč/uživatel/měsíc\n- Cena (Enterprise): na vyžádání\n- Dostupnost: září - Region: EU regiony"
                   }
                 },
                 {
@@ -115,25 +115,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00011445
+                    "doubleValue": 0.0002256
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "167"
+                    "intValue": "168"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "149"
+                    "intValue": "334"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "**Technická část tiskové zprávy**\n\nProdukt: Atlas Sync\n\nTyp synchronizace: Obousměrná (dříve jednosměrná)\n\nLatence: 5 ms (dříve 1000 ms)\n\nKonfliktní strategie: Na úrovni pole\n\nJednotné přihlašování (SSO): Podporováno prostřednictvím SAML\n\nAudit log: Uchovává se po dobu 30 dní\n\nCenové modely:\n- Cena pro Team: 200 Kč/uživatel/měsíc\n- Cena pro Enterprise: Na vyžádání\n\nDostupnost: Od září 2023\n\nRegiony: Evropská unie"
+                    "stringValue": "**Technická část tiskové zprávy**\n\nProdukt: Atlas Sync\n\n1. **Typ synchronizace**: Atlas Sync nyní podporuje obousměrnou synchronizaci, což zvyšuje flexibilitu a efektivitu správy dat ve srovnání s předchozí jednosměrnou verzí.\n\n2. **Latence**: Nová verze dosahuje latence v milisekundách, což představuje výrazné zlepšení oproti dřívějšímu zpoždění v sekundách.\n\n3. **Konfliktní strategie**: Synchronizace dat probíhá na úrovni pole, což umožňuje detailnější a přesnější řešení konfliktů mezi datovými sadami.\n\n4. **Jednotné přihlašování (SSO)**: Atlas Sync implementuje SSO prostřednictvím protokolu SAML, což zjednodušuje proces přihlašování pro uživatele a zvyšuje bezpečnost.\n\n5. **Audit log**: Systém uchovává auditní záznamy po dobu 30 dní, což umožňuje sledování a analýzu změn v datech.\n\n6. **Cenové modely**:\n   - **Team**: Cena činí Kč XX/uživatel/měsíc.\n   - **Enterprise**: Cena je dostupná na vyžádání, přičemž zahrnuje přizpůsobení a další služby.\n\n7. **Dostupnost**: Atlas Sync bude k dispozici od září v regionech EU."
                   }
                 }
               ],
@@ -142,13 +142,13 @@
               }
             },
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "717a679f93ef15ee",
-              "parentSpanId": "7bd7aa1f0e6fa9f6",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "ea5d7d06f451aaa3",
+              "parentSpanId": "16c2a30ce474e9c2",
               "name": "marketing_writer",
               "kind": 0,
-              "startTimeUnixNano": "1785315305726387000",
-              "endTimeUnixNano": "1785315315969431000",
+              "startTimeUnixNano": "1785316725236003000",
+              "endTimeUnixNano": "1785316731102218000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -165,7 +165,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- spec_extractor ---\n- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena pro Team: Kč/uživatel/měsíc\n- Cena pro Enterprise: na vyžádání\n- Dostupnost: září - Regiony: EU"
+                    "stringValue": "--- spec_extractor ---\n- Název produktu: Atlas Sync - Typ synchronizace: obousměrná (dříve jednosměrná)\n- Latence: ms (dříve s)\n- Konfliktní strategie: na úrovni pole\n- SSO: přes SAML\n- Audit log: dní\n- Cena (Team): Kč/uživatel/měsíc\n- Cena (Enterprise): na vyžádání\n- Dostupnost: září - Region: EU regiony"
                   }
                 },
                 {
@@ -177,25 +177,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0003744
+                    "doubleValue": 0.00026535
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "184"
+                    "intValue": "185"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "578"
+                    "intValue": "396"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "**Tisková zpráva: Představujeme Atlas Sync – Revoluční nástroj pro efektivní synchronizaci dat**\n\nS potěšením oznamujeme uvedení Atlas Sync, našeho nového nástroje pro obousměrnou synchronizaci dat, který přináší revoluci do způsobu, jakým týmy spravují a sdílejí informace. Atlas Sync je navržen tak, aby zjednodušil a zefektivnil pracovní procesy, a to jak pro malé týmy, tak pro velké podniky.\n\n**Klíčové výhody Atlas Sync:**\n\n1. **Obousměrná synchronizace:** Na rozdíl od tradičních jednosměrných řešení, Atlas Sync umožňuje obousměrnou synchronizaci dat, což znamená, že změny provedené v jednom systému se okamžitě projeví i v druhém. To zajišťuje, že všechny týmy mají vždy přístup k aktuálním informacím.\n\n2. **Rychlost a efektivita:** S latencí v milisekundách se Atlas Sync postará o to, že vaše data budou synchronizována téměř okamžitě. Už žádné zbytečné čekání – vaše týmy mohou pracovat rychleji a efektivněji.\n\n3. **Intuitivní správa konfliktů:** Naše pokročilá strategie správy konfliktů na úrovni pole zajišťuje, že i v případě, kdy dojde k rozporu mezi daty, bude situace vyřešena hladce a bez zbytečných komplikací.\n\n4. **Bezpečnost na prvním místě:** Atlas Sync podporuje SSO přes SAML, což zaručuje bezpečný a snadný přístup pro všechny uživatele. Vaše data jsou chráněna na nejvyšší úrovni.\n\n5. **Podrobný audit log:** S naším audit logem, který uchovává záznamy po dobu několika dní, máte vždy přehled o všech změnách a aktivitách, což zvyšuje transparentnost a důvěru ve správu dat.\n\nAtlas Sync je dostupný od září a je ideální pro týmy i podniky v regionu EU. Cena pro týmové uživatele začíná na Kč/uživatel/měsíc, zatímco pro enterprise řešení je cena k dispozici na vyžádání.\n\nPřipojte se k revoluci v synchronizaci dat s Atlas Sync a zjistěte, jak může zlepšit efektivitu vašeho týmu. Pro více informací nás neváhejte kontaktovat."
+                    "stringValue": "**Představujeme Atlas Sync: Revoluční obousměrná synchronizace pro váš tým!**\n\nS potěšením oznamujeme příchod Atlas Sync, inovativního nástroje, který přetváří způsob, jakým vaše organizace spravuje data. Na rozdíl od tradiční jednosměrné synchronizace, Atlas Sync nabízí obousměrnou synchronizaci, což znamená, že vaše data jsou nyní vždy aktuální a dostupná na všech platformách. \n\nJednou z nejvýznamnějších výhod Atlas Sync je jeho extrémně nízká latence, která se nyní měří v milisekundách, což zajišťuje okamžitou reakci a efektivní práci bez zbytečných prodlev. Naše pokročilá konfliktní strategie na úrovni pole vám navíc dává plnou kontrolu nad tím, jak se data synchronizují, což minimalizuje riziko chyb a zajišťuje hladký průběh práce.\n\nBezpečnost je pro nás prioritou. Atlas Sync podporuje SSO přes SAML, což znamená, že přístup k vašim datům je nejen snadný, ale také bezpečný. A s možností audit logu po dobu několika dní máte vždy přehled o všech změnách a aktivitách.\n\nAtlas Sync je dostupný od září a je ideální pro týmy i velké podniky. Cena pro týmové uživatele začíná na Kč/uživatel/měsíc, zatímco pro podnikové zákazníky nabízíme individuální cenové nabídky na vyžádání.\n\nNezmeškejte příležitost posunout vaši organizaci na novou úroveň efektivity a bezpečnosti. Připravte se na revoluci v synchronizaci dat s Atlas Sync!"
                   }
                 }
               ],
@@ -204,13 +204,13 @@
               }
             },
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "26c7e2a6490fc5ef",
-              "parentSpanId": "ac8112a12164c3b6",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "679a7aea93910071",
+              "parentSpanId": "fa0443ba5c55cc8a",
               "name": "read:marketing_writer",
               "kind": 0,
-              "startTimeUnixNano": "1785315323314033000",
-              "endTimeUnixNano": "1785315323314050000",
+              "startTimeUnixNano": "1785316736377870000",
+              "endTimeUnixNano": "1785316736377905000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -236,13 +236,13 @@
               }
             },
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "ac8112a12164c3b6",
-              "parentSpanId": "03bf14fadb528303",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "fa0443ba5c55cc8a",
+              "parentSpanId": "8ba3cc7b7ab89fde",
               "name": "press_editor",
               "kind": 0,
-              "startTimeUnixNano": "1785315315969856000",
-              "endTimeUnixNano": "1785315323314103000",
+              "startTimeUnixNano": "1785316731102637000",
+              "endTimeUnixNano": "1785316736377996000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -259,7 +259,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- tech_writer ---\n**Technická část tiskové zprávy**\n\nProdukt: Atlas Sync\n\nTyp synchronizace: Obousměrná (dříve jednosměrná)\n\nLatence: 5 ms (dříve 1000 ms)\n\nKonfliktní strategie: Na úrovni pole\n\nJednotné přihlašování (SSO): Podporováno prostřednictvím SAML\n\nAudit log: Uchovává se po dobu 30 dní\n\nCenové modely:\n- Cena pro Team: 200 Kč/uživatel/měsíc\n- Cena pro Enterprise: Na vyžádání\n\nDostupnost: Od září 2023\n\nRegiony: Evropská unie\n\n--- marketing_writer ---\n**Tisková zpráva: Představujeme Atlas Sync – Revoluční nástroj pro efektivní synchronizaci dat**\n\nS potěšením oznamujeme uvedení Atlas Sync, našeho nového nástroje pro obousměrnou synchronizaci dat, který přináší revoluci do způsobu, jakým týmy spravují a sdílejí informace. Atlas Sync je navržen tak, aby zjednodušil a zefektivnil pracovní procesy, a to jak pro malé týmy, tak pro velké podniky.\n\n**Klíčové výhody Atlas Sync:**\n\n1. **Obousměrná synchronizace:** Na rozdíl od tradičních jednosměrných řešení, Atlas Sync umožňuje obousměrnou synchronizaci dat, což znamená, že změny provedené v jednom systému se okamžitě projeví i v druhém. To zajišťuje, že všechny týmy mají vždy přístup k aktuálním informacím.\n\n2. **Rychlost a efektivita:** S latencí v milisekundách se Atlas Sync postará o to, že vaše data budou synchronizována téměř okamžitě. Už žádné zbytečné čekání – vaše týmy mohou pracovat rychleji a efektivněji.\n\n3. **Intuitivní správa konfliktů:** Naše pokročilá strategie správy konfliktů na úrovni pole zajišťuje, že i v případě, kdy dojde k rozporu mezi daty, bude situace vyřešena hladce a bez zbytečných komplikací.\n\n4. **Bezpečnost na prvním místě:** Atlas Sync podporuje SSO přes SAML, což zaručuje bezpečný a snadný přístup pro všechny uživatele. Vaše data jsou chráněna na nejvyšší úrovni.\n\n5. **Podrobný audit log:** S naším audit logem, který uchovává záznamy po dobu několika dní, máte vždy přehled o všech změnách a aktivitách, což zvyšuje transparentnost a důvěru ve správu dat.\n\nAtlas Sync je dostupný od září a je ideální pro týmy i podniky v regionu EU. Cena pro týmové uživatele začíná na Kč/uživatel/měsíc, zatímco pro enterprise řešení je cena k dispozici na vyžádání.\n\nPřipojte se k revoluci v synchronizaci dat s Atlas Sync a zjistěte, jak může zlepšit efektivitu vašeho týmu. Pro více informací nás neváhejte kontaktovat."
+                    "stringValue": "--- tech_writer ---\n**Technická část tiskové zprávy**\n\nProdukt: Atlas Sync\n\n1. **Typ synchronizace**: Atlas Sync nyní podporuje obousměrnou synchronizaci, což zvyšuje flexibilitu a efektivitu správy dat ve srovnání s předchozí jednosměrnou verzí.\n\n2. **Latence**: Nová verze dosahuje latence v milisekundách, což představuje výrazné zlepšení oproti dřívějšímu zpoždění v sekundách.\n\n3. **Konfliktní strategie**: Synchronizace dat probíhá na úrovni pole, což umožňuje detailnější a přesnější řešení konfliktů mezi datovými sadami.\n\n4. **Jednotné přihlašování (SSO)**: Atlas Sync implementuje SSO prostřednictvím protokolu SAML, což zjednodušuje proces přihlašování pro uživatele a zvyšuje bezpečnost.\n\n5. **Audit log**: Systém uchovává auditní záznamy po dobu 30 dní, což umožňuje sledování a analýzu změn v datech.\n\n6. **Cenové modely**:\n   - **Team**: Cena činí Kč XX/uživatel/měsíc.\n   - **Enterprise**: Cena je dostupná na vyžádání, přičemž zahrnuje přizpůsobení a další služby.\n\n7. **Dostupnost**: Atlas Sync bude k dispozici od září v regionech EU.\n\n--- marketing_writer ---\n**Představujeme Atlas Sync: Revoluční obousměrná synchronizace pro váš tým!**\n\nS potěšením oznamujeme příchod Atlas Sync, inovativního nástroje, který přetváří způsob, jakým vaše organizace spravuje data. Na rozdíl od tradiční jednosměrné synchronizace, Atlas Sync nabízí obousměrnou synchronizaci, což znamená, že vaše data jsou nyní vždy aktuální a dostupná na všech platformách. \n\nJednou z nejvýznamnějších výhod Atlas Sync je jeho extrémně nízká latence, která se nyní měří v milisekundách, což zajišťuje okamžitou reakci a efektivní práci bez zbytečných prodlev. Naše pokročilá konfliktní strategie na úrovni pole vám navíc dává plnou kontrolu nad tím, jak se data synchronizují, což minimalizuje riziko chyb a zajišťuje hladký průběh práce.\n\nBezpečnost je pro nás prioritou. Atlas Sync podporuje SSO přes SAML, což znamená, že přístup k vašim datům je nejen snadný, ale také bezpečný. A s možností audit logu po dobu několika dní máte vždy přehled o všech změnách a aktivitách.\n\nAtlas Sync je dostupný od září a je ideální pro týmy i velké podniky. Cena pro týmové uživatele začíná na Kč/uživatel/měsíc, zatímco pro podnikové zákazníky nabízíme individuální cenové nabídky na vyžádání.\n\nNezmeškejte příležitost posunout vaši organizaci na novou úroveň efektivity a bezpečnosti. Připravte se na revoluci v synchronizaci dat s Atlas Sync!"
                   }
                 },
                 {
@@ -271,25 +271,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00047985
+                    "doubleValue": 0.0003879
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "811"
+                    "intValue": "814"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "597"
+                    "intValue": "443"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "**Tisková zpráva: Představujeme Atlas Sync – Revoluční nástroj pro efektivní synchronizaci dat**\n\nS potěšením oznamujeme uvedení Atlas Sync, našeho nového nástroje pro obousměrnou synchronizaci dat, který přináší revoluci do způsobu, jakým týmy spravují a sdílejí informace. Atlas Sync je navržen tak, aby zjednodušil a zefektivnil pracovní procesy, a to jak pro malé týmy, tak pro velké podniky.\n\n**Klíčové výhody Atlas Sync:**\n\n1. **Obousměrná synchronizace:** Na rozdíl od tradičních jednosměrných řešení, Atlas Sync umožňuje obousměrnou synchronizaci dat, což znamená, že změny provedené v jednom systému se okamžitě projeví i v druhém. To zajišťuje, že všechny týmy mají vždy přístup k aktuálním informacím.\n\n2. **Rychlost a efektivita:** S latencí pouhých 5 ms se Atlas Sync postará o to, že vaše data budou synchronizována téměř okamžitě. Už žádné zbytečné čekání – vaše týmy mohou pracovat rychleji a efektivněji.\n\n3. **Intuitivní správa konfliktů:** Naše pokročilá strategie správy konfliktů na úrovni pole zajišťuje, že i v případě, kdy dojde k rozporu mezi daty, bude situace vyřešena hladce a bez zbytečných komplikací.\n\n4. **Bezpečnost na prvním místě:** Atlas Sync podporuje jednotné přihlašování (SSO) prostřednictvím SAML, což zaručuje bezpečný a snadný přístup pro všechny uživatele. Vaše data jsou chráněna na nejvyšší úrovni.\n\n5. **Podrobný audit log:** S naším audit logem, který uchovává záznamy po dobu 30 dní, máte vždy přehled o všech změnách a aktivitách, což zvyšuje transparentnost a důvěru ve správu dat.\n\nAtlas Sync je dostupný od září 2023 a je ideální pro týmy i podniky v regionu Evropské unie. Cena pro týmové uživatele začíná na 200 Kč/uživatel/měsíc, zatímco pro enterprise řešení je cena k dispozici na vyžádání.\n\nPřipojte se k revoluci v synchronizaci dat s Atlas Sync a zjistěte, jak může zlepšit efektivitu vašeho týmu. Pro více informací nás neváhejte kontaktovat."
+                    "stringValue": "**Tisková zpráva: Představujeme Atlas Sync – Revoluční obousměrná synchronizace pro váš tým!**\n\nS potěšením oznamujeme příchod Atlas Sync, inovativního nástroje, který přetváří způsob, jakým vaše organizace spravuje data. Na rozdíl od tradiční jednosměrné synchronizace, Atlas Sync nyní nabízí obousměrnou synchronizaci, což zvyšuje flexibilitu a efektivitu správy dat. Vaše data jsou tak vždy aktuální a dostupná na všech platformách.\n\nJednou z nejvýznamnějších výhod Atlas Sync je extrémně nízká latence, která se nyní měří v milisekundách. To zajišťuje okamžitou reakci a efektivní práci bez zbytečných prodlev. Naše pokročilá konfliktní strategie na úrovni pole vám navíc dává plnou kontrolu nad tím, jak se data synchronizují, což minimalizuje riziko chyb a zajišťuje hladký průběh práce.\n\nBezpečnost je pro nás prioritou. Atlas Sync implementuje jednotné přihlašování (SSO) prostřednictvím protokolu SAML, což znamená, že přístup k vašim datům je nejen snadný, ale také bezpečný. S možností audit logu, který uchovává záznamy po dobu 30 dní, máte vždy přehled o všech změnách a aktivitách.\n\nAtlas Sync bude k dispozici od září v regionech EU a je ideální jak pro týmy, tak pro velké podniky. Cena pro týmové uživatele začíná na Kč XX/uživatel/měsíc, zatímco pro podnikové zákazníky nabízíme individuální cenové nabídky na vyžádání.\n\nNezmeškejte příležitost posunout vaši organizaci na novou úroveň efektivity a bezpečnosti. Připravte se na revoluci v synchronizaci dat s Atlas Sync!"
                   }
                 }
               ],
@@ -298,13 +298,13 @@
               }
             },
             {
-              "traceId": "7158f084a85c3dd22125736b240e9c72",
-              "spanId": "ebd9f9d815e9d5dd",
+              "traceId": "dd2fcdc96628ad30e18d18d3002da4ea",
+              "spanId": "3d59a9e03b2979c6",
               "parentSpanId": "",
               "name": "05_diamond",
               "kind": 0,
-              "startTimeUnixNano": "1785315302436216000",
-              "endTimeUnixNano": "1785315323314192000",
+              "startTimeUnixNano": "1785316721953876000",
+              "endTimeUnixNano": "1785316736378153000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -321,7 +321,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "agent_topo_db topology 05_diamond"
+                    "stringValue": "Priprav tiskovou zpravu k uvedeni noveho produktu."
                   }
                 },
                 {

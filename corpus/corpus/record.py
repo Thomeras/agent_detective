@@ -31,7 +31,7 @@ from .otel_bridge import build_tracer_provider
 from .topolab_adapter import TopolabTracer, install_usage_capture
 
 
-def _load_topology_main(topo_db: Path, topology: str):
+def _load_topology_module(topo_db: Path, topology: str):
     """Load ``topologies/<name>/main.py`` the way agent_topo_db's own runner does."""
     main_py = topo_db / "topologies" / topology / "main.py"
     if not main_py.is_file():
@@ -41,7 +41,7 @@ def _load_topology_main(topo_db: Path, topology: str):
         raise SystemExit(f"cannot load {main_py}")
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
-    return module.main
+    return module
 
 
 def record(
@@ -71,12 +71,25 @@ def record(
     )
     tracer = provider.get_tracer("agent-detective-corpus")
 
-    topology_main = _load_topology_main(topo_db, topology)
+    module = _load_topology_module(topo_db, topology)
+    topology_main = module.main
+    # The ORIGINAL request, read off the topology itself. This is the provenance
+    # the terminal judge cites — it is the only thing it can check the
+    # deliverable against. Naming the topology here instead (which this recorder
+    # did at first) hands the judge a string that is not a request at all, and
+    # it then correctly reports that the output does not answer it: a false
+    # incident manufactured entirely by the harness.
+    task = getattr(module, "TASK", None)
+    if not task:
+        raise SystemExit(
+            f"{topology} exposes no TASK constant; the terminal judge would have "
+            f"nothing to check the deliverable against. No entry written."
+        )
 
     root = tracer.start_span(topology, kind=SpanKind.INTERNAL)
     root.set_attribute("openinference.span.kind", "AGENT")
     root.set_attribute("gen_ai.agent.name", topology)
-    root.set_attribute("input.value", f"agent_topo_db topology {topology}")
+    root.set_attribute("input.value", task)
     root.set_attribute("output.value", "")
 
     install_usage_capture()
@@ -108,12 +121,22 @@ def record(
 
     meta = {
         "topology": topology,
+        "task": task,
         "source": "agent_topo_db",
         "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
         "fault": fault_name,
         "target_agent": target_agent,
         "injections_applied": injector.applied,
         "expect_incident": fault is not None,
+        # Faults whose consequence is a NAMED deterministic signal carry that
+        # expectation into the label, so CI can assert ground truth with no
+        # model in the path. Faults that only degrade prose cannot: their
+        # detection is a judged question and belongs in the scoreboard.
+        **(
+            {"expect_signal": "empty_output", "expect_origin": target_agent}
+            if fault_name == "empty_answer"
+            else {}
+        ),
         "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
     }
     (out_dir / f"{slug}.label.json").write_text(

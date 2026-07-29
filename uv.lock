@@ -119,6 +119,7 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "agent-detective" },
+    { name = "agent-detective-corpus" },
     { name = "agent-detective-worker", extra = ["server"] },
     { name = "api" },
     { name = "blame-engine" },
@@ -138,6 +139,7 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent-detective", editable = "packages/detective_cli" },
+    { name = "agent-detective-corpus", editable = "corpus" },
     { name = "agent-detective-worker", extras = ["server"], editable = "services/worker" },
     { name = "api", editable = "services/api" },
     { name = "blame-engine", editable = "packages/blame_engine" },

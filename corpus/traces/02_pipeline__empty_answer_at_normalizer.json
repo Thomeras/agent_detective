@@ -18,13 +18,13 @@
           },
           "spans": [
             {
-              "traceId": "6fd337576fe788f9c1a5dd1faaad6842",
-              "spanId": "64f9cd6e7d95ff0a",
-              "parentSpanId": "4a66b967a790948f",
+              "traceId": "dcde8ddf81333571ffb8aeafa41c93fa",
+              "spanId": "7299b6a69c585e3c",
+              "parentSpanId": "12e76796b5a699e7",
               "name": "log_ingestor",
               "kind": 0,
-              "startTimeUnixNano": "1785315210684067000",
-              "endTimeUnixNano": "1785315222722851000",
+              "startTimeUnixNano": "1785316652242839000",
+              "endTimeUnixNano": "1785316658660462000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -53,7 +53,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0003288
+                    "doubleValue": 0.0002676
                   }
                 },
                 {
@@ -65,13 +65,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "476"
+                    "intValue": "374"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "### Týdenní přehled nejčastějších problémů\n\n1. **Datum:** 2026-07-18 | **Typ:** billing | **Popis:** platba zamitnuta, kod 51 | **Zákazník:** ACME (enterprise) | **Dopad:** Zákazník nemohl provést platbu.\n2. **Datum:** 2026-07-18 | **Typ:** login | **Popis:** 2FA SMS nedorazila | **Zákazník:** Bez s.r.o. (small) | **Dopad:** Zákazník se nemohl přihlásit.\n3. **Datum:** 2026-07-19 | **Typ:** billing | **Popis:** dvojita platba | **Zákazník:** Nordis (enterprise) | **Dopad:** Zákazník byl zasažen finančními problémy.\n4. **Datum:** 2026-07-19 | **Typ:** export | **Popis:** CSV export skoncil timeoutem | **Zákazník:** ACME (enterprise) | **Dopad:** Zákazník neměl přístup k potřebným datům.\n5. **Datum:** 2026-07-20 | **Typ:** login | **Popis:** 2FA SMS nedorazila | **Zákazník:** Ferrum (mid) | **Dopad:** Zákazník se nemohl přihlásit.\n6. **Datum:** 2026-07-21 | **Typ:** export | **Popis:** CSV export skoncil timeoutem | **Zákazník:** Nordis (enterprise) | **Dopad:** Zákazník neměl přístup k potřebným datům.\n\n### Shrnutí problémů\n- **Nejčastější problémy:**\n  - 2FA SMS nedorazila (2 případy)\n  - CSV export skončil timeoutem (2 případy)\n  \n- **Dopady:**\n  - Problémy s přihlášením (2 zákazníci)\n  - Finanční problémy (1 zákazník)\n  - Nedostupnost dat (2 zákazníci)"
+                    "stringValue": "- 2026-07-18 | billing | platba zamitnuta, kod 51 | zakaznik: ACME (enterprise)\n- 2026-07-18 | login | 2FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- 2026-07-19 | billing | dvojita platba | zakaznik: Nordis (enterprise)\n- 2026-07-19 | export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- 2026-07-20 | login | 2FA SMS nedorazila | zakaznik: Ferrum (mid)\n- 2026-07-21 | export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)\n\n### Týdenní přehled nejčastějších problémů:\n\n1. **2FA SMS nedorazila**\n   - Počet: 2\n   - Dopad: Zákazníci (Bez s.r.o., Ferrum) nemohli přistupovat ke svým účtům.\n\n2. **CSV export skončil timeoutem**\n   - Počet: 2\n   - Dopad: Zákazníci (ACME, Nordis) nemohli úspěšně exportovat data.\n\n3. **Platba zamítnuta, kód 51**\n   - Počet: 1\n   - Dopad: Zákazník (ACME) nemohl provést platbu.\n\n4. **Dvojitá platba**\n   - Počet: 1\n   - Dopad: Zákazník (Nordis) měl problém s nechtěným zpracováním platby."
                   }
                 }
               ],
@@ -80,13 +80,13 @@
               }
             },
             {
-              "traceId": "6fd337576fe788f9c1a5dd1faaad6842",
-              "spanId": "3afcf2c7d2097086",
-              "parentSpanId": "64f9cd6e7d95ff0a",
+              "traceId": "dcde8ddf81333571ffb8aeafa41c93fa",
+              "spanId": "6805fbdad8b03724",
+              "parentSpanId": "7299b6a69c585e3c",
               "name": "normalizer",
               "kind": 0,
-              "startTimeUnixNano": "1785315222723151000",
-              "endTimeUnixNano": "1785315229540775000",
+              "startTimeUnixNano": "1785316658660714000",
+              "endTimeUnixNano": "1785316664664260000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -103,7 +103,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- log_ingestor ---\n### Týdenní přehled nejčastějších problémů\n\n1. **Datum:** 2026-07-18 | **Typ:** billing | **Popis:** platba zamitnuta, kod 51 | **Zákazník:** ACME (enterprise) | **Dopad:** Zákazník nemohl provést platbu.\n2. **Datum:** 2026-07-18 | **Typ:** login | **Popis:** 2FA SMS nedorazila | **Zákazník:** Bez s.r.o. (small) | **Dopad:** Zákazník se nemohl přihlásit.\n3. **Datum:** 2026-07-19 | **Typ:** billing | **Popis:** dvojita platba | **Zákazník:** Nordis (enterprise) | **Dopad:** Zákazník byl zasažen finančními problémy.\n4. **Datum:** 2026-07-19 | **Typ:** export | **Popis:** CSV export skoncil timeoutem | **Zákazník:** ACME (enterprise) | **Dopad:** Zákazník neměl přístup k potřebným datům.\n5. **Datum:** 2026-07-20 | **Typ:** login | **Popis:** 2FA SMS nedorazila | **Zákazník:** Ferrum (mid) | **Dopad:** Zákazník se nemohl přihlásit.\n6. **Datum:** 2026-07-21 | **Typ:** export | **Popis:** CSV export skoncil timeoutem | **Zákazník:** Nordis (enterprise) | **Dopad:** Zákazník neměl přístup k potřebným datům.\n\n### Shrnutí problémů\n- **Nejčastější problémy:**\n  - 2FA SMS nedorazila (2 případy)\n  - CSV export skončil timeoutem (2 případy)\n  \n- **Dopady:**\n  - Problémy s přihlášením (2 zákazníci)\n  - Finanční problémy (1 zákazník)\n  - Nedostupnost dat (2 zákazníci)"
+                    "stringValue": "--- log_ingestor ---\n- 2026-07-18 | billing | platba zamitnuta, kod 51 | zakaznik: ACME (enterprise)\n- 2026-07-18 | login | 2FA SMS nedorazila | zakaznik: Bez s.r.o. (small)\n- 2026-07-19 | billing | dvojita platba | zakaznik: Nordis (enterprise)\n- 2026-07-19 | export | CSV export skoncil timeoutem | zakaznik: ACME (enterprise)\n- 2026-07-20 | login | 2FA SMS nedorazila | zakaznik: Ferrum (mid)\n- 2026-07-21 | export | CSV export skoncil timeoutem | zakaznik: Nordis (enterprise)\n\n### Týdenní přehled nejčastějších problémů:\n\n1. **2FA SMS nedorazila**\n   - Počet: 2\n   - Dopad: Zákazníci (Bez s.r.o., Ferrum) nemohli přistupovat ke svým účtům.\n\n2. **CSV export skončil timeoutem**\n   - Počet: 2\n   - Dopad: Zákazníci (ACME, Nordis) nemohli úspěšně exportovat data.\n\n3. **Platba zamítnuta, kód 51**\n   - Počet: 1\n   - Dopad: Zákazník (ACME) nemohl provést platbu.\n\n4. **Dvojitá platba**\n   - Počet: 1\n   - Dopad: Zákazník (Nordis) měl problém s nechtěným zpracováním platby."
                   }
                 },
                 {
@@ -115,19 +115,19 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00033795
+                    "doubleValue": 0.00027645
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "557"
+                    "intValue": "455"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "424"
+                    "intValue": "347"
                   }
                 },
                 {
@@ -142,13 +142,13 @@
               }
             },
             {
-              "traceId": "6fd337576fe788f9c1a5dd1faaad6842",
-              "spanId": "2d94507f5181d9c7",
-              "parentSpanId": "3afcf2c7d2097086",
+              "traceId": "dcde8ddf81333571ffb8aeafa41c93fa",
+              "spanId": "7ed53c77450b5d23",
+              "parentSpanId": "6805fbdad8b03724",
               "name": "enricher",
               "kind": 0,
-              "startTimeUnixNano": "1785315229540961000",
-              "endTimeUnixNano": "1785315230955294000",
+              "startTimeUnixNano": "1785316664664496000",
+              "endTimeUnixNano": "1785316670939109000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -177,7 +177,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 5.235e-05
+                    "doubleValue": 0.00026055
                   }
                 },
                 {
@@ -189,13 +189,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "66"
+                    "intValue": "413"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Omlouvám se, ale potřeboval bych více informací o konkrétních událostech nebo situacích, které bych měl posoudit. Můžete prosím poskytnout konkrétní příklady událostí, které bych měl analyzovat a odhadnout jejich dopad?"
+                    "stringValue": "Odhad dopadu pro segment zákazníka a četnost problému:\n\n1. **Segment zákazníka: Malé podniky**\n   - **Četnost problému: Vysoká**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Malé podniky často nemají dostatečné zdroje na řešení problémů, což může vést k výrazným ztrátám v produktivitě a příjmech.\n\n2. **Segment zákazníka: Střední podniky**\n   - **Četnost problému: Střední**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Střední podniky mají obvykle lepší zdroje než malé, ale stále mohou být citlivé na problémy, které ovlivňují jejich provoz a ziskovost.\n\n3. **Segment zákazníka: Velké korporace**\n   - **Četnost problému: Nízká**\n   - **Odhad dopadu: Nízký**\n   - **Zdůvodnění:** Velké korporace mají obvykle robustní systémy a zdroje na řešení problémů, což minimalizuje dopad na jejich operace.\n\n4. **Segment zákazníka: Individuální uživatelé**\n   - **Četnost problému: Střední**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Individuální uživatelé mohou být ovlivněni problémy, ale jejich dopad je obvykle menší než u podniků, i když může mít významný vliv na jejich každodenní život.\n\nTento odhad dopadu je založen na analýze segmentů zákazníků a četnosti problémů, které se vyskytují v jejich specifických kontextech."
                   }
                 }
               ],
@@ -204,13 +204,13 @@
               }
             },
             {
-              "traceId": "6fd337576fe788f9c1a5dd1faaad6842",
-              "spanId": "7daebd9016724dda",
-              "parentSpanId": "2d94507f5181d9c7",
+              "traceId": "dcde8ddf81333571ffb8aeafa41c93fa",
+              "spanId": "9266ee43f3f2592c",
+              "parentSpanId": "7ed53c77450b5d23",
               "name": "report_writer",
               "kind": 0,
-              "startTimeUnixNano": "1785315230955510000",
-              "endTimeUnixNano": "1785315239869708000",
+              "startTimeUnixNano": "1785316670939358000",
+              "endTimeUnixNano": "1785316679922510000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -227,7 +227,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- enricher ---\nOmlouvám se, ale potřeboval bych více informací o konkrétních událostech nebo situacích, které bych měl posoudit. Můžete prosím poskytnout konkrétní příklady událostí, které bych měl analyzovat a odhadnout jejich dopad?"
+                    "stringValue": "--- enricher ---\nOdhad dopadu pro segment zákazníka a četnost problému:\n\n1. **Segment zákazníka: Malé podniky**\n   - **Četnost problému: Vysoká**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Malé podniky často nemají dostatečné zdroje na řešení problémů, což může vést k výrazným ztrátám v produktivitě a příjmech.\n\n2. **Segment zákazníka: Střední podniky**\n   - **Četnost problému: Střední**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Střední podniky mají obvykle lepší zdroje než malé, ale stále mohou být citlivé na problémy, které ovlivňují jejich provoz a ziskovost.\n\n3. **Segment zákazníka: Velké korporace**\n   - **Četnost problému: Nízká**\n   - **Odhad dopadu: Nízký**\n   - **Zdůvodnění:** Velké korporace mají obvykle robustní systémy a zdroje na řešení problémů, což minimalizuje dopad na jejich operace.\n\n4. **Segment zákazníka: Individuální uživatelé**\n   - **Četnost problému: Střední**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Individuální uživatelé mohou být ovlivněni problémy, ale jejich dopad je obvykle menší než u podniků, i když může mít významný vliv na jejich každodenní život.\n\nTento odhad dopadu je založen na analýze segmentů zákazníků a četnosti problémů, které se vyskytují v jejich specifických kontextech."
                   }
                 },
                 {
@@ -239,25 +239,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00027165
+                    "doubleValue": 0.00043455
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "147"
+                    "intValue": "493"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "416"
+                    "intValue": "601"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "1. **Zvýšení prodeje o 15%** - Doporučení: Udržet současnou marketingovou strategii a zvážit rozšíření do nových segmentů trhu.\n\n2. **Zpoždění dodávek o 2 týdny** - Doporučení: Provést analýzu dodavatelského řetězce a identifikovat alternativní dodavatele pro minimalizaci rizik.\n\n3. **Zvýšení nákladů na energie o 10%** - Doporučení: Zvážit investice do energeticky úsporných technologií a revizi provozních nákladů.\n\n4. **Zvýšení spokojenosti zákazníků o 20%** - Doporučení: Pokračovat v implementaci zákaznických programů a sbírat další zpětnou vazbu.\n\n5. **Pokles produktivity o 5%** - Doporučení: Provést školení pro zaměstnance a zhodnotit pracovní procesy.\n\n6. **Úspěšné zavedení nového produktu** - Doporučení: Zajistit dostatečné zásoby a připravit marketingovou kampaň pro podporu prodeje.\n\n7. **Nárůst konkurence na trhu** - Doporučení: Analyzovat konkurenci a přizpůsobit strategii pro udržení tržního podílu.\n\n8. **Zvýšení fluktuace zaměstnanců o 3%** - Doporučení: Provést průzkum spokojenosti zaměstnanců a zlepšit pracovní podmínky.\n\n9. **Úspěšné dokončení interního auditu** - Doporučení: Implementovat doporučení z auditu pro zlepšení procesů.\n\n10. **Zavedení nového softwaru** - Doporučení: Zajistit školení pro zaměstnance a monitorovat adaptaci na nový systém."
+                    "stringValue": "**Týdenní přehled pro vedení**\n\n1. **Malé podniky**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Zajistit cílenou podporu a zdroje pro malé podniky, aby se minimalizovaly ztráty v produktivitě.\n\n2. **Střední podniky**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Poskytnout školení a nástroje pro efektivní řešení problémů, které mohou ovlivnit jejich provoz.\n\n3. **Individuální uživatelé**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Zlepšit zákaznickou podporu a komunikaci, aby se snížil negativní dopad na jejich každodenní život.\n\n4. **Velké korporace**  \n   - **Dopad:** Nízký  \n   - **Doporučení:** Monitorovat situaci, ale zaměřit se na prevenci a inovace pro udržení konkurenceschopnosti.\n\n5. **Zvýšení povědomí**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Vytvořit marketingové kampaně zaměřené na malé a střední podniky pro zvýšení povědomí o dostupných řešeních.\n\n6. **Analýza dat**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Investovat do analytických nástrojů pro lepší porozumění potřebám jednotlivých segmentů zákazníků.\n\n7. **Zpětná vazba zákazníků**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Implementovat systém pro sběr a analýzu zpětné vazby od zákazníků pro zlepšení služeb.\n\n8. **Zaměření na inovace**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Podporovat inovace v produktech a službách, které mohou přinést hodnotu zejména malým a středním podnikům.\n\n9. **Školení zaměstnanců**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Zajistit pravidelná školení pro zaměstnance zaměřená na řešení problémů a zákaznický servis.\n\n10. **Sledování trendů**  \n   - **Dopad:** Nízký  \n   - **Doporučení:** Pravidelně sledovat trendy v průmyslu a přizpůsobovat strategie podle aktuálních potřeb trhu."
                   }
                 }
               ],
@@ -266,13 +266,13 @@
               }
             },
             {
-              "traceId": "6fd337576fe788f9c1a5dd1faaad6842",
-              "spanId": "4a66b967a790948f",
+              "traceId": "dcde8ddf81333571ffb8aeafa41c93fa",
+              "spanId": "12e76796b5a699e7",
               "parentSpanId": "",
               "name": "02_pipeline",
               "kind": 0,
-              "startTimeUnixNano": "1785315210246511000",
-              "endTimeUnixNano": "1785315239869949000",
+              "startTimeUnixNano": "1785316651820125000",
+              "endTimeUnixNano": "1785316679922677000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -289,7 +289,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "agent_topo_db topology 02_pipeline"
+                    "stringValue": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu."
                   }
                 },
                 {

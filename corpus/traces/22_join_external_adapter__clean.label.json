@@ -1,10 +1,11 @@
 {
   "topology": "22_join_external_adapter",
+  "task": "Priprav mesicni prehled vykonu: interni metriky + data od partnera.",
   "source": "agent_topo_db",
   "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
   "fault": null,
   "target_agent": null,
   "injections_applied": 0,
   "expect_incident": false,
-  "recorded_at": "2026-07-29T08:51:19+00:00"
+  "recorded_at": "2026-07-29T09:17:16+00:00"
 }

@@ -18,13 +18,13 @@
           },
           "spans": [
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "757ddd6cda5b6322",
-              "parentSpanId": "ba040235b65ead04",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "1100a7986e4ddf9a",
+              "parentSpanId": "a025e8d914638c46",
               "name": "partner_feed_adapter",
               "kind": 0,
-              "startTimeUnixNano": "1785315159626104000",
-              "endTimeUnixNano": "1785315161610471000",
+              "startTimeUnixNano": "1785316770373276000",
+              "endTimeUnixNano": "1785316772413293000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -71,7 +71,7 @@
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4619740"
+                    "stringValue": "--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4614340"
                   }
                 }
               ],
@@ -80,13 +80,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "bcfd5075640269b7",
-              "parentSpanId": "ba040235b65ead04",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "512ea503840250ff",
+              "parentSpanId": "a025e8d914638c46",
               "name": "metrics_source",
               "kind": 0,
-              "startTimeUnixNano": "1785315159626022000",
-              "endTimeUnixNano": "1785315163130146000",
+              "startTimeUnixNano": "1785316770373204000",
+              "endTimeUnixNano": "1785316775940883000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -115,7 +115,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00019725
+                    "doubleValue": 0.00023805
                   }
                 },
                 {
@@ -127,13 +127,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "299"
+                    "intValue": "367"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Zde je měsíční přehled výkonu na základě poskytnutých interních metrik:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn (%) | NPS |\n|-----------|-------------------|-----------|-----|\n| 2026-06   | 4380              | 1.8       | 44  |\n| 2026-07   | 4290              | 3.4       | 38  |\n\n### Pozorování:\n1. **Aktivní uživatelé**: Došlo k poklesu počtu aktivních uživatelů z 4380 v červnu na 4290 v červenci.\n2. **Churn rate**: Churn procento vzrostlo z 1.8% na 3.4%, což naznačuje, že více uživatelů opustilo službu.\n3. **NPS (Net Promoter Score)**: NPS kleslo z 44 na 38, což může znamenat nižší spokojenost uživatelů.\n\nTento přehled ukazuje na potřebu zaměřit se na udržení uživatelů a zlepšení celkové spokojenosti. Doporučuje se provést další analýzu a zjistit příčiny poklesu metrik."
+                    "stringValue": "Na základě poskytnutých interních metrik připravuji měsíční přehled výkonu:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn % | NPS |\n|-----------|-------------------|---------|-----|\n| 2026-06   | 4380              | 1.8     | 44  |\n| 2026-07   | 4290              | 3.4     | 38  |\n\n### Pozorování:\n1. **Snížení počtu aktivních uživatelů**: V červenci došlo k poklesu aktivních uživatelů z 4380 na 4290, což představuje pokles o 2.0%.\n2. **Zvýšení churn rate**: Churn rate vzrostl z 1.8% v červnu na 3.4% v červenci, což může naznačovat, že více uživatelů opouští službu.\n3. **Pokles NPS**: NPS (Net Promoter Score) klesl z 44 na 38, což může naznačovat nižší spokojenost uživatelů.\n\n### Doporučení:\n- Zjistit příčiny zvýšeného churn rate a poklesu NPS.\n- Zvážit strategie pro zvýšení angažovanosti uživatelů a zlepšení jejich zkušenosti.\n- Monitorovat trendy v následujících měsících pro lepší pochopení vývoje situace. \n\nPokud máte další data od partnera nebo další metriky, rád je zahrnu do přehledu."
                   }
                 }
               ],
@@ -142,13 +142,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "c0f1f4dbd15204b0",
-              "parentSpanId": "757ddd6cda5b6322",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "f9a9a5b181e7ee18",
+              "parentSpanId": "1100a7986e4ddf9a",
               "name": "partner_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785315161610785000",
-              "endTimeUnixNano": "1785315171894562000",
+              "startTimeUnixNano": "1785316772413439000",
+              "endTimeUnixNano": "1785316780671570000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -165,7 +165,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- partner_feed_adapter ---\n--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4619740"
+                    "stringValue": "--- partner_feed_adapter ---\n--- interni_model ---\nmesic;aktivni_uzivatele;churn_pct;nps;trzby_czk\n2026-07;3980;1.38;76;4538580\n2026-06;4010;0.73;81;4614340"
                   }
                 },
                 {
@@ -177,7 +177,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0003591
+                    "doubleValue": 0.0003765
                   }
                 },
                 {
@@ -189,13 +189,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "564"
+                    "intValue": "593"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Na základě poskytnutých dat lze provést analýzu a identifikovat případné odchylky.\n\n### Poskytnutá data:\n| Měsíc     | Aktivní uživatelé | Churn % | NPS | Tržby (CZK) |\n|-----------|-------------------|---------|-----|-------------|\n| 2026-07   | 3980              | 1.38    | 76  | 4538580     |\n| 2026-06   | 4010              | 0.73    | 81  | 4619740     |\n\n### Analýza:\n1. **Aktivní uživatelé**:\n   - V červenci 2026 došlo k poklesu počtu aktivních uživatelů z 4010 na 3980, což představuje pokles o 0.75%. Tento pokles může naznačovat ztrátu zájmu o službu nebo problémy s udržením uživatelů.\n\n2. **Churn %**:\n   - Churn rate vzrostl z 0.73% v červnu na 1.38% v červenci. Tento nárůst o 0.65 procentního bodu je významný a může signalizovat, že více uživatelů odchází, což je negativní trend.\n\n3. **NPS (Net Promoter Score)**:\n   - NPS klesl z 81 na 76. Tento pokles o 5 bodů může naznačovat, že uživatelé jsou méně spokojeni se službami, což může být spojeno s vyšším churn rate.\n\n4. **Tržby**:\n   - Tržby se snížily z 4,619,740 CZK na 4,538,580 CZK, což představuje pokles o přibližně 1.75%. Tento pokles může být důsledkem nižšího počtu aktivních uživatelů a vyššího churn rate.\n\n### Závěr:\n- Všechna sledovaná metrika (aktivní uživatelé, churn %, NPS a tržby) vykazuje negativní trend mezi červnem a červencem 2026.\n- Doporučuje se provést hloubkovou analýzu příčin těchto odchylek, například zkoumáním zpětné vazby od uživatelů, analýzou konkurence nebo hodnocením změn v produktu/službě, které mohly ovlivnit uživatelskou zkušenost."
+                    "stringValue": "Na základě poskytnutých dat můžeme provést analýzu a identifikovat odchylky od očekávání. Zde jsou klíčové ukazatele, které můžeme analyzovat:\n\n1. **Aktivní uživatelé**:\n   - Červen 2026: 4010\n   - Červenec 2026: 3980\n   - **Odchylka**: Pokles o 30 aktivních uživatelů. To může naznačovat problém s udržením uživatelů nebo nižší akvizici nových uživatelů.\n\n2. **Churn rate (churn_pct)**:\n   - Červen 2026: 0.73%\n   - Červenec 2026: 1.38%\n   - **Odchylka**: Nárůst churn rate o 0.65%. Tento nárůst může signalizovat, že více uživatelů odchází, což je negativní trend a může vyžadovat další analýzu příčin.\n\n3. **NPS (Net Promoter Score)**:\n   - Červen 2026: 81\n   - Červenec 2026: 76\n   - **Odchylka**: Pokles o 5 bodů. To může naznačovat, že spokojenost zákazníků se snižuje, což může být důsledkem zvýšeného churnu nebo jiných faktorů.\n\n4. **Tržby (trzby_czk)**:\n   - Červen 2026: 4,614,340 CZK\n   - Červenec 2026: 4,538,580 CZK\n   - **Odchylka**: Pokles o 75,760 CZK. Tento pokles v tržbách může být způsoben jak poklesem aktivních uživatelů, tak zvýšeným churnem.\n\n### Shrnutí:\n- **Pokles aktivních uživatelů** a **nárůst churn rate** jsou alarmující signály, které by měly být prozkoumány podrobněji.\n- **Pokles NPS** naznačuje, že uživatelé nejsou tak spokojeni jako dříve, což může mít vliv na jejich rozhodnutí zůstat u služby.\n- **Pokles tržeb** je přímým důsledkem předchozích faktorů a může mít dlouhodobé dopady na podnikání.\n\nDoporučuji provést další analýzu příčin těchto odchylek, například prostřednictvím průzkumů spokojenosti zákazníků, analýzy konkurence nebo hodnocení změn v produktech/službách."
                   }
                 }
               ],
@@ -204,13 +204,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "0746f055dc15d2d5",
-              "parentSpanId": "bcfd5075640269b7",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "d97bada9fa7ab751",
+              "parentSpanId": "512ea503840250ff",
               "name": "metrics_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785315163130201000",
-              "endTimeUnixNano": "1785315173826611000",
+              "startTimeUnixNano": "1785316775941103000",
+              "endTimeUnixNano": "1785316787934661000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -227,7 +227,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- metrics_source ---\nZde je měsíční přehled výkonu na základě poskytnutých interních metrik:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn (%) | NPS |\n|-----------|-------------------|-----------|-----|\n| 2026-06   | 4380              | 1.8       | 44  |\n| 2026-07   | 4290              | 3.4       | 38  |\n\n### Pozorování:\n1. **Aktivní uživatelé**: Došlo k poklesu počtu aktivních uživatelů z 4380 v červnu na 4290 v červenci.\n2. **Churn rate**: Churn procento vzrostlo z 1.8% na 3.4%, což naznačuje, že více uživatelů opustilo službu.\n3. **NPS (Net Promoter Score)**: NPS kleslo z 44 na 38, což může znamenat nižší spokojenost uživatelů.\n\nTento přehled ukazuje na potřebu zaměřit se na udržení uživatelů a zlepšení celkové spokojenosti. Doporučuje se provést další analýzu a zjistit příčiny poklesu metrik."
+                    "stringValue": "--- metrics_source ---\nNa základě poskytnutých interních metrik připravuji měsíční přehled výkonu:\n\n### Měsíční přehled výkonu\n\n| Měsíc     | Aktivní uživatelé | Churn % | NPS |\n|-----------|-------------------|---------|-----|\n| 2026-06   | 4380              | 1.8     | 44  |\n| 2026-07   | 4290              | 3.4     | 38  |\n\n### Pozorování:\n1. **Snížení počtu aktivních uživatelů**: V červenci došlo k poklesu aktivních uživatelů z 4380 na 4290, což představuje pokles o 2.0%.\n2. **Zvýšení churn rate**: Churn rate vzrostl z 1.8% v červnu na 3.4% v červenci, což může naznačovat, že více uživatelů opouští službu.\n3. **Pokles NPS**: NPS (Net Promoter Score) klesl z 44 na 38, což může naznačovat nižší spokojenost uživatelů.\n\n### Doporučení:\n- Zjistit příčiny zvýšeného churn rate a poklesu NPS.\n- Zvážit strategie pro zvýšení angažovanosti uživatelů a zlepšení jejich zkušenosti.\n- Monitorovat trendy v následujících měsících pro lepší pochopení vývoje situace. \n\nPokud máte další data od partnera nebo další metriky, rád je zahrnu do přehledu."
                   }
                 },
                 {
@@ -239,25 +239,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00047625
+                    "doubleValue": 0.0005061
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "355"
+                    "intValue": "422"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "705"
+                    "intValue": "738"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Na základě poskytnutých interních metrik a pozorování lze interpretovat následující trendy a jejich možné příčiny:\n\n### Trendy\n\n1. **Pokles aktivních uživatelů**:\n   - Snížení počtu aktivních uživatelů z 4380 na 4290 naznačuje, že služba ztrácí atraktivitu nebo že uživatelé nejsou dostatečně motivováni k dalšímu používání.\n\n2. **Zvýšení churn rate**:\n   - Churn rate vzrostl z 1.8% na 3.4%, což je významný nárůst. To může znamenat, že více uživatelů se rozhodlo službu opustit, což je alarmující signál pro udržení zákazníků.\n\n3. **Pokles NPS**:\n   - NPS klesl z 44 na 38, což naznačuje, že uživatelé jsou méně ochotni doporučit službu ostatním. To může být důsledkem zhoršení uživatelského zážitku nebo nespokojenosti s funkcionalitou služby.\n\n### Možné příčiny\n\n1. **Zhoršení uživatelského zážitku**:\n   - Pokud došlo k nějakým změnám v uživatelském rozhraní, funkcionalitě nebo výkonu služby, mohlo by to negativně ovlivnit spokojenost uživatelů.\n\n2. **Konkurence**:\n   - Zvýšení konkurence v daném segmentu může vést k tomu, že uživatelé hledají alternativy, které nabízejí lepší hodnotu nebo funkce.\n\n3. **Nedostatečná komunikace**:\n   - Pokud uživatelé nejsou dostatečně informováni o novinkách, vylepšeních nebo výhodách služby, mohou mít pocit, že služba stagnuje.\n\n4. **Změny v potřebách uživatelů**:\n   - Měnící se potřeby a preference uživatelů mohou znamenat, že služba již neodpovídá jejich očekáváním.\n\n### Doporučení\n\n1. **Provést hloubkovou analýzu**:\n   - Zjistit, proč uživatelé odcházejí, prostřednictvím dotazníků nebo rozhovorů.\n\n2. **Zlepšit uživatelský zážitek**:\n   - Zvážit úpravy na základě zpětné vazby od uživatelů a zaměřit se na zlepšení funkcionality a uživatelského rozhraní.\n\n3. **Zvýšit marketingové úsilí**:\n   - Zaměřit se na komunikaci hodnoty služby a novinky, které mohou přilákat nové uživatele a udržet stávající.\n\n4. **Monitorovat metriky**:\n   - Pokračovat v sledování těchto metrik a reagovat na jakékoli další negativní trendy, aby se předešlo dalšímu poklesu. \n\nCelkově je důležité reagovat na tyto trendy pro zajištění udržení uživatelů a zlepšení jejich spokojenosti."
+                    "stringValue": "### Interpretace metrik\n\nNa základě poskytnutých interních metrik a pozorování lze vyvodit následující závěry a doporučení:\n\n1. **Snížení počtu aktivních uživatelů**:\n   - Pokles aktivních uživatelů o 2.0% může naznačovat, že služba ztratila část své atraktivity nebo že uživatelé našli alternativy. Je důležité analyzovat, zda se jedná o jednorázový trend, nebo zda se jedná o začátek dlouhodobějšího poklesu.\n\n2. **Zvýšení churn rate**:\n   - Vzestup churn rate z 1.8% na 3.4% je alarmující. To může znamenat, že uživatelé nejsou spokojeni s nabízenými službami, nebo že se objevily problémy, které je odrazují od pokračování v používání. Je důležité provést hloubkovou analýzu, abychom zjistili, které segmenty uživatelů nejvíce odcházejí a proč.\n\n3. **Pokles NPS**:\n   - Pokles NPS z 44 na 38 ukazuje na snížení loajality a spokojenosti uživatelů. NPS je klíčovým ukazatelem, který může odrážet celkovou zkušenost uživatelů se službou. Je důležité provést průzkum mezi uživateli, abychom zjistili konkrétní důvody nespokojenosti a identifikovali oblasti pro zlepšení.\n\n### Doporučení:\n- **Analýza příčin**: Je nezbytné provést analýzu, abychom pochopili, proč uživatelé odcházejí. Může být užitečné provést průzkum spokojenosti nebo analyzovat zpětnou vazbu od uživatelů.\n  \n- **Zvýšení angažovanosti**: Implementace programů pro zvýšení angažovanosti uživatelů, jako jsou věrnostní programy, personalizované nabídky nebo zlepšení zákaznického servisu, může pomoci udržet uživatele a snížit churn rate.\n\n- **Zlepšení uživatelské zkušenosti**: Zaměřit se na zlepšení uživatelské zkušenosti, například optimalizací platformy, zjednodušením procesu registrace nebo zlepšením obsahu, může přispět k vyšší spokojenosti uživatelů a tím i k vyššímu NPS.\n\n- **Pravidelné monitorování**: Je důležité pravidelně sledovat tyto metriky v následujících měsících, abychom mohli rychle reagovat na jakékoli negativní trendy a upravit strategii podle aktuálních potřeb uživatelů.\n\n### Závěr:\nCelkově je situace znepokojivá, a proto je klíčové rychle reagovat na zjištěné problémy a implementovat strategie, které pomohou zlepšit spokojenost uživatelů a snížit churn rate. Důkladná analýza a proaktivní přístup mohou přispět k obnovení růstu a loajality uživatelů."
                   }
                 }
               ],
@@ -266,13 +266,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "114810e79bdd3258",
-              "parentSpanId": "8cd0010e086dab44",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "878c5b8261d3f81b",
+              "parentSpanId": "bc7b266d8204a430",
               "name": "read:partner_analyst",
               "kind": 0,
-              "startTimeUnixNano": "1785315185424357000",
-              "endTimeUnixNano": "1785315185424388000",
+              "startTimeUnixNano": "1785316802444032000",
+              "endTimeUnixNano": "1785316802444069000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -298,13 +298,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "8cd0010e086dab44",
-              "parentSpanId": "0746f055dc15d2d5",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "bc7b266d8204a430",
+              "parentSpanId": "d97bada9fa7ab751",
               "name": "performance_join",
               "kind": 0,
-              "startTimeUnixNano": "1785315173827587000",
-              "endTimeUnixNano": "1785315185424449000",
+              "startTimeUnixNano": "1785316787935365000",
+              "endTimeUnixNano": "1785316802444160000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -321,7 +321,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- metrics_analyst ---\nNa základě poskytnutých interních metrik a pozorování lze interpretovat následující trendy a jejich možné příčiny:\n\n### Trendy\n\n1. **Pokles aktivních uživatelů**:\n   - Snížení počtu aktivních uživatelů z 4380 na 4290 naznačuje, že služba ztrácí atraktivitu nebo že uživatelé nejsou dostatečně motivováni k dalšímu používání.\n\n2. **Zvýšení churn rate**:\n   - Churn rate vzrostl z 1.8% na 3.4%, což je významný nárůst. To může znamenat, že více uživatelů se rozhodlo službu opustit, což je alarmující signál pro udržení zákazníků.\n\n3. **Pokles NPS**:\n   - NPS klesl z 44 na 38, což naznačuje, že uživatelé jsou méně ochotni doporučit službu ostatním. To může být důsledkem zhoršení uživatelského zážitku nebo nespokojenosti s funkcionalitou služby.\n\n### Možné příčiny\n\n1. **Zhoršení uživatelského zážitku**:\n   - Pokud došlo k nějakým změnám v uživatelském rozhraní, funkcionalitě nebo výkonu služby, mohlo by to negativně ovlivnit spokojenost uživatelů.\n\n2. **Konkurence**:\n   - Zvýšení konkurence v daném segmentu může vést k tomu, že uživatelé hledají alternativy, které nabízejí lepší hodnotu nebo funkce.\n\n3. **Nedostatečná komunikace**:\n   - Pokud uživatelé nejsou dostatečně informováni o novinkách, vylepšeních nebo výhodách služby, mohou mít pocit, že služba stagnuje.\n\n4. **Změny v potřebách uživatelů**:\n   - Měnící se potřeby a preference uživatelů mohou znamenat, že služba již neodpovídá jejich očekáváním.\n\n### Doporučení\n\n1. **Provést hloubkovou analýzu**:\n   - Zjistit, proč uživatelé odcházejí, prostřednictvím dotazníků nebo rozhovorů.\n\n2. **Zlepšit uživatelský zážitek**:\n   - Zvážit úpravy na základě zpětné vazby od uživatelů a zaměřit se na zlepšení funkcionality a uživatelského rozhraní.\n\n3. **Zvýšit marketingové úsilí**:\n   - Zaměřit se na komunikaci hodnoty služby a novinky, které mohou přilákat nové uživatele a udržet stávající.\n\n4. **Monitorovat metriky**:\n   - Pokračovat v sledování těchto metrik a reagovat na jakékoli další negativní trendy, aby se předešlo dalšímu poklesu. \n\nCelkově je důležité reagovat na tyto trendy pro zajištění udržení uživatelů a zlepšení jejich spokojenosti.\n\n--- partner_analyst ---\nNa základě poskytnutých dat lze provést analýzu a identifikovat případné odchylky.\n\n### Poskytnutá data:\n| Měsíc     | Aktivní uživatelé | Churn % | NPS | Tržby (CZK) |\n|-----------|-------------------|---------|-----|-------------|\n| 2026-07   | 3980              | 1.38    | 76  | 4538580     |\n| 2026-06   | 4010              | 0.73    | 81  | 4619740     |\n\n### Analýza:\n1. **Aktivní uživatelé**:\n   - V červenci 2026 došlo k poklesu počtu aktivních uživatelů z 4010 na 3980, což představuje pokles o 0.75%. Tento pokles může naznačovat ztrátu zájmu o službu nebo problémy s udržením uživatelů.\n\n2. **Churn %**:\n   - Churn rate vzrostl z 0.73% v červnu na 1.38% v červenci. Tento nárůst o 0.65 procentního bodu je významný a může signalizovat, že více uživatelů odchází, což je negativní trend.\n\n3. **NPS (Net Promoter Score)**:\n   - NPS klesl z 81 na 76. Tento pokles o 5 bodů může naznačovat, že uživatelé jsou méně spokojeni se službami, což může být spojeno s vyšším churn rate.\n\n4. **Tržby**:\n   - Tržby se snížily z 4,619,740 CZK na 4,538,580 CZK, což představuje pokles o přibližně 1.75%. Tento pokles může být důsledkem nižšího počtu aktivních uživatelů a vyššího churn rate.\n\n### Závěr:\n- Všechna sledovaná metrika (aktivní uživatelé, churn %, NPS a tržby) vykazuje negativní trend mezi červnem a červencem 2026.\n- Doporučuje se provést hloubkovou analýzu příčin těchto odchylek, například zkoumáním zpětné vazby od uživatelů, analýzou konkurence nebo hodnocením změn v produktu/službě, které mohly ovlivnit uživatelskou zkušenost."
+                    "stringValue": "--- metrics_analyst ---\n### Interpretace metrik\n\nNa základě poskytnutých interních metrik a pozorování lze vyvodit následující závěry a doporučení:\n\n1. **Snížení počtu aktivních uživatelů**:\n   - Pokles aktivních uživatelů o 2.0% může naznačovat, že služba ztratila část své atraktivity nebo že uživatelé našli alternativy. Je důležité analyzovat, zda se jedná o jednorázový trend, nebo zda se jedná o začátek dlouhodobějšího poklesu.\n\n2. **Zvýšení churn rate**:\n   - Vzestup churn rate z 1.8% na 3.4% je alarmující. To může znamenat, že uživatelé nejsou spokojeni s nabízenými službami, nebo že se objevily problémy, které je odrazují od pokračování v používání. Je důležité provést hloubkovou analýzu, abychom zjistili, které segmenty uživatelů nejvíce odcházejí a proč.\n\n3. **Pokles NPS**:\n   - Pokles NPS z 44 na 38 ukazuje na snížení loajality a spokojenosti uživatelů. NPS je klíčovým ukazatelem, který může odrážet celkovou zkušenost uživatelů se službou. Je důležité provést průzkum mezi uživateli, abychom zjistili konkrétní důvody nespokojenosti a identifikovali oblasti pro zlepšení.\n\n### Doporučení:\n- **Analýza příčin**: Je nezbytné provést analýzu, abychom pochopili, proč uživatelé odcházejí. Může být užitečné provést průzkum spokojenosti nebo analyzovat zpětnou vazbu od uživatelů.\n  \n- **Zvýšení angažovanosti**: Implementace programů pro zvýšení angažovanosti uživatelů, jako jsou věrnostní programy, personalizované nabídky nebo zlepšení zákaznického servisu, může pomoci udržet uživatele a snížit churn rate.\n\n- **Zlepšení uživatelské zkušenosti**: Zaměřit se na zlepšení uživatelské zkušenosti, například optimalizací platformy, zjednodušením procesu registrace nebo zlepšením obsahu, může přispět k vyšší spokojenosti uživatelů a tím i k vyššímu NPS.\n\n- **Pravidelné monitorování**: Je důležité pravidelně sledovat tyto metriky v následujících měsících, abychom mohli rychle reagovat na jakékoli negativní trendy a upravit strategii podle aktuálních potřeb uživatelů.\n\n### Závěr:\nCelkově je situace znepokojivá, a proto je klíčové rychle reagovat na zjištěné problémy a implementovat strategie, které pomohou zlepšit spokojenost uživatelů a snížit churn rate. Důkladná analýza a proaktivní přístup mohou přispět k obnovení růstu a loajality uživatelů.\n\n--- partner_analyst ---\nNa základě poskytnutých dat můžeme provést analýzu a identifikovat odchylky od očekávání. Zde jsou klíčové ukazatele, které můžeme analyzovat:\n\n1. **Aktivní uživatelé**:\n   - Červen 2026: 4010\n   - Červenec 2026: 3980\n   - **Odchylka**: Pokles o 30 aktivních uživatelů. To může naznačovat problém s udržením uživatelů nebo nižší akvizici nových uživatelů.\n\n2. **Churn rate (churn_pct)**:\n   - Červen 2026: 0.73%\n   - Červenec 2026: 1.38%\n   - **Odchylka**: Nárůst churn rate o 0.65%. Tento nárůst může signalizovat, že více uživatelů odchází, což je negativní trend a může vyžadovat další analýzu příčin.\n\n3. **NPS (Net Promoter Score)**:\n   - Červen 2026: 81\n   - Červenec 2026: 76\n   - **Odchylka**: Pokles o 5 bodů. To může naznačovat, že spokojenost zákazníků se snižuje, což může být důsledkem zvýšeného churnu nebo jiných faktorů.\n\n4. **Tržby (trzby_czk)**:\n   - Červen 2026: 4,614,340 CZK\n   - Červenec 2026: 4,538,580 CZK\n   - **Odchylka**: Pokles o 75,760 CZK. Tento pokles v tržbách může být způsoben jak poklesem aktivních uživatelů, tak zvýšeným churnem.\n\n### Shrnutí:\n- **Pokles aktivních uživatelů** a **nárůst churn rate** jsou alarmující signály, které by měly být prozkoumány podrobněji.\n- **Pokles NPS** naznačuje, že uživatelé nejsou tak spokojeni jako dříve, což může mít vliv na jejich rozhodnutí zůstat u služby.\n- **Pokles tržeb** je přímým důsledkem předchozích faktorů a může mít dlouhodobé dopady na podnikání.\n\nDoporučuji provést další analýzu příčin těchto odchylek, například prostřednictvím průzkumů spokojenosti zákazníků, analýzy konkurence nebo hodnocení změn v produktech/službách."
                   }
                 },
                 {
@@ -333,25 +333,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0006879
+                    "doubleValue": 0.0007308
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "1358"
+                    "intValue": "1420"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "807"
+                    "intValue": "863"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "### Měsíční přehled - červenec 2026\n\n#### Shrnutí interních metrik a partnerských dat\n\n1. **Aktivní uživatelé**:\n   - **Interní metriky**: Pokles z 4380 na 4290 (2.05%).\n   - **Partnerská data**: Pokles z 4010 na 3980 (0.75%).\n   - **Rozpor**: Interní metriky ukazují větší pokles než partnerská data. Je možné, že interní metriky zahrnují širší spektrum uživatelů, včetně těch, kteří nejsou pravidelně aktivní.\n   - **Doporučení**: Důvěřovat interním metrikám, které mohou lépe reflektovat celkovou situaci.\n\n2. **Churn rate**:\n   - **Interní metriky**: Nárůst z 1.8% na 3.4%.\n   - **Partnerská data**: Nárůst z 0.73% na 1.38%.\n   - **Rozpor**: Interní metriky ukazují mnohem vyšší churn rate. To může naznačovat, že interní metriky zahrnují více uživatelů, kteří odcházejí z různých důvodů.\n   - **Doporučení**: Důvěřovat interním metrikám pro analýzu churn rate, jelikož ukazují výraznější problém.\n\n3. **NPS (Net Promoter Score)**:\n   - **Interní metriky**: Pokles z 44 na 38.\n   - **Partnerská data**: Pokles z 81 na 76.\n   - **Rozpor**: Interní metriky vykazují mnohem nižší hodnoty NPS, což naznačuje, že uživatelé nejsou spokojeni. Partnerská data ukazují vyšší spokojenost, ale stále pokles.\n   - **Doporučení**: Důvěřovat interním metrikám, které mohou lépe reflektovat nespokojenost uživatelů.\n\n4. **Tržby**:\n   - **Interní metriky**: Není uvedeno.\n   - **Partnerská data**: Pokles z 4,619,740 CZK na 4,538,580 CZK (1.75%).\n   - **Rozpor**: Interní metriky neobsahují tržby, což ztěžuje porovnání.\n   - **Doporučení**: Zaměřit se na partnerská data pro analýzu tržeb, ale sledovat i interní metriky pro celkový obraz.\n\n### Závěr a doporučení\n\n- **Celkový trend**: Všechny sledované metriky vykazují negativní trend, což naznačuje potřebu urgentní reakce na ztrátu uživatelů a snížení spokojenosti.\n- **Doporučení**:\n  - Provést hloubkovou analýzu příčin odchodu uživatelů.\n  - Zlepšit uživatelský zážitek na základě zpětné vazby.\n  - Zaměřit se na marketing a komunikaci hodnoty služby.\n  - Monitorovat metriky a reagovat na negativní trendy.\n\nVzhledem k rozporům mezi interními a partnerskými daty je důležité zaměřit se na interní metriky pro detailnější analýzu uživatelské spokojenosti a churn rate, zatímco partnerská data mohou poskytnout užitečné informace o tržbách."
+                    "stringValue": "### Měsíční přehled za červenec 2026\n\n#### 1. Klíčové metriky\n\n| Metrika               | Interní data (metrics_analyst) | Partnerská data (partner_analyst) | Rozdíl         |\n|----------------------|---------------------------------|------------------------------------|----------------|\n| Aktivní uživatelé    | 3,980                           | 3,980                              | 0              |\n| Churn rate           | 3.4%                            | 1.38%                              | 2.02%          |\n| NPS                  | 38                              | 76                                 | -38            |\n| Tržby (CZK)         | N/A                             | 4,538,580                          | N/A            |\n\n#### 2. Interpretace a analýza\n\n- **Aktivní uživatelé**: Obě analýzy uvádějí stejný počet aktivních uživatelů (3,980), což naznačuje, že v této oblasti není rozpor. Pokles o 30 uživatelů oproti červnu je potvrzen.\n\n- **Churn rate**: Interní metriky ukazují výrazně vyšší churn rate (3.4%) než partnerská data (1.38%). Tento rozdíl je alarmující a naznačuje, že interní analýza může být přesnější, neboť odráží větší odchod uživatelů. Doporučuji věnovat větší pozornost interním datům, protože ukazují na vážnější problém s udržením uživatelů.\n\n- **NPS**: Rozdíl v NPS je značný, interní metriky uvádějí hodnotu 38, zatímco partnerská data 76. Tento rozpor naznačuje, že uživatelé nejsou spokojeni a interní data mohou lépe odrážet skutečnou zkušenost uživatelů. Je důležité provést hloubkovou analýzu, aby se zjistily konkrétní důvody nespokojenosti.\n\n- **Tržby**: Partnerská data ukazují pokles tržeb o 75,760 CZK, což je pravděpodobně důsledkem poklesu aktivních uživatelů a zvýšeného churnu. Interní metriky pro tržby nejsou k dispozici, takže nelze provést přímé srovnání.\n\n#### 3. Doporučení\n\n- **Analýza příčin**: Je nezbytné provést hloubkovou analýzu příčin zvýšeného churnu a poklesu NPS. Doporučuji provést průzkum spokojenosti uživatelů a analyzovat zpětnou vazbu.\n\n- **Zvýšení angažovanosti**: Implementace programů pro zvýšení angažovanosti uživatelů, jako jsou věrnostní programy a zlepšení zákaznického servisu, může pomoci udržet uživatele.\n\n- **Zlepšení uživatelské zkušenosti**: Zaměřit se na optimalizaci platformy a zlepšení obsahu, aby se zvýšila spokojenost uživatelů.\n\n- **Pravidelné monitorování**: Je důležité pravidelně sledovat tyto metriky a reagovat na jakékoli negativní trendy.\n\n#### 4. Závěr\n\nCelkově je situace znepokojivá. Rozdíly mezi interními a partnerskými daty naznačují, že je třeba důkladně prozkoumat příčiny nespokojenosti uživatelů a implementovat strategie pro zlepšení. Interní metriky by měly být brány jako prioritní pro analýzu a rozhodování, protože lépe odrážejí aktuální problémy s uživatelskou spokojeností a udržitelností."
                   }
                 }
               ],
@@ -360,13 +360,13 @@
               }
             },
             {
-              "traceId": "37afa1f8a184bd3a7a2d1415dbc947d8",
-              "spanId": "ba040235b65ead04",
+              "traceId": "4f8d1bfe7cc1eecc093de3c5a38120d9",
+              "spanId": "a025e8d914638c46",
               "parentSpanId": "",
               "name": "22_join_external_adapter",
               "kind": 0,
-              "startTimeUnixNano": "1785315159233194000",
-              "endTimeUnixNano": "1785315185424617000",
+              "startTimeUnixNano": "1785316769975740000",
+              "endTimeUnixNano": "1785316802444379000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -383,7 +383,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "agent_topo_db topology 22_join_external_adapter"
+                    "stringValue": "Priprav mesicni prehled vykonu: interni metriky + data od partnera."
                   }
                 },
                 {

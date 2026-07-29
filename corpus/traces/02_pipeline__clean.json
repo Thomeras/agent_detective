@@ -18,13 +18,13 @@
           },
           "spans": [
             {
-              "traceId": "be7eac5c5cfd391c7962d2ccfd2b7a1a",
-              "spanId": "893962df2ba1709e",
-              "parentSpanId": "e115ae0899cd70e8",
+              "traceId": "9b1ec762aed75ab183834ae8ff2aafd8",
+              "spanId": "65f9a2a8ea87227d",
+              "parentSpanId": "d4aab753a2e832ad",
               "name": "log_ingestor",
               "kind": 0,
-              "startTimeUnixNano": "1785315004419036000",
-              "endTimeUnixNano": "1785315007784019000",
+              "startTimeUnixNano": "1785316532630586000",
+              "endTimeUnixNano": "1785316536042298000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -53,7 +53,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0001458
+                    "doubleValue": 0.0001464
                   }
                 },
                 {
@@ -65,7 +65,7 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "171"
+                    "intValue": "172"
                   }
                 },
                 {
@@ -80,13 +80,13 @@
               }
             },
             {
-              "traceId": "be7eac5c5cfd391c7962d2ccfd2b7a1a",
-              "spanId": "694e77dcb4dc1b80",
-              "parentSpanId": "893962df2ba1709e",
+              "traceId": "9b1ec762aed75ab183834ae8ff2aafd8",
+              "spanId": "e17105f7547f2314",
+              "parentSpanId": "65f9a2a8ea87227d",
               "name": "normalizer",
               "kind": 0,
-              "startTimeUnixNano": "1785315007784285000",
-              "endTimeUnixNano": "1785315011959129000",
+              "startTimeUnixNano": "1785316536042536000",
+              "endTimeUnixNano": "1785316540304444000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -115,7 +115,7 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00018975
+                    "doubleValue": 0.00022575
                   }
                 },
                 {
@@ -127,13 +127,13 @@
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "253"
+                    "intValue": "313"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "Znormalizované události:\n\n1. Datum: 2026-07-18T00:00:00Z | Kategorie: billing | Popis: platba zamitnuta, kod 51 | Segment zákazníka: enterprise\n2. Datum: 2026-07-18T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: small\n3. Datum: 2026-07-19T00:00:00Z | Kategorie: billing | Popis: dvojita platba | Segment zákazníka: enterprise\n4. Datum: 2026-07-19T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise\n5. Datum: 2026-07-20T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: mid\n6. Datum: 2026-07-21T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise"
+                    "stringValue": "Znormalizované události:\n\n1. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: billing\n   - popis: platba zamitnuta, kod 51\n   - zakaznik_segment: enterprise\n\n2. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: small\n\n3. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: billing\n   - popis: dvojita platba\n   - zakaznik_segment: enterprise\n\n4. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n\n5. \n   - čas: 2026-07-20T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: mid\n\n6. \n   - čas: 2026-07-21T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise"
                   }
                 }
               ],
@@ -142,13 +142,13 @@
               }
             },
             {
-              "traceId": "be7eac5c5cfd391c7962d2ccfd2b7a1a",
-              "spanId": "54cbdf0cb7e11c0b",
-              "parentSpanId": "694e77dcb4dc1b80",
+              "traceId": "9b1ec762aed75ab183834ae8ff2aafd8",
+              "spanId": "84baaeb0226ad4f2",
+              "parentSpanId": "e17105f7547f2314",
               "name": "enricher",
               "kind": 0,
-              "startTimeUnixNano": "1785315011959378000",
-              "endTimeUnixNano": "1785315022167303000",
+              "startTimeUnixNano": "1785316540304685000",
+              "endTimeUnixNano": "1785316549297085000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -165,7 +165,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- normalizer ---\nZnormalizované události:\n\n1. Datum: 2026-07-18T00:00:00Z | Kategorie: billing | Popis: platba zamitnuta, kod 51 | Segment zákazníka: enterprise\n2. Datum: 2026-07-18T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: small\n3. Datum: 2026-07-19T00:00:00Z | Kategorie: billing | Popis: dvojita platba | Segment zákazníka: enterprise\n4. Datum: 2026-07-19T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise\n5. Datum: 2026-07-20T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: mid\n6. Datum: 2026-07-21T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise"
+                    "stringValue": "--- normalizer ---\nZnormalizované události:\n\n1. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: billing\n   - popis: platba zamitnuta, kod 51\n   - zakaznik_segment: enterprise\n\n2. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: small\n\n3. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: billing\n   - popis: dvojita platba\n   - zakaznik_segment: enterprise\n\n4. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n\n5. \n   - čas: 2026-07-20T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: mid\n\n6. \n   - čas: 2026-07-21T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise"
                   }
                 },
                 {
@@ -177,25 +177,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.0004413
+                    "doubleValue": 0.0004653
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "338"
+                    "intValue": "398"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "651"
+                    "intValue": "676"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "1. **Datum: 2026-07-18T00:00:00Z | Kategorie: billing | Popis: platba zamitnuta, kod 51 | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Zákazníci v segmentu enterprise obvykle provádějí vyšší objemy transakcí. Zamitnutí platby může mít významný dopad na jejich operace a důvěru v poskytované služby.\n\n2. **Datum: 2026-07-18T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: small**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** I když problém s 2FA může být frustrující, segment small zákazníků obvykle nemá tak vysoké nároky na bezpečnost jako enterprise, což snižuje celkový dopad.\n\n3. **Datum: 2026-07-19T00:00:00Z | Kategorie: billing | Popis: dvojita platba | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Dvojitá platba může vést k vážným finančním problémům a ztrátě důvěry u enterprise zákazníků, kteří očekávají bezproblémové a spolehlivé služby.\n\n4. **Datum: 2026-07-19T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Timeout při exportu dat může výrazně ovlivnit pracovní procesy enterprise zákazníků, kteří často potřebují rychlý a spolehlivý přístup k datům.\n\n5. **Datum: 2026-07-20T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: mid**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Zákazníci v segmentu mid mohou mít vyšší nároky na bezpečnost než small zákazníci, ale stále to není tak kritické jako u enterprise, což snižuje dopad.\n\n6. **Datum: 2026-07-21T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Opakovaný problém s exportem dat v segmentu enterprise může vést k frustraci a narušení pracovních procesů, což má vysoký dopad na jejich spokojenost a důvěru."
+                    "stringValue": "1. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: billing\n   - popis: platba zamitnuta, kod 51\n   - zakaznik_segment: enterprise\n   - dopad: vysoký\n   - zdůvodnění: Zákazníci v segmentu enterprise obvykle představují významné příjmy pro firmu. Zamitnutí platby může vést k vážným problémům s cash flow a důvěrou zákazníka.\n\n2. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: small\n   - dopad: střední\n   - zdůvodnění: I když se jedná o menší segment, problémy s dvoufaktorovým ověřením mohou ovlivnit bezpečnost a přístup k účtu, což může vést k frustraci uživatelů.\n\n3. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: billing\n   - popis: dvojita platba\n   - zakaznik_segment: enterprise\n   - dopad: vysoký\n   - zdůvodnění: Dvojité platby mohou způsobit značné finanční komplikace pro enterprise zákazníky a mohou vést k nutnosti vrácení peněz, což zvyšuje administrativní zátěž.\n\n4. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n   - dopad: střední\n   - zdůvodnění: Pro enterprise zákazníky může být export dat klíčový pro jejich operace. Časový limit může narušit jejich pracovní procesy, ale nemusí mít okamžitý finanční dopad.\n\n5. \n   - čas: 2026-07-20T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: mid\n   - dopad: střední\n   - zdůvodnění: Uživatelé v segmentu mid mohou mít střední úroveň závislosti na službách. Problémy s přihlášením mohou vést k frustraci, ale pravděpodobně neohrozí jejich obchodní vztah.\n\n6. \n   - čas: 2026-07-21T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n   - dopad: střední\n   - zdůvodnění: Stejně jako u předchozího exportu, i zde může být problém s timeoutem nepříjemný pro enterprise zákazníky, ale ne nutně kritický pro jejich operace."
                   }
                 }
               ],
@@ -204,13 +204,13 @@
               }
             },
             {
-              "traceId": "be7eac5c5cfd391c7962d2ccfd2b7a1a",
-              "spanId": "cf4e01429b7dfcd2",
-              "parentSpanId": "54cbdf0cb7e11c0b",
+              "traceId": "9b1ec762aed75ab183834ae8ff2aafd8",
+              "spanId": "482864f0350de088",
+              "parentSpanId": "84baaeb0226ad4f2",
               "name": "report_writer",
               "kind": 0,
-              "startTimeUnixNano": "1785315022167534000",
-              "endTimeUnixNano": "1785315028680454000",
+              "startTimeUnixNano": "1785316549297287000",
+              "endTimeUnixNano": "1785316553746269000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -227,7 +227,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "--- enricher ---\n1. **Datum: 2026-07-18T00:00:00Z | Kategorie: billing | Popis: platba zamitnuta, kod 51 | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Zákazníci v segmentu enterprise obvykle provádějí vyšší objemy transakcí. Zamitnutí platby může mít významný dopad na jejich operace a důvěru v poskytované služby.\n\n2. **Datum: 2026-07-18T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: small**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** I když problém s 2FA může být frustrující, segment small zákazníků obvykle nemá tak vysoké nároky na bezpečnost jako enterprise, což snižuje celkový dopad.\n\n3. **Datum: 2026-07-19T00:00:00Z | Kategorie: billing | Popis: dvojita platba | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Dvojitá platba může vést k vážným finančním problémům a ztrátě důvěry u enterprise zákazníků, kteří očekávají bezproblémové a spolehlivé služby.\n\n4. **Datum: 2026-07-19T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Timeout při exportu dat může výrazně ovlivnit pracovní procesy enterprise zákazníků, kteří často potřebují rychlý a spolehlivý přístup k datům.\n\n5. **Datum: 2026-07-20T00:00:00Z | Kategorie: login | Popis: 2FA SMS nedorazila | Segment zákazníka: mid**\n   - **Odhad dopadu: Střední**\n   - **Zdůvodnění:** Zákazníci v segmentu mid mohou mít vyšší nároky na bezpečnost než small zákazníci, ale stále to není tak kritické jako u enterprise, což snižuje dopad.\n\n6. **Datum: 2026-07-21T00:00:00Z | Kategorie: export | Popis: CSV export skoncil timeoutem | Segment zákazníka: enterprise**\n   - **Odhad dopadu: Vysoký**\n   - **Zdůvodnění:** Opakovaný problém s exportem dat v segmentu enterprise může vést k frustraci a narušení pracovních procesů, což má vysoký dopad na jejich spokojenost a důvěru."
+                    "stringValue": "--- enricher ---\n1. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: billing\n   - popis: platba zamitnuta, kod 51\n   - zakaznik_segment: enterprise\n   - dopad: vysoký\n   - zdůvodnění: Zákazníci v segmentu enterprise obvykle představují významné příjmy pro firmu. Zamitnutí platby může vést k vážným problémům s cash flow a důvěrou zákazníka.\n\n2. \n   - čas: 2026-07-18T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: small\n   - dopad: střední\n   - zdůvodnění: I když se jedná o menší segment, problémy s dvoufaktorovým ověřením mohou ovlivnit bezpečnost a přístup k účtu, což může vést k frustraci uživatelů.\n\n3. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: billing\n   - popis: dvojita platba\n   - zakaznik_segment: enterprise\n   - dopad: vysoký\n   - zdůvodnění: Dvojité platby mohou způsobit značné finanční komplikace pro enterprise zákazníky a mohou vést k nutnosti vrácení peněz, což zvyšuje administrativní zátěž.\n\n4. \n   - čas: 2026-07-19T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n   - dopad: střední\n   - zdůvodnění: Pro enterprise zákazníky může být export dat klíčový pro jejich operace. Časový limit může narušit jejich pracovní procesy, ale nemusí mít okamžitý finanční dopad.\n\n5. \n   - čas: 2026-07-20T00:00:00Z\n   - kategorie: login\n   - popis: 2FA SMS nedorazila\n   - zakaznik_segment: mid\n   - dopad: střední\n   - zdůvodnění: Uživatelé v segmentu mid mohou mít střední úroveň závislosti na službách. Problémy s přihlášením mohou vést k frustraci, ale pravděpodobně neohrozí jejich obchodní vztah.\n\n6. \n   - čas: 2026-07-21T00:00:00Z\n   - kategorie: export\n   - popis: CSV export skoncil timeoutem\n   - zakaznik_segment: enterprise\n   - dopad: střední\n   - zdůvodnění: Stejně jako u předchozího exportu, i zde může být problém s timeoutem nepříjemný pro enterprise zákazníky, ale ne nutně kritický pro jejich operace."
                   }
                 },
                 {
@@ -239,25 +239,25 @@
                 {
                   "key": "gen_ai.usage.cost",
                   "value": {
-                    "doubleValue": 0.00036645
+                    "doubleValue": 0.00031695
                   }
                 },
                 {
                   "key": "gen_ai.usage.input_tokens",
                   "value": {
-                    "intValue": "731"
+                    "intValue": "757"
                   }
                 },
                 {
                   "key": "gen_ai.usage.output_tokens",
                   "value": {
-                    "intValue": "428"
+                    "intValue": "339"
                   }
                 },
                 {
                   "key": "output.value",
                   "value": {
-                    "stringValue": "**Týdenní přehled pro vedení**\n\n1. **Dvojitá platba (19.07.2026, enterprise)**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Okamžitě prověřit a vrátit nesprávně zpracované platby, komunikovat s dotčenými zákazníky.\n\n2. **Timeout při CSV exportu (19.07.2026, enterprise)**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Analyzovat a optimalizovat proces exportu dat, aby se předešlo opakování problému.\n\n3. **Timeout při CSV exportu (21.07.2026, enterprise)**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Zajistit řešení problému a informovat zákazníky o pokroku.\n\n4. **Zamítnutí platby (18.07.2026, enterprise)**  \n   - **Dopad:** Vysoký  \n   - **Doporučení:** Prověřit příčiny zamítnutí a zajistit, aby se situace neopakovala.\n\n5. **2FA SMS nedorazila (18.07.2026, small)**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Zlepšit systém doručování SMS a poskytnout alternativní metody ověření.\n\n6. **2FA SMS nedorazila (20.07.2026, mid)**  \n   - **Dopad:** Střední  \n   - **Doporučení:** Monitorovat situaci a zlepšit komunikaci s uživateli o dostupných možnostech.\n\nTento přehled shrnuje klíčové problémy a doporučení pro zajištění spokojenosti zákazníků a minimalizaci dopadů na podnikání."
+                    "stringValue": "**Týdenní přehled pro vedení**\n\n1. **Vysoký dopad**: Platba zamítnuta (kód 51) - segment enterprise. Doporučení: Okamžitě prověřit a vyřešit problém s platbami, aby se předešlo ztrátě důvěry zákazníků a problémům s cash flow.\n\n2. **Vysoký dopad**: Dvojitá platba - segment enterprise. Doporučení: Zajistit vrácení peněz a zlepšit procesy pro prevenci dvojitých plateb, aby se minimalizovaly administrativní komplikace.\n\n3. **Střední dopad**: 2FA SMS nedorazila - segment small. Doporučení: Zlepšit systém dvoufaktorového ověřování, aby se zvýšila bezpečnost a spokojenost uživatelů.\n\n4. **Střední dopad**: CSV export skončil timeoutem - segment enterprise. Doporučení: Optimalizovat proces exportu dat, aby se předešlo narušení pracovních procesů zákazníků.\n\n5. **Střední dopad**: 2FA SMS nedorazila - segment mid. Doporučení: Monitorovat a zlepšit spolehlivost dvoufaktorového ověřování pro střední segment.\n\n6. **Střední dopad**: CSV export skončil timeoutem - segment enterprise. Doporučení: Provést analýzu výkonu exportních procesů a implementovat potřebné úpravy."
                   }
                 }
               ],
@@ -266,13 +266,13 @@
               }
             },
             {
-              "traceId": "be7eac5c5cfd391c7962d2ccfd2b7a1a",
-              "spanId": "e115ae0899cd70e8",
+              "traceId": "9b1ec762aed75ab183834ae8ff2aafd8",
+              "spanId": "d4aab753a2e832ad",
               "parentSpanId": "",
               "name": "02_pipeline",
               "kind": 0,
-              "startTimeUnixNano": "1785315003594204000",
-              "endTimeUnixNano": "1785315028680611000",
+              "startTimeUnixNano": "1785316531831908000",
+              "endTimeUnixNano": "1785316553746392000",
               "attributes": [
                 {
                   "key": "openinference.span.kind",
@@ -289,7 +289,7 @@
                 {
                   "key": "input.value",
                   "value": {
-                    "stringValue": "agent_topo_db topology 02_pipeline"
+                    "stringValue": "Z logu podpory udelej tydenni prehled nejcastejsich problemu vcetne dopadu."
                   }
                 },
                 {

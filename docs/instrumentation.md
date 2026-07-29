@@ -128,16 +128,30 @@ with run("intel", task=user_request) as r:          # root carries the ORIGINAL 
         s.artifact("out/dossier.md")                # integrity, outside the payload
 ```
 
-Two shapes, because topology changes how the graph reads:
+Four shapes across five calls (a fan-out and its fan-in are one shape), because
+topology changes how the graph reads:
 
 | Call | Parent | Use for |
 |---|---|---|
 | `r.step(name)` | the previous step | pipelines / handoff chains |
 | `r.span(name)` | the innermost open span | orchestrator trees, sub-agents |
+| `r.branch(name)` | the step that dispatched | one arm of a fan-out — arms run beside each other, never chained into a pipeline nobody ran |
+| `r.join(name, arms)` | the dispatch point | the fan-IN — one edge per arm, so blame walks back from a bad merge into the arm that poisoned it |
+| `r.retry(name)` | the enclosing step | a loop — attempts get per-attempt identity (`write#1`, `write#2`) plus the back-edge that closes the cycle |
+
+`join` and `retry` are constructs rather than conventions because a span carries
+one `parentSpanId`: nesting can express a fan-OUT and never a fan-IN, and spans
+sharing an agent name get no edge between them at all. Both emit attributes you
+would otherwise have to learn from the mapper's source.
 
 `step` also defaults each step's input to the previous step's output — that
 handoff is what lets blame compare neighbours; without it every node looks like
 it started from nothing.
+
+`s.contract(lang="cs")` declares a parameter this step must not silently
+rewrite. Read [Contracts](#contracts-the-agent_detectivecontract_params-attribute)
+before writing your first one: the intuitive first attempt is a check that
+cannot fire, and it fails by staying quiet.
 
 Switched off unless `AGENT_DETECTIVE_ENDPOINT` or `AGENT_DETECTIVE_TRACE_FILE`
 is set, so instrumented code ships to production untouched:
@@ -154,6 +168,63 @@ Report only what you measured. `cost()` omits what you do not pass, and an
 absent cost stays honestly unknown rather than becoming `$0` — otherwise a
 metered agent looks more expensive than an unmetered one. Agent Detective ships
 no pricing table and never infers a price.
+
+### No `with` block? Start here, finish there
+
+Existing code rarely lets you wrap a step in a `with` block. You hook whatever
+callbacks the framework already fires — `on_chain_start` / `on_chain_end`, a
+phase event bus, a graph-node listener — and open the step in one callback,
+close it in another. Every construct has that event-driven half:
+
+```python
+from detective_sdk import run
+
+r = run("pipeline", task=user_request)     # no `with`: the run outlives the function
+
+def on_phase_start(phase):           r.step(phase)
+def on_phase_finish(phase, result):  r.end(phase, output=result)
+def on_phase_error(phase, err):      r.end(phase, output=str(err), failed=True)
+def on_pipeline_finish():            r.close()        # the export happens HERE
+```
+
+| Opened by | Closed by |
+|---|---|
+| `r.step(name)` / `r.span(name)` / `r.branch(name)` | `r.end(name, output=…, failed=…)` — the most recent still-open step of that name |
+| `loop.attempt(agent)` | `loop.end(agent, output=…, failed=…)` — the **plain** name (`"write"`), not `write#2`: the finish callback does not know which attempt it was |
+| `r.retry(name)` | `loop.close(output)` |
+| `run(...)` | `r.close()` |
+
+Four properties that make this safe in a callback world:
+
+- **A stray finish invents nothing.** `r.end(name)` returns `None` when no step
+  of that name is open, instead of manufacturing a zero-length span.
+- **A doubled finish is harmless.** `Span.end()` is idempotent, so a framework
+  that fires "finished" twice cannot corrupt the timing.
+- **`r.close()` is not optional.** The export happens there and nowhere else; a
+  run that is never closed emits nothing. It is idempotent, so closing in both a
+  finish hook and a `finally` is fine.
+- **Off is still off.** With neither env var set every call above stays a cheap
+  no-op, so the hooks ship to production untouched.
+
+**A fan-out needs an arm registry.** `r.join` takes the arm spans, so the
+dispatch callback has to keep them for the merge callback — this is the one
+piece of bookkeeping the event-driven form adds:
+
+```python
+arms = {}                                  # arm name -> the open Span
+
+def on_arm_start(name):            arms[name] = r.branch(name)
+def on_arm_finish(name, result):   r.end(name, output=result)
+def on_merge(result):              r.join("merge", list(arms.values())).end(result)
+```
+
+By merge time each arm has recorded its output, so the joiner's default input is
+the real `{agent: output}` map rather than a claim about values it never saw.
+
+**Phases must actually be sequential for `step`.** If your framework opens phase
+B before phase A reports its finish, B is still parented on A but records **no
+input** — the SDK will not substitute a handoff that did not happen. Concurrent
+work is `branch`, not `step`.
 
 ## A concrete Python example
 
@@ -408,6 +479,104 @@ zero bytes → `empty`, else `binary`; missing file → `missing`), `parse_ok` f
 a format-appropriate open (docx/xlsx/pptx = zip opens and the main part exists,
 pdf = header + `%%EOF`, md/txt/html/json = UTF-8 decode).
 
+### Contracts: the `agent_detective.contract_params` attribute
+
+The deterministic contract channel answers one narrow question: **did a
+parameter that was supposed to survive this step come out different?** `lang=cs`
+going in and `lang=en` coming out is a breach no judge is needed to confirm.
+
+Normally both sides come from the payloads. The checker parses the input and the
+output as JSON (or one `{...}` block embedded in prose), walks each recursively,
+and compares every scalar it finds under a contract key. The built-in key set:
+
+```
+file_type, filetype, format, target_format, doc_kind, medium, lang, language, locale
+```
+
+When your payloads are prose or code, that walk has nothing to parse.
+`agent_detective.contract_params` is the out-of-band lane — a flat JSON object
+of scalars, set by instrumentation, standing in for the **input** side:
+
+```
+agent_detective.contract_params = {"lang":"cs","target_format":"pdf"}
+```
+
+In `detective-sdk` that is `span.contract(lang="cs", target_format="pdf")`.
+Because instrumentation sets it and payload text cannot, a declared value
+overrides whatever the input payload parse found for the same key. Declared keys
+also widen the **output**-side search to themselves, so a key outside the
+built-in list (`ico`, `tenant`, `currency`) is checked too.
+
+#### The rule everything else follows from
+
+**Declaring a parameter supplies the input side. The output side must still be
+observable in the output payload — and it has to be the value the step
+PRODUCED, not the value it was handed.**
+
+A violation is reported only when a key appears on *both* sides with different
+values (compared casefolded and unicode-normalized). That is the entire check,
+and it is why the intuitive first contract usually cannot fire.
+
+#### A contract that can never fire
+
+```python
+with r.step("fetch_registry") as s:
+    s.contract(ico=ico)                        # input side: the ICO we asked for
+    s.output = {"ico": ico, "name": name}      # output echoes the SAME variable
+```
+
+The `ico` in the output *is* the value that was declared, so `in == out` holds
+by construction — on every run, including the ones where the step fetched the
+wrong company entirely. The check is a tautology, and it announces nothing: an
+unfalsifiable contract is indistinguishable from a satisfied one.
+
+The same step, made falsifiable:
+
+```python
+with r.step("fetch_registry") as s:
+    s.contract(ico=ico)                        # what must come back unchanged
+    s.output = {"ico": record.ico, ...}        # the ICO the RECORD carries
+```
+
+Now the output side is evidence rather than an echo — a record for a different
+company reports its own ICO, and the two values diverge.
+
+Rule of thumb: **if the value in the output comes from the same expression you
+passed to `contract()`, the pair proves nothing.** Wire one of the two to the
+step's actual result, or drop the contract.
+
+#### Three ways a contract stays silent
+
+| Situation | Result | Why |
+|---|---|---|
+| Output is prose, or otherwise not parseable as JSON | no violation, ever | there is no output side to diff against |
+| The declared key never appears in the output | no violation | declaring the input side does not conjure an output side |
+| A key read **from a payload** carries two different values | dropped as **unknown** | a fan-in merging `lang=cs` and `lang=en` has no single contract to have violated; picking one would name a culprit on no evidence |
+
+A declared value is never ambiguous in that last sense — it overrides the
+input-side parse — but the *output* side is still subject to it, so a declared
+key that appears twice in the output with different values also goes unknown.
+
+Values must be scalars — nested objects, lists and `None` are ignored in the
+declaration — and keys match case-insensitively. None of the three cases above
+is an error, and none appears in the verdict. Silence is the designed
+behaviour, which is exactly why a contract must be tested rather than assumed.
+
+#### Test it by breaking it
+
+`detective doctor` validates what the trace can support; it cannot tell whether
+a declared contract is *falsifiable*. The check that works is the one you run
+yourself — inject the violation you claim to be guarding against, and confirm
+the verdict flips:
+
+```python
+s.contract(lang="cs")
+s.output = {"lang": "en", "text": translated}   # deliberately wrong
+```
+
+If that run still comes back `PASSED`, the contract is wired to nothing. Do it
+once per contract key before trusting the channel.
+
 ### Per-run identity attributes
 
 Four attributes answer "why did this work yesterday?" by making every run
@@ -457,6 +626,22 @@ integration adds it.
   into one graph but conveys no edge direction (see above). Cross-process call
   structure must come from trace-context propagation or tool-delegation
   attributes.
+- **One trace file per run; `detective analyze` reads one file.**
+  `AGENT_DETECTIVE_TRACE_FILE` is a single path, so a batch job must vary it per
+  run — pass `trace_file=f"{outdir}/{run_id}.json"` to `run()` directly rather
+  than relying on the env var. The analysis side already takes many at once, via
+  the Python API rather than the CLI:
+
+  ```python
+  from detective_cli import analyze, bundles_from_exports, load_trace
+
+  exports = [export for path in paths for export in load_trace(path)]
+  result = analyze(bundles_from_exports(exports))
+  ```
+
+  Runs that belong to one logical execution still need a shared
+  `x-execution-graph-id` (or propagated trace context) to land in one graph;
+  being analysed in the same batch only makes cross-file edges *resolvable*.
 - **Storage split.** ClickHouse stores the **raw spans** (table `otel_spans`,
   ordered by `(trace_id, start_time)`); Postgres stores the reconstructed
   **graph** (graphs, runs, edges, scores, incidents, blame reports). Large

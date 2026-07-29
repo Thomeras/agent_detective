@@ -47,13 +47,16 @@ uv sync --all-packages --all-extras
 export OPENROUTER_API_KEY=...
 
 # negative control and its faulted twin, from byte-identical topology code
-uv run python -m corpus.record --topo-db ~/Projekty/agent_topo_db --topology 21_fan_in_join
-uv run python -m corpus.record --topo-db ~/Projekty/agent_topo_db --topology 21_fan_in_join \
-    --fault drop_numbers --target metrics_analyst
+uv run --all-extras python -m corpus.record --topo-db ~/Projekty/agent_topo_db \
+    --topology 21_fan_in_join
+uv run --all-extras python -m corpus.record --topo-db ~/Projekty/agent_topo_db \
+    --topology 21_fan_in_join --fault drop_numbers --target metrics_analyst
 ```
 
-A fault that never fires refuses to write an entry, and a crashed run deletes
-its own half-written trace: a mislabelled cell is worse than a missing one.
+A fault that never fires refuses to write an entry, a crashed run deletes its own
+half-written trace, and a topology with no `TASK` constant is refused outright —
+a mislabelled cell is worse than a missing one, and finding 1 below is what that
+rule was written from.
 
 ## Replay (what CI runs)
 
@@ -68,63 +71,75 @@ observations below are recorded as findings, not asserted as behaviour.
 ## The scoreboard
 
 `uv run python -m corpus.scoreboard` (needs a judge; output committed as
-`scoreboard.json`). Two numbers, 11 cells across 4 topologies:
+`scoreboard.json`). 12 cells over 4 topologies, measured repeatedly because the
+judged channel is not deterministic:
 
 | | |
 |---|---|
-| **false positive rate** | **1.00** — 4 of 4 clean controls reported an incident |
-| **discrimination** | **0.50** — 3 of 6 faulted cells produced a verdict differing from their own topology's clean baseline |
+| **false positive rate** | **0.25** — 1 of 4 clean controls reported an incident; identical across every run |
+| **discrimination** | **0.67 – 0.83** on the 6 judged-only faults; **0.75 (6/8)** with the two deterministic `empty_answer` cells included |
+| **verdict stability** | **9 of 10** judged cells returned the same report type every run; the two deterministic cells never move |
 
 Discrimination is measured against the PAIRED baseline, not against an absolute
 expectation. A verdict that fires on everything scores well on "did it report an
 incident" and is worth nothing; only the pairing makes that visible.
 
-Verdict distribution: `composition_failure` 7, `cut_point` 3, `multi_culprit` 1.
-
 ## What it found
 
-**1. Every clean control fails. FPR is 1.00.** This is the number that decides
-whether anyone can gate a build on this tool, and right now it says nobody can.
-The cause is the terminal judge, not the engine: on an untouched run of
-`02_pipeline` it returns `bad` at 0.4 with
+**1. CORRECTED — the 1.00 false positive rate was this harness, not the judge.**
+The first version of the recorder wrote `"agent_topo_db topology 05_diamond"`
+into the run root's `input.value`. That field is the ORIGINAL REQUEST, and the
+only thing the terminal judge can check the deliverable against — so the judge
+was handed a string that is not a request and correctly reported that the output
+did not answer it. Every clean control failed for that reason. With the real
+`TASK` read off the topology module, FPR is 0.25.
 
-> "lacks context regarding the overall performance of the system and does not
-> provide a comprehensive analysis of the pipeline's effectiveness, which is
-> essential for a complete report"
+The diagnosis this replaces ("the judge grades against an ideal rather than
+against the request") was tested and rejected. A rewritten terminal prompt —
+delivery not excellence, "bad" requires naming a specific absent or invented
+element, an anchored score scale — was measured against the same corpus:
 
-That is not a defect report, it is a wish for a better document. The judge is
-grading against an ideal rather than against the request that was actually made.
-`composition_failure` then fires by construction — every node healthy, terminal
-bad — which is why it is 7 of 11 verdicts.
+| prompt | FPR | discrimination |
+|---|---|---|
+| shipped | 0.25 | 0.67 – 0.83 |
+| rewritten | 0.25 | 0.33 |
 
-**2. Half the injected faults are invisible.** Stripping *every number* out of a
-metrics analysis, appending a fabricated audit claim, and rewriting a currency
-unit at a boundary adapter all produced verdicts identical to their own clean
-baseline, down to the confidence. Per-node scores clustered at 0.93 regardless.
-The judge is grading fluency; none of these three faults damages fluency.
+It moved the false positive rate not at all and halved detection. Reverted. The
+lesson is about method, not about prompts: the corpus existed, so a plausible
+diagnosis could be checked instead of shipped.
 
-**3. The two things that DO work are the deterministic channel and the graph.**
-`empty_output` localised at 95% on a foreign trace. `truncate` and `drop_numbers`
-at a pipeline head both localised as `cut_point`. And every graph reconstructed
-correctly from stock-SDK spans — topology 21's fan-in across `ThreadPoolExecutor`
-boundaries, topology 13's nested loops with correct per-agent attempt ordinals.
-The mapper is in better shape than the judged channel.
+**2. The judged channel is not deterministic.** Same trace, same prompt, three
+runs: discrimination came back 0.83, 0.67, 0.83, and
+`21_fan_in_join__drop_numbers_at_metrics_analyst` returned
+`composition_failure` twice and clean once. 9 of 10 cells were stable. Any single
+measurement of these numbers — including one used to justify a change — is worth
+less than it looks.
 
-**4. FIXED — a deterministic-only localisation reported 0% confidence.** The
+**3. Two faults stay invisible.** Stripping every number out of a metrics
+analysis, and truncating an enricher mid-sentence, both produced verdicts equal
+to their clean baseline. Neither damages fluency, which is what the judged
+channel reads.
+
+**4. The deterministic channel and the mapper are the solid parts.**
+`empty_output` localised at 95% on foreign spans. Every graph reconstructed
+correctly from stock-SDK output — topology 21's fan-in across
+`ThreadPoolExecutor` boundaries, topology 13's nested loops with correct
+per-agent attempt ordinals.
+
+**5. FIXED — a deterministic-only localisation reported 0% confidence.** The
 `empty_output` cell named an origin, cited a finding at `certainty 100%`, and
 printed `confidence 0%`. Two predicates for "this node has a hard deterministic
 defect" had drifted apart: `cutpoint._deterministic_defect` counts any
 fail-severity signal and decides whether the node is localised at all, while
 `blame._has_deterministic_defect` read only contract violations and a closed set
 of three flag names, and drives the confidence. Now 95/95, with the deterministic
-attribution headline earned by an explicit `originates` marker on the signal —
-blanket-granting it would over-claim for a signal like an injection signature,
-which says the output is bad and nothing about where it came from.
+attribution headline earned by an explicit `originates` marker — blanket-granting
+it would over-claim for a signal like an injection signature, which says the
+output is bad and nothing about where it came from.
 
-**5. NOT A BUG — the run wrapper named as composition_failure suspect.** Called
-this one wrong on first reading. An orchestrator entry node and an SDK wrapper
-span are the SAME SHAPE in a trace — both are sources with no output of their
-own — so the engine cannot tell them apart, and
+**6. NOT A BUG — the run wrapper named as composition_failure suspect.** An
+orchestrator entry node and an SDK wrapper span are the same shape in a trace, so
+the engine cannot tell them apart, and
 `test_composition_failure_all_healthy_bad_terminal` deliberately pins blaming the
 entry node. Left alone.
 
@@ -137,5 +152,6 @@ branch-vs-merge. Metamorphic invariance (span order, batch splits, node renames)
 and adversarial traces (orphaned spans, duplicate ids, clock skew) are not
 started; the reliability diagram needs enough cells to bin.
 
-None of that is the bottleneck. Finding 1 is: while the terminal judge rejects
-clean work, every additional cell measures the same miscalibration again.
+The one number that should come first is repeat count. Finding 2 says a single
+scoreboard run is not a measurement, and every cell added now makes the variance
+cheaper to hide rather than easier to see.
