@@ -16,7 +16,9 @@ Signals emitted here:
   out twice, which IS a production incident, hence fail;
 - ``tool_args_invalid``     (fail) — raw args violate a registered tool schema;
 - ``cost_anomaly`` / ``token_anomaly`` (warn) — z-score >= 3 vs the agent's
-  rolling baseline.
+  rolling baseline;
+- ``empty_output``          (fail) — the run recorded an empty output while its
+  own usage says the model emitted tokens: it spent and shipped nothing.
 
 All functions are pure and identity-free; the caller stamps run_id/agent.
 """
@@ -35,6 +37,7 @@ SIGNAL_DUPLICATE_SIDE_EFFECT = "duplicate_side_effect"
 SIGNAL_TOOL_ARGS_INVALID = "tool_args_invalid"
 SIGNAL_COST_ANOMALY = "cost_anomaly"
 SIGNAL_TOKEN_ANOMALY = "token_anomaly"
+SIGNAL_EMPTY_OUTPUT = "empty_output"
 
 DEFAULT_SIDE_EFFECT_MARKERS: tuple[str, ...] = (
     "send",
@@ -321,3 +324,37 @@ def cost_zscore_signals(
                 )
             )
     return signals
+
+
+def empty_output_signals(output_text: str | None, tokens_out: int | None) -> list[dict]:
+    """``empty_output`` (fail) — the run recorded an output, it was empty, and
+    the run's own usage says the model emitted tokens.
+
+    An empty payload has two possible causes and they need different answers:
+    the exporter never recorded the output, or the agent genuinely produced
+    nothing. Both arrive as "no text to score", and calling both an
+    instrumentation defect told the operator to go fix an exporter that was
+    working — while the run's most expensive node silently shipped nothing.
+
+    The discriminator is that the field was RECORDED and empty (``""``, not
+    absent) while ``gen_ai.usage.output_tokens`` is positive: the exporter
+    demonstrably wrote this run's payload and usage, and what it wrote was a
+    model that spent its budget and returned no content. That is a fact about
+    the agent, not about the instrumentation, so it is a fail-severity signal
+    and localises blame here. Absent output (``None``) stays an instrumentation
+    warning — nothing was recorded, so nothing can be claimed.
+
+    The score stays UNKNOWN either way: scoring "" produced a hard 0.0, the
+    strongest claim from the weakest evidence. This is the deterministic
+    channel the empty-payload branch always said the defect belonged in.
+    """
+    if output_text is None or output_text.strip():
+        return []
+    if not isinstance(tokens_out, int) or isinstance(tokens_out, bool) or tokens_out <= 0:
+        return []
+    return [
+        signal(
+            SIGNAL_EMPTY_OUTPUT, "fail", "empty_output_with_spend",
+            tokens_out=tokens_out, chars=len(output_text),
+        )
+    ]

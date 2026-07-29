@@ -57,7 +57,7 @@ BAD = TerminalVerdict(bad=True, score=0.2, reasoning="the report is empty")
 OK = TerminalVerdict(bad=True and False, score=1.0, reasoning="looks complete")
 
 
-def _ns(run_id, score, *, contract=(), flags=(), unscored=None):
+def _ns(run_id, score, *, contract=(), flags=(), unscored=None, signals=()):
     return NodeScore(
         run_id=run_id,
         score=score,
@@ -67,7 +67,18 @@ def _ns(run_id, score, *, contract=(), flags=(), unscored=None):
         judge_note=None,
         flags=tuple(flags),
         contract_violations=tuple(contract),
+        deterministic_signals=tuple(signals),
     )
+
+
+_EMPTY_OUTPUT_SIGNAL = {
+    "name": "empty_output",
+    "severity": "fail",
+    "code": "empty_output_with_spend",
+    "params": {"tokens_out": 1200, "chars": 0},
+    "detail": "produced no output while spending 1200 output tokens",
+    "basis": "output.value recorded and empty (0 chars); gen_ai.usage.output_tokens=1200",
+}
 
 
 def _scenarios(mk):
@@ -214,6 +225,23 @@ def _scenarios(mk):
                    ("p3", "out")],
             scores={"p1": 0.3, "p2": 0.35, "p3": 0.85, "out": 0.85},
             end_times={"p1": 1.0, "p2": 2.0, "p3": 3.0, "out": 4.0},
+            terminal_verdict=BAD,
+        ),
+        # 15. a node that recorded an EMPTY output while its usage says it spent
+        #     tokens: unscored, but the emptiness is evidence against the node,
+        #     not an instrumentation blind spot (a separate note from
+        #     instrumentation_warning, which scenario 7 covers)
+        mk(
+            nodes=["draft", "review", "ship"],
+            edges=[("draft", "review"), ("review", "ship")],
+            scores={
+                "draft": _ns("draft", 0.9),
+                "review": _ns(
+                    "review", None, unscored="empty_output",
+                    flags=["empty_output"], signals=[_EMPTY_OUTPUT_SIGNAL],
+                ),
+                "ship": _ns("ship", 0.9),
+            },
             terminal_verdict=BAD,
         ),
     ]

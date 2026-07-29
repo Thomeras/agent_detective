@@ -446,3 +446,36 @@ def test_graph_type_is_none_without_service_name() -> None:
     # No resource service.name -> None, never invented; every graph still keyed.
     result = map_spans([_agent_span()])
     assert result.graph_types == {"t1": None}
+
+
+# --- loop identity --------------------------------------------------------
+#
+# Attempts of one agent must carry DISTINCT names (`builder#1`, `builder#2`) or
+# no edge is drawn between them — which leaves the reconstructed graph unable to
+# tell one agent that ran eight times from eight agents. These two attributes
+# carry that back, and only as a pair.
+
+
+def test_attempt_identity_extracted_from_opener_span() -> None:
+    span = _agent_span()
+    span["attributes"]["agent_detective.attempt"] = "3"
+    span["attributes"]["agent_detective.attempt_of"] = "builder"
+    run = map_spans([span]).runs[0]
+    assert (run.attempt, run.attempt_of) == (3, "builder")
+
+
+def test_attempt_absent_is_none() -> None:
+    run = map_spans([_agent_span()]).runs[0]
+    assert (run.attempt, run.attempt_of) == (None, None)
+
+
+def test_half_an_attempt_identity_is_dropped() -> None:
+    """An ordinal with no agent cannot be grouped into a loop, and an agent with
+    no ordinal cannot be counted: neither half is usable alone."""
+    only_number = _agent_span()
+    only_number["attributes"]["agent_detective.attempt"] = "2"
+    assert map_spans([only_number]).runs[0].attempt is None
+
+    only_agent = _agent_span()
+    only_agent["attributes"]["agent_detective.attempt_of"] = "builder"
+    assert map_spans([only_agent]).runs[0].attempt_of is None

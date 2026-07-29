@@ -166,6 +166,18 @@ def _common_fields(bundle: GraphBundle) -> dict[str, object]:
     node_end_times = {str(r.run_id): to_epoch(r.ended_at) for r in bundle.runs}
     agent_names = {str(r.run_id): (r.agent_name or str(r.run_id)) for r in bundle.runs}
     error_span_ids = {str(r.run_id): [] for r in bundle.runs}
+    # Only the pair is usable: an ordinal with no agent cannot be grouped into a
+    # loop, so a half-recorded attempt is left out rather than half-counted.
+    node_attempts = {
+        str(r.run_id): int(r.attempt)
+        for r in bundle.runs
+        if r.attempt is not None and r.attempt_of
+    }
+    node_attempt_of = {
+        str(r.run_id): r.attempt_of
+        for r in bundle.runs
+        if r.attempt is not None and r.attempt_of
+    }
     return {
         "nodes": nodes,
         "edges": edges,
@@ -173,6 +185,8 @@ def _common_fields(bundle: GraphBundle) -> dict[str, object]:
         "node_end_times": node_end_times,
         "agent_names": agent_names,
         "error_span_ids": error_span_ids,
+        "node_attempts": node_attempts,
+        "node_attempt_of": node_attempt_of,
     }
 
 
@@ -194,6 +208,8 @@ def build_loop_input(
         terminal_verdict=None,
         loop_baselines=_loop_baselines(baselines),
         config=config,
+        node_attempts=fields["node_attempts"],
+        node_attempt_of=fields["node_attempt_of"],
     )
 
 
@@ -217,4 +233,6 @@ def build_blame_input(
         terminal_verdict=terminal_verdict,
         loop_baselines=_loop_baselines(baselines),
         config=config,
+        node_attempts=fields["node_attempts"],
+        node_attempt_of=fields["node_attempt_of"],
     )

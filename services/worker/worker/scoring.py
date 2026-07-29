@@ -30,6 +30,7 @@ from blame_engine import NodeScore, is_planner, is_verifier
 
 from .behavioral import (
     duplicate_side_effect_signals,
+    empty_output_signals,
     loop_fingerprint_signals,
     parse_tool_calls,
     retry_storm_signals,
@@ -723,14 +724,25 @@ async def score_node(
     # here raises the `instrumentation_warning` note ("these nodes have no
     # output payload — fix the exporter"), which says what is actually true
     # ("we were blinded here") instead of accusing the agent.
+    #
+    # Unless the run itself says otherwise. A payload that was RECORDED empty
+    # while usage reports emitted tokens is not a blind spot — the exporter
+    # worked and what it captured is an agent that spent its budget and
+    # returned nothing. That goes out on the deterministic channel (below), the
+    # one this comment has always pointed at, so it lands as a defect at the
+    # node instead of as advice to fix a healthy exporter. The score stays
+    # UNKNOWN either way; a signal is not a quality scalar.
     if output_text is None or not output_text.strip():
+        empty_signals = empty_output_signals(output_text, run.tokens_out)
         return NodeScore(
             run_id=run_id,
             score=None,
             components={"schema": None, "judge": None, "heuristics": None},
             input_flawed=None,
-            unscored_reason="payload_missing",
+            unscored_reason="empty_output" if empty_signals else "payload_missing",
             judge_note=None,
+            flags=tuple(s["name"] for s in empty_signals),
+            deterministic_signals=tuple(empty_signals),
         )
 
     schema_component = evaluate_schema(

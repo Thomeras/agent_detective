@@ -5,7 +5,7 @@
 # `worker` to that stranger's 2018 release instead of this one. Namespacing the
 # distribution is what makes the dependency unambiguous.
 name = "agent-detective-worker"
-version = "0.1.0"
+version = "0.2.0"
 description = "Two-tier detection/scoring/blame pipeline over Redis Streams (build spec section 4)"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
@@ -24,7 +24,7 @@ dependencies = [
     "pydantic>=2.7",
     "pydantic-settings>=2.3",
     "langdetect>=1.0.9",
-    "blame-engine",
+    "blame-engine>=0.2.0",
 ]
 
 [project.urls]

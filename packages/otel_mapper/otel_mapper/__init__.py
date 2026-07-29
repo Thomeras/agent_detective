@@ -10,7 +10,7 @@ from .ids import graph_id_from_str, run_id_from_key
 from .mapper import flatten_export_request, map_spans
 from .types import AgentRunCandidate, EdgeCandidate, EdgeType, MappingResult
 
-__version__ = "0.1.0"
+__version__ = "0.2.0"
 
 __all__ = [
     "AgentRunCandidate",

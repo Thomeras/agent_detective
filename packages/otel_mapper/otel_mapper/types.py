@@ -46,6 +46,15 @@ class AgentRunCandidate:
     # [{"name": ..., "args_sha": <12 hex of sha256(input.value)>, "status":
     # "ok"|"error"}, ...]. None when the run has no TOOL member spans.
     tool_calls: str | None
+    # Loop identity, from ``agent_detective.attempt`` / ``.attempt_of``. An
+    # instrumentation that numbers retries has to give each attempt a DISTINCT
+    # agent_name (``write#1``, ``write#2``) or reconstruction emits no edge
+    # between them — which also means the reconstructed graph can no longer
+    # tell "one agent that ran four times" from "four agents". These two carry
+    # that back: ``attempt_of`` is the agent the attempts belong to, ``attempt``
+    # is which pass this was. Both None for a run that is not a loop attempt.
+    attempt: int | None
+    attempt_of: str | None
     tokens_in: int | None
     tokens_out: int | None
     cost_usd: float | None

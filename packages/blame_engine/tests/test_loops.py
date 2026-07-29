@@ -93,3 +93,89 @@ def test_anomalous_loop_with_cut_point_elsewhere(mk) -> None:
     assert report.culprit_run_ids == ["y"]
     assert len(report.evidence.loop_anomalies) == 1
     assert report.evidence.loop_anomalies[0].limit_kind == "max_iterations"
+
+
+# --- rounds vs cycle size -------------------------------------------------
+#
+# The check bounds ITERATIONS ("burned iterations past the limit"), and cycle
+# size is not that number. A bounded nested loop (2 outer x 3 inner, every
+# bound a literal `range()`) condenses into a 21-node SCC and was reported as
+# 21 runaway iterations at 100% confidence, with all 21 members named origin.
+# Found by running topologies/13_nested_loops from agent_topo_db through the
+# CLI: nothing ran away, and the report named the entire graph.
+
+
+def _nested_loop_input(mk, *, outer=2, inner=3, config=None, baselines=None):
+    """One SCC the way an instrumented nested loop condenses: the busiest agent
+    (`builder`) runs once per outer round plus once per inner round."""
+    nodes, edges, attempts, agent_names = ["ctrl"], [], {}, {"ctrl": "ctrl"}
+    previous = "ctrl"
+    count = 0
+    for _ in range(outer * (inner + 1)):
+        count += 1
+        node = f"b{count}"
+        nodes.append(node)
+        agent_names[node] = f"builder#{count}"   # attempts need distinct names
+        attempts[node] = ("builder", count)
+        edges.append((previous, node))
+        previous = node
+    edges.append((previous, "ctrl"))             # the back-edge closes the loop
+    return mk(
+        nodes=nodes, edges=edges, attempts=attempts, agent_names=agent_names,
+        scores={n: 0.9 for n in nodes}, config=config,
+        loop_baselines=baselines,
+    )
+
+
+def test_bounded_nested_loop_is_not_a_runaway(mk) -> None:
+    """8 rounds inside a 9-member cycle, limit 10 -> no anomaly. The real trace
+    that surfaced this had 21 members and fired at 100%."""
+    assert detect_loop_anomalies(_nested_loop_input(mk)) == []
+    assert find_blame(_nested_loop_input(mk)).report_type != "loop_detected"
+
+
+def test_rounds_are_counted_not_members(mk) -> None:
+    """12 rounds of one agent > 10 -> still detected, and reported as 12 even
+    though the cycle has 13 members."""
+    inp = _nested_loop_input(mk, outer=3, inner=3)
+    anomalies = detect_loop_anomalies(inp)
+    assert len(anomalies) == 1
+    assert anomalies[0].iterations == 12
+    assert len(anomalies[0].member_run_ids) == 13
+
+
+def test_only_the_repeating_runs_are_blamed(mk) -> None:
+    """The controller is caught in the cycle; it is not what ran away."""
+    report = find_blame(_nested_loop_input(mk, outer=3, inner=3))
+    assert report.report_type == "loop_detected"
+    assert "ctrl" not in report.culprit_run_ids
+    assert report.culprit_run_ids == [f"b{i}" for i in range(1, 13)]
+
+
+def test_baselines_key_on_the_agent_not_the_attempt(mk) -> None:
+    """An attempt's agent_name is per-attempt (`builder#7`), so a baseline
+    recorded for `builder` was looked up under a name that occurs exactly once
+    and never matched."""
+    inp = _nested_loop_input(
+        mk, outer=2, inner=2,
+        config=BlameConfig(max_loop_iterations=100),
+        baselines={
+            "builder": LoopBaseline(
+                mean_iterations=2.0, std_iterations=0.5, sample_count=5
+            )
+        },
+    )
+    anomalies = detect_loop_anomalies(inp)
+    assert len(anomalies) == 1
+    assert anomalies[0].limit_kind == "statistical"
+
+
+def test_uninstrumented_cycles_keep_the_old_count(mk) -> None:
+    """No loop identity in the trace -> member count is all there is, and the
+    pre-existing behaviour is unchanged."""
+    nodes = [f"l{i}" for i in range(12)]
+    inp = mk(nodes=nodes, edges=_cycle_edges("l", 12), scores={n: 0.9 for n in nodes})
+    anomalies = detect_loop_anomalies(inp)
+    assert len(anomalies) == 1
+    assert anomalies[0].iterations == 12
+    assert anomalies[0].repeating_run_ids == []

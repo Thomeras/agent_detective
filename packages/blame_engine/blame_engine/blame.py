@@ -314,7 +314,22 @@ def find_blame(
             and ns.unscored_reason == "payload_missing"
         )
 
-    hidden_unscored = [n for n in unscored if not _is_structural_root(n)]
+    def _observed_empty(n: str) -> bool:
+        """Known to have produced nothing — an OBSERVED absence.
+
+        Distinct from an absent observation, and only the second can hide a
+        culprit. A node whose output was recorded empty while its usage reports
+        emitted tokens was measured, and the measurement says "no work came out
+        of here": there is no room behind it for a defect nobody saw. Counting
+        it as an unknown suppressed the classification on the strength of a node
+        we know more about than most.
+        """
+        ns = inp.scores.get(n)
+        return ns is not None and ns.unscored_reason == "empty_output"
+
+    hidden_unscored = [
+        n for n in unscored if not _is_structural_root(n) and not _observed_empty(n)
+    ]
 
     # The classification rationale as TYPED records (§2.4: no free-prose channel
     # out of decision code). Rendered to sentences once, at the end, by the
@@ -566,7 +581,11 @@ def find_blame(
             ),
             anomalies[0],
         )
-        culprits = list(anomaly.member_run_ids)
+        # The attempts that actually repeated, when the trace said which they
+        # were. Everything caught in the cycle is not the runaway: a nested loop
+        # condenses its controllers, its siblings and the nodes downstream of
+        # the back-edge into one SCC, and naming all of them names the graph.
+        culprits = list(anomaly.repeating_run_ids or anomaly.member_run_ids)
         loop_sid = cond.node_to_super[anomaly.member_run_ids[0]]
         loop_candidate = candidate_sids.get(loop_sid)
         # No candidate: the deterministic limit breach itself is the evidence.
@@ -583,7 +602,10 @@ def find_blame(
                 {
                     "iterations": anomaly.iterations,
                     "limit_kind": anomaly.limit_kind,
-                    "agents": sorted(set(anomaly.agent_names)),
+                    "agents": sorted(
+                        {inp.agent_names.get(r, r) for r in anomaly.repeating_run_ids}
+                        or set(anomaly.agent_names)
+                    ),
                 },
             )
         )
@@ -1123,6 +1145,20 @@ def find_blame(
         notes.append(
             NoteRecord("instrumentation_warning", {"agents": missing_payload})
         )
+
+    # NOT the same finding, and it used to be filed as one: a node whose output
+    # was recorded EMPTY while its usage reports emitted tokens is not a blind
+    # spot in the exporter, it is an agent that spent and shipped nothing. It
+    # rides the deterministic channel as an `empty_output` signal; this note is
+    # what stops it being read as advice to go fix working instrumentation.
+    empty_output = sorted(
+        inp.agent_names.get(n, n)
+        for n in graph_nodes
+        if (ens := inp.scores.get(n)) is not None
+        and ens.unscored_reason == "empty_output"
+    )
+    if empty_output:
+        notes.append(NoteRecord("empty_output", {"agents": empty_output}))
 
     # Topology-driven instrumentation-quality warning (same family as
     # payload_missing). The ONLY behavioral use of the advisory classification:

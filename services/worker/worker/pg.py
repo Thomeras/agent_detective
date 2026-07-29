@@ -110,6 +110,11 @@ agent_runs = Table(
     # Out-of-band declared contract params (migration 0011). Raw JSON-object
     # string; scoring parses it tolerantly.
     Column("contract_params", Text),
+    # Loop identity (migration 0012): which pass this run was, of which
+    # agent. Attempts carry distinct agent names, so this pair is the only
+    # thing that lets the loop check count rounds instead of cycle size.
+    Column("attempt", Integer),
+    Column("attempt_of", Text),
 )
 
 edges = Table(
@@ -329,6 +334,8 @@ class PgRepo:
                 tool_calls=r.tool_calls,
                 tool_schema_hash=r.tool_schema_hash,
                 contract_params=r.contract_params,
+                attempt=r.attempt,
+                attempt_of=r.attempt_of,
             )
             for r in run_rows
         ]

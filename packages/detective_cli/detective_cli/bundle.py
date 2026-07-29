@@ -109,6 +109,8 @@ def _run_record(candidate: AgentRunCandidate) -> RunRecord:
         contract_params=candidate.contract_params,
         tool_calls=candidate.tool_calls,
         tool_schema_hash=candidate.tool_schema_hash,
+        attempt=candidate.attempt,
+        attempt_of=candidate.attempt_of,
     )
 
 

@@ -147,6 +147,15 @@ _SIGNAL_TEMPLATES: dict[str, tuple[Callable[..., str], Callable[..., str]]] = {
         lambda d: f"size check (size={d['size']} < min {d['min_bytes']})",
     ),
     # --- behavioral (behavioral.py) ---
+    "empty_output_with_spend": (
+        lambda d: (
+            f"produced no output while spending {d['tokens_out']} output tokens"
+        ),
+        lambda d: (
+            f"output.value recorded and empty ({d['chars']} chars); "
+            f"gen_ai.usage.output_tokens={d['tokens_out']}"
+        ),
+    ),
     "loop_fingerprint": (
         lambda d: (
             f"tool '{d['tool']}' called {d['calls']}x consecutively "

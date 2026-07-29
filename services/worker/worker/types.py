@@ -84,6 +84,13 @@ class RunRecord:
     # payloads are prose/code and give the input-side JSON diff nothing to
     # parse. Text on purpose — scoring parses it tolerantly.
     contract_params: str | None = None
+    # Loop identity from ``agent_detective.attempt`` / ``.attempt_of``: which
+    # pass this run was, and of which agent. Retry attempts must carry distinct
+    # agent_names or reconstruction draws no edge between them, so without this
+    # pair the graph cannot tell one agent that ran four times from four
+    # agents — and the loop check ends up counting cycle SIZE instead of rounds.
+    attempt: int | None = None
+    attempt_of: str | None = None
 
 
 @dataclass(frozen=True)

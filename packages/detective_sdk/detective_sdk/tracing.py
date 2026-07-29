@@ -51,10 +51,18 @@ Four shapes, because topology changes the analysis:
                     break
             loop.output = draft
 
+    with run("talk", task=brief) as r:
+        research = r.retry("research_loop", parallel=True)   # LOOPS SIDE BY SIDE
+        draft = r.retry("draft_loop", parallel=True)         # (threads, no
+        ...                                                  #  edge between them)
+        with r.join("merge", [research.span, draft.span]) as m:
+            m.output = deck
+
 `step` is a handoff chain (each step's input is what the previous one produced —
 without that the blame engine has nothing to compare between neighbours);
-`span` nests; `branch` fans out; `join` fans back IN; `retry` is a loop. Mixing
-them is fine.
+`span` nests; `branch` fans out; `join` fans back IN; `retry` is a loop, and
+`retry(parallel=True)` is a loop that is one ARM of a fan-out. Mixing them is
+fine.
 
 Why `join` and `retry` are constructs and not just conventions: a span carries
 ONE ``parentSpanId``, so nesting can express a fan-OUT and never a fan-IN —
@@ -78,6 +86,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import threading
 import time
 import urllib.request
 import uuid
@@ -610,6 +619,19 @@ class Run:
         self._open: list[Span] = []          # nesting stack, for `span`
         self._last_step: Optional[Span] = None  # handoff chain, for `step`
         self._closed = False
+        # Parallel arms are the point of `branch` and `retry(parallel=True)`, so
+        # two threads really do open and close spans at the same time. `_close`
+        # REBUILDS the open list, and a rebuild racing an append drops the
+        # appended span from the stack — a lost parent, silently, in the one
+        # shape this SDK exists to get right.
+        self._lock = threading.RLock()
+
+    def _track(self, span: "Span") -> None:
+        """Record a span and push it on the open stack."""
+        with self._lock:
+            if self.enabled:
+                self._spans.append(span)
+            self._open.append(span)
 
     # -- opening steps -------------------------------------------------------- #
 
@@ -626,10 +648,8 @@ class Run:
         if input is None and self._last_step is None:
             input = self._task
         span = Span(self, name, parent, input=input)
-        if self.enabled:
-            self._spans.append(span)
+        self._track(span)
         self._last_step = span
-        self._open.append(span)
         return span
 
     def span(self, name: str, *, input: Any = None) -> Span:
@@ -638,9 +658,7 @@ class Run:
         if input is None:
             input = self._open[-1]._input if self._open else self._task
         span = Span(self, name, parent, input=input)
-        if self.enabled:
-            self._spans.append(span)
-        self._open.append(span)
+        self._track(span)
         return span
 
     def _fanout_point(self) -> Optional[Span]:
@@ -651,9 +669,10 @@ class Run:
         threads, three still-running arms — and taking the innermost open span
         would then chain arm 2 behind arm 1 and produce a pipeline nobody ran.
         """
-        for span in reversed(self._open):
-            if not span._parallel:
-                return span
+        with self._lock:
+            for span in reversed(self._open):
+                if not span._parallel:
+                    return span
         return self._last_step
 
     def branch(self, name: str, *, input: Any = None, of: Span | None = None) -> Span:
@@ -690,9 +709,7 @@ class Run:
             input = self._task
         span = Span(self, name, parent, input=input)
         span._parallel = True
-        if self.enabled:
-            self._spans.append(span)
-        self._open.append(span)
+        self._track(span)
         return span
 
     def join(self, name: str, sources: "Iterable[Span | str]", *, input: Any = None) -> Span:
@@ -717,9 +734,7 @@ class Run:
         if input is None:
             input = self._join_input(collected)
         span = Span(self, name, parent, input=input)
-        if self.enabled:
-            self._spans.append(span)
-        self._open.append(span)
+        self._track(span)
         span.reads_from(*collected, tool="collect")
         # The pipeline resumes here: a following `step` continues from the merge,
         # not from the step that fanned out.
@@ -748,7 +763,14 @@ class Run:
         # joiner was handed nothing.
         return merged or None
 
-    def retry(self, name: str, *, input: Any = None) -> "Retry":
+    def retry(
+        self,
+        name: str,
+        *,
+        input: Any = None,
+        of: Span | None = None,
+        parallel: bool = False,
+    ) -> "Retry":
         """A LOOP: repeated attempts at the same work, under one controller.
 
         ``name`` names the controller — the code that dispatches an attempt,
@@ -758,22 +780,39 @@ class Run:
 
         The controller hangs off the enclosing step (the innermost open span,
         else the current chain head) and starts from what that step produced.
+        Pass ``of=`` to name that step yourself.
+
+        ``parallel=True`` makes this loop one ARM of a fan-out — the same thing
+        :meth:`branch` declares, for a loop instead of a single step. Two arms
+        running in threads, one of them iterative, is a shape the catalogue is
+        full of (a research loop beside a drafting loop, joined at the end) and
+        it was not expressible: whichever arm opened its span first became the
+        other one's parent, so the trace claimed a handoff no execution ever
+        performed. A parallel loop never parents on another arm, and no later
+        arm parents on it.
 
         Set ``loop.output`` to what the loop finally returned. It is left unset
         otherwise — the SDK will not assume the last attempt's output was
         accepted, and an unset output is recorded as unscored, not as empty.
         """
-        point = self._open[-1] if self._open else self._last_step
+        if of is not None:
+            point = of
+        elif parallel:
+            point = self._fanout_point()
+        else:
+            point = self._open[-1] if self._open else self._last_step
         parent = point.span_id if point is not None else self._root_id
         if input is None:
             input = point.output if point is not None else self._task
         span = Span(self, name, parent, input=input)
-        if self.enabled:
-            self._spans.append(span)
-        self._open.append(span)
-        # The loop is one stage of the enclosing pipeline: what follows it
-        # chains off the controller, never off an attempt.
-        self._last_step = span
+        span._parallel = parallel
+        self._track(span)
+        if not parallel:
+            # The loop is one stage of the enclosing pipeline: what follows it
+            # chains off the controller, never off an attempt. An ARM is not a
+            # stage — like `branch`, it must not become the chain head, or the
+            # step after the join would continue from whichever arm ran last.
+            self._last_step = span
         return Retry(self, span)
 
     def _delegate(
@@ -781,8 +820,9 @@ class Run:
     ) -> None:
         """Record one ``source -> span`` flow as a TOOL delegation span."""
         record = _Delegation(tool, span.span_id, target_name, target)
-        if self.enabled:
-            self._spans.append(record)
+        with self._lock:
+            if self.enabled:
+                self._spans.append(record)
 
     def _final_names(self) -> dict[int, str]:
         """``id(span) -> the agent name that ships``, disambiguating collisions.
@@ -838,7 +878,8 @@ class Run:
     def _close(self, span: Span) -> None:
         # Spans can close out of order (concurrency); drop by identity, not by
         # popping blindly, or one late finisher would unbalance the stack.
-        self._open = [s for s in self._open if s is not span]
+        with self._lock:
+            self._open = [s for s in self._open if s is not span]
 
     # -- context manager ------------------------------------------------------ #
 

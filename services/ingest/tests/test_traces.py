@@ -278,3 +278,17 @@ def test_graph_type_is_none_without_resource_service_name(harness: Harness) -> N
     assert response.status_code == 200
     graph = harness.repo.graphs[graph_id_from_str(trace_id)]
     assert graph["graph_type"] is None
+
+
+def test_attempt_identity_lands_on_the_run_row(harness: Harness) -> None:
+    payload = load_fixture("spawn_pipeline.json")
+    opener = payload["resourceSpans"][0]["scopeSpans"][0]["spans"][0]
+    opener["attributes"].extend(
+        [
+            {"key": "agent_detective.attempt", "value": {"stringValue": "2"}},
+            {"key": "agent_detective.attempt_of", "value": {"stringValue": "builder"}},
+        ]
+    )
+    asyncio.run(harness.post_traces(payload))
+    run = harness.repo.runs[run_id_from_key(ORCHESTRATOR_KEY)]
+    assert (run.attempt, run.attempt_of) == (2, "builder")

@@ -587,6 +587,13 @@ _NOTE_TEMPLATES: dict[str, Callable[[Mapping[str, Any]], str]] = {
         "payload — they cannot be scored or blamed, which blinds the "
         "analysis; fix the exporter/instrumentation for these nodes"
     ),
+    "empty_output": lambda d: (
+        f"empty_output: node(s) {d['agents']} recorded an EMPTY output while "
+        "their own usage reports emitted tokens — the instrumentation worked "
+        "and captured an agent that spent its budget and produced nothing. "
+        "They stay unscored (there is no work to grade), but the emptiness "
+        "itself is evidence against the node, not against the exporter"
+    ),
     "topology": lambda d: (
         f"topology: graph has {d['components']} weakly-connected "
         "components — runs share membership but lack instrumented edges "

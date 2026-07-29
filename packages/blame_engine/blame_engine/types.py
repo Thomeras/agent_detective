@@ -109,6 +109,11 @@ class BlameInput:
     terminal_verdict: TerminalVerdict | None
     loop_baselines: dict[str, LoopBaseline]  # key: agent_name
     config: BlameConfig = BlameConfig()
+    # Loop identity per run (agent_detective.attempt / .attempt_of), when the
+    # instrumentation recorded it. This is what lets the loop check count ROUNDS
+    # instead of cycle size — see loops.py. Empty for traces that never said.
+    node_attempts: dict[str, int] = field(default_factory=dict)
+    node_attempt_of: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(frozen=True)
@@ -118,6 +123,11 @@ class LoopAnomaly:
     iterations: int
     limit_kind: Literal["max_iterations", "statistical"]
     baseline: LoopBaseline | None
+    # The runs that actually repeated — the attempts of the agent that hit the
+    # count. Blaming every member of the cycle names the whole graph, which is
+    # the same as naming nobody. Empty when the trace carried no loop identity
+    # and the members are all we can honestly point at.
+    repeating_run_ids: list[str] = field(default_factory=list)
 
 
 @dataclass(frozen=True)

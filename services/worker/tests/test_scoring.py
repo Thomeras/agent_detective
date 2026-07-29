@@ -973,3 +973,40 @@ def test_score_node_states_the_role_in_the_judge_prompt():
     assert captured, "judge was never called"
     assert "PLANNER — its correct output is a plan" in captured[0]
     assert "<<NODE_ROLE>>" not in captured[0]
+
+
+# --- empty output vs missing payload --------------------------------------
+#
+# Both arrive as "no text to score" and were filed as one finding: fix the
+# exporter. On a real run (agent_topo_db topologies/13_nested_loops) the node
+# that landed here was a reasoning model that spent all 1200 of its output
+# tokens on reasoning and returned empty content — 62% of the run's cost, no
+# review produced, and the report told the operator to go fix instrumentation
+# that had worked perfectly.
+
+
+def test_empty_output_with_spent_tokens_is_the_agents_defect():
+    run = make_run(1, "validator", output_inline="", tokens_out=1200)
+    result = _score(run, "", FakeJudge())
+    assert result.score is None                       # still not a hard 0.0
+    assert result.unscored_reason == "empty_output"
+    assert [s["name"] for s in result.deterministic_signals] == ["empty_output"]
+    assert result.deterministic_signals[0]["severity"] == "fail"
+    assert "empty_output" in result.flags
+
+
+def test_empty_output_without_spend_stays_an_instrumentation_warning():
+    """A wrapper span that spent nothing produced nothing to spend it on."""
+    run = make_run(1, "orchestrator", output_inline="", tokens_out=None)
+    result = _score(run, "", FakeJudge())
+    assert result.unscored_reason == "payload_missing"
+    assert result.deterministic_signals == ()
+
+
+def test_absent_output_is_never_the_agents_defect():
+    """Nothing was RECORDED — so nothing can be claimed about the agent, spend
+    or no spend. Absence of an observation, not an observed absence."""
+    run = make_run(1, "validator", output_inline=None, tokens_out=1200)
+    result = _score(run, None, FakeJudge())
+    assert result.unscored_reason == "payload_missing"
+    assert result.deterministic_signals == ()

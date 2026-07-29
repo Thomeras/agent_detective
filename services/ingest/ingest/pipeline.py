@@ -82,6 +82,8 @@ async def batch_from_spans(
                 artifact_meta=candidate.artifact_meta,
                 tool_calls=candidate.tool_calls,
                 contract_params=candidate.contract_params,
+                attempt=candidate.attempt,
+                attempt_of=candidate.attempt_of,
                 trace_id=candidate.trace_id,
                 status=candidate.status,
                 input_inline=input_payload.inline,

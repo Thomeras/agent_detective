@@ -664,3 +664,95 @@ class TestAgainstTheShippedClassifier:
         assert shape["primary"] == "dag"
         # Not a star: the arms converge on a node that reads all of them.
         assert len(graph.predecessors("merge")) == 4
+
+
+class TestParallelRetryArms:
+    """Two loops running side by side — the shape topology 18 (two independent
+    loops joined at the end) is built from, and the one `retry` could not draw.
+
+    A loop opened while another arm is still running took ``_open[-1]`` as its
+    parent, so whichever thread reached ``retry()`` first became the other's
+    predecessor: an edge no execution performed, in a graph whose whole job is
+    to say which node fed which. ``parallel=True`` is the same declaration
+    ``branch`` already makes, for a loop instead of a single step.
+    """
+
+    def _two_loops(self, tmp_path):
+        """research loop || draft loop -> merge, arms interleaved as threads
+        would interleave them."""
+        r = _enabled(tmp_path, "conference_talk", task={"goal": "talk on EDA"})
+        research = r.retry("research_loop", parallel=True, input={"topic": "EDA"})
+        draft = r.retry("draft_loop", parallel=True, input={"topic": "EDA"})
+        for i in range(2):
+            with research.attempt("research_planner") as a:
+                a.output = {"next": f"subtopic {i}"}
+            with draft.attempt("draft_writer") as a:
+                a.output = {"text": f"draft {i}"}
+        research.close({"sources": 4})
+        draft.close({"text": "draft 1"})
+        with r.join("deck_merger", [research.span, draft.span]) as m:
+            m.output = {"deck": "slides + notes"}
+        return r
+
+    def test_neither_arm_parents_on_the_other(self, tmp_path) -> None:
+        g = _graph(self._two_loops(tmp_path))
+        assert "draft_loop" not in g.predecessors("research_loop")
+        assert "research_loop" not in g.predecessors("draft_loop")
+        # Both hang off the run root, which is what actually dispatched them.
+        # (Their own last attempt is the other predecessor — the loop back-edge.)
+        assert "conference_talk" in g.predecessors("research_loop")
+        assert "conference_talk" in g.predecessors("draft_loop")
+
+    def test_each_arm_keeps_its_own_loop(self, tmp_path) -> None:
+        """Parallel must not cost the arms their cycles."""
+        g = _graph(self._two_loops(tmp_path))
+        assert g.has_cycle_through("research_loop", "research_planner#1",
+                                   "research_planner#2")
+        assert g.has_cycle_through("draft_loop", "draft_writer#1", "draft_writer#2")
+
+    def test_the_join_reads_both_arms(self, tmp_path) -> None:
+        g = _graph(self._two_loops(tmp_path))
+        assert {"research_loop", "draft_loop"} <= g.predecessors("deck_merger")
+
+    def test_a_parallel_loop_is_not_the_chain_head(self, tmp_path) -> None:
+        """A following `step` continues from the fan-out point, not from
+        whichever arm happened to run last — the rule `branch` already keeps."""
+        r = _enabled(tmp_path, "run")
+        with r.step("plan") as p:
+            p.output = {"plan": 1}
+        arm = r.retry("polish_loop", parallel=True)
+        with arm.attempt("polisher") as a:
+            a.output = {"clean": True}
+        arm.close({"clean": True})
+        with r.step("publish") as pub:
+            pub.output = {"url": "x"}
+        g = _graph(r)
+        assert g.predecessors("publish") == {"plan"}
+
+    def test_sequential_retry_still_chains(self, tmp_path) -> None:
+        """The default is unchanged: a plain loop IS a stage of the pipeline."""
+        r = _enabled(tmp_path, "run")
+        with r.step("plan") as p:
+            p.output = {"plan": 1}
+        with r.retry("revise") as loop:
+            with loop.attempt("write") as a:
+                a.output = {"draft": 1}
+            loop.output = {"draft": 1}
+        with r.step("publish") as pub:
+            pub.output = {"url": "x"}
+        g = _graph(r)
+        assert g.predecessors("revise") == {"plan"}
+        assert g.predecessors("publish") == {"revise"}
+
+    def test_of_names_the_dispatching_step(self, tmp_path) -> None:
+        r = _enabled(tmp_path, "run")
+        with r.step("plan") as p:
+            p.output = {"plan": 1}
+        with r.step("collect") as c:
+            c.output = {"docs": 3}
+        loop = r.retry("revise", of=p)
+        with loop.attempt("write") as a:
+            a.output = {"draft": 1}
+        loop.close({"draft": 1})
+        g = _graph(r)
+        assert g.predecessors("revise") == {"plan"}

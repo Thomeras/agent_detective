@@ -32,12 +32,15 @@ def make_input(
     terminal_verdict=None,
     loop_baselines=None,
     config: BlameConfig | None = None,
+    attempts: Mapping[str, tuple[str, int]] | None = None,
 ) -> BlameInput:
     """Build a BlameInput with deterministic defaults.
 
     scores maps run_id -> float score, None (unknown), or a full NodeScore.
     Default end_times follow node order (0.0, 1.0, ...), costs default to 1.0,
-    agent_names default to the run_id itself.
+    agent_names default to the run_id itself. ``attempts`` maps run_id ->
+    (agent the attempt belongs to, which attempt it was), the loop identity an
+    instrumented retry records.
     """
     node_list = list(nodes)
     raw_scores = scores or {}
@@ -54,6 +57,8 @@ def make_input(
         terminal_verdict=terminal_verdict,
         loop_baselines=dict(loop_baselines or {}),
         config=config or BlameConfig(),
+        node_attempts={n: a[1] for n, a in (attempts or {}).items()},
+        node_attempt_of={n: a[0] for n, a in (attempts or {}).items()},
     )
 
 

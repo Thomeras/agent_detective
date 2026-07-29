@@ -707,6 +707,8 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     # artifact metadata onto every run under that resource. Never invented.
     artifact_meta = _first_str(opener.attrs.get("agent_detective.artifact_meta"))
     contract_params = _first_str(opener.attrs.get("agent_detective.contract_params"))
+    attempt_of = _first_str(opener.attrs.get("agent_detective.attempt_of"))
+    attempt = _num(opener.attrs.get("agent_detective.attempt"))
     prompt_hash = _first_str(
         opener.attrs.get("agent_detective.prompt_hash"),
         opener.resource_attrs.get("agent_detective.prompt_hash"),
@@ -740,6 +742,10 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
         artifact_meta=artifact_meta,
         contract_params=contract_params,
         tool_calls=_tool_calls_digest(acc),
+        # Only a pair means anything: an ordinal with no agent to belong to
+        # cannot be grouped, and a group with no ordinal cannot be counted.
+        attempt=int(attempt) if attempt is not None and attempt_of else None,
+        attempt_of=attempt_of if attempt is not None and attempt_of else None,
         tokens_in=tokens_in if tokens_in is None else int(tokens_in),
         tokens_out=tokens_out if tokens_out is None else int(tokens_out),
         cost_usd=cost if cost is None else float(cost),

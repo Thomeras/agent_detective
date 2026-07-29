@@ -1,6 +1,6 @@
 [project]
 name = "detective-sdk"
-version = "0.1.0"
+version = "0.2.0"
 description = "Universal, dependency-free instrumentation helpers for Agent Detective conventions"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"

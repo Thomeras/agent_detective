@@ -94,6 +94,12 @@ class RunRow:
     artifact_meta: str | None  # raw agent_detective.artifact_meta opener-span attribute
     tool_calls: str | None  # compact JSON digest of the run's TOOL spans (mapper-derived)
     contract_params: str | None  # raw agent_detective.contract_params opener-span attribute
+    # agent_detective.attempt / .attempt_of: which pass this run was, and of
+    # which agent. Attempts need distinct agent names or reconstruction draws
+    # no edge between them, so without this pair the loop check cannot tell
+    # rounds from cycle size.
+    attempt: int | None
+    attempt_of: str | None
     trace_id: str
     status: str  # 'ok' | 'failed' (schema also allows 'degraded', set downstream)
     input_inline: str | None
