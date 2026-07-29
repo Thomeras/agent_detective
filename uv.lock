@@ -119,7 +119,6 @@ version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
     { name = "agent-detective" },
-    { name = "agent-detective-corpus" },
     { name = "agent-detective-worker", extra = ["server"] },
     { name = "api" },
     { name = "blame-engine" },
@@ -131,6 +130,7 @@ dependencies = [
 
 [package.dev-dependencies]
 dev = [
+    { name = "agent-detective-corpus" },
     { name = "alembic" },
     { name = "pytest" },
     { name = "sqlalchemy" },
@@ -139,7 +139,6 @@ dev = [
 [package.metadata]
 requires-dist = [
     { name = "agent-detective", editable = "packages/detective_cli" },
-    { name = "agent-detective-corpus", editable = "corpus" },
     { name = "agent-detective-worker", extras = ["server"], editable = "services/worker" },
     { name = "api", editable = "services/api" },
     { name = "blame-engine", editable = "packages/blame_engine" },
@@ -151,6 +150,7 @@ requires-dist = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "agent-detective-corpus", editable = "corpus" },
     { name = "alembic", specifier = ">=1.13" },
     { name = "pytest", specifier = ">=8.0" },
     { name = "sqlalchemy", specifier = ">=2.0" },

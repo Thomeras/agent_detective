@@ -12,9 +12,6 @@ dependencies = [
     "detective-sdk",
     "detective-ci",
     "agent-detective",
-    # Foreign-trace corpus (corpus/): a workspace member like the rest, so the
-    # dev env keeps it and its `record` extra instead of dropping them on sync.
-    "agent-detective-corpus",
     "ingest",
     # The deployed service wants the database/stream/object-store clients; the
     # core alone is what the local-mode CLI installs.
@@ -45,6 +42,11 @@ addopts = "--import-mode=importlib"
 [dependency-groups]
 dev = [
     "pytest>=8.0",
+    # Foreign-trace corpus (corpus/). DEV ONLY: the service images build with
+    # `uv sync --no-dev` and have no business installing a test corpus — as a
+    # runtime dependency it broke every image build, because their build context
+    # does not include corpus/.
+    "agent-detective-corpus",
     # Needed to author and validate the migrations under db/.
     "alembic>=1.13",
     "sqlalchemy>=2.0",
