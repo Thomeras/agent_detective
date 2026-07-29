@@ -8,6 +8,51 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
+## [0.3.0] — 2026-07-29
+
+`agent-detective`, `agent-detective-worker`, `blame-engine`. Verdicts change on
+unchanged traces — that is the point of the release.
+
+Measured on the foreign corpus (18 cells, 6 topologies, 5 runs each):
+attribution accuracy **0.43 → 0.833**, discrimination 0.58 → 0.93, false
+positive rate 0.24 → 0.20.
+
+### Added
+- **Numeric fidelity**, the deterministic answer to "fluent but wrong".
+  `number_not_derivable` catches a figure in a tabular output that is neither
+  present in the input nor reachable from one by a rate the input states;
+  `numeric_content_lost` catches an output that dropped every figure it was
+  handed. No model in either. This is what moved attribution.
+- `run_failed` — the trace records a run as errored. That fact used to reach the
+  verdict as nothing: its only landing place was the heuristics component, whose
+  weight does not clear the scoring floor alone, so a graph containing a crashed
+  node was reported INCONCLUSIVE at 0% confidence.
+- `worker/payload.py` — one typed view per payload, built once. Every check used
+  to re-parse the raw text and decide for itself whether a comma separates
+  fields or marks a decimal; getting that wrong does not make a check miss, it
+  makes it accuse.
+- `JUDGE_GATE` (off by default) — run the deterministic half first and skip the
+  per-node judged pass when it already localised a defect whose origin it
+  observed.
+
+### Fixed
+- **The judge's reasoning now travels with the number it explains.** Judged
+  findings carried `{agent, score}` and nothing else, so a report said "plan
+  scored 0.56" with no way to learn why. The text existed the whole time.
+- A deterministic-only localisation reported 0% confidence while citing a
+  100%-certainty finding: two predicates for "this node has a hard deterministic
+  defect" had drifted apart, and the one driving confidence read a closed set of
+  three flag names.
+- `evaluate_heuristics` returned a full 1.0 when none of its checks fired, and
+  the composite averaged that in as positive evidence of quality — a constant
+  worth ~27% of every score, which undid the judge's flag caps.
+
+### Changed
+- A failed judge plus a passing schema contract no longer clears the scoring
+  floor on its own. Conforming JSON and no complaints is not a quality
+  measurement, so those nodes are unscored rather than carrying a number nothing
+  measured.
+
 ## [0.2.2] — 2026-07-29
 
 Self-hosted stack only; no distribution changed. `agent-detective` stays at

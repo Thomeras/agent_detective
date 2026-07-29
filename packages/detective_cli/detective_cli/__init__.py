@@ -32,7 +32,7 @@ from .analyze import AnalysisRun, GraphAnalysis, analyze, analyze_async, local_s
 from .bundle import TraceFormatError, bundles_from_exports, bundles_from_mapping, load_trace
 from .doctor import Check, Claim, Diagnosis, diagnose
 
-__version__ = "0.2.1"
+__version__ = "0.3.0"
 
 __all__ = [
     "AnalysisRun",

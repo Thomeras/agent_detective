@@ -1,6 +1,6 @@
 [project]
 name = "agent-detective"
-version = "0.2.1"
+version = "0.3.0"
 description = "Blame analysis for multi-agent runs: read an OTEL trace, name where quality broke"
 authors = [{ name = "Tomáš Jeřábek" }]
 readme = "README.md"
@@ -22,11 +22,11 @@ classifiers = [
 # worker.memory. `worker` core is deliberately installed WITHOUT its [server]
 # extra — see services/worker/pyproject.toml.
 dependencies = [
-    "blame-engine>=0.2.0",
+    "blame-engine>=0.3.0",
     "otel-mapper>=0.2.0",
     # The tier1/tier2 processors, without the [server] extra: no database, no
     # broker, no object store (see services/worker/pyproject.toml).
-    "agent-detective-worker>=0.2.0",
+    "agent-detective-worker>=0.3.0",
     # Instrumentation helpers. Strictly the AGENT side, not the analysis side —
     # but shipping it here means `pip install agent-detective` covers the whole
     # quickstart (instrument a run, then analyse it) with one install. It is
