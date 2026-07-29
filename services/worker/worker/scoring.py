@@ -31,6 +31,7 @@ from blame_engine import NodeScore, is_planner, is_verifier
 from .behavioral import (
     duplicate_side_effect_signals,
     empty_output_signals,
+    run_failed_signals,
     loop_fingerprint_signals,
     parse_tool_calls,
     retry_storm_signals,
@@ -941,6 +942,7 @@ async def score_node(
         + retry_storm_signals(tool_calls)
         + duplicate_side_effect_signals(tool_calls)
         + tool_args_signals(run.tool_calls, tool_calls, tool_schemas)
+        + run_failed_signals(run.status, error_span_ids)
     )
 
     # GENERALIZED deterministic-fail override: ANY fail-severity signal is a

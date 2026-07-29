@@ -18,7 +18,8 @@ Signals emitted here:
 - ``cost_anomaly`` / ``token_anomaly`` (warn) — z-score >= 3 vs the agent's
   rolling baseline;
 - ``empty_output``          (fail) — the run recorded an empty output while its
-  own usage says the model emitted tokens: it spent and shipped nothing.
+  own usage says the model emitted tokens: it spent and shipped nothing;
+- ``run_failed``            (fail) — the trace records the run as errored.
 
 All functions are pure and identity-free; the caller stamps run_id/agent.
 """
@@ -38,6 +39,7 @@ SIGNAL_TOOL_ARGS_INVALID = "tool_args_invalid"
 SIGNAL_COST_ANOMALY = "cost_anomaly"
 SIGNAL_TOKEN_ANOMALY = "token_anomaly"
 SIGNAL_EMPTY_OUTPUT = "empty_output"
+SIGNAL_RUN_FAILED = "run_failed"
 
 DEFAULT_SIDE_EFFECT_MARKERS: tuple[str, ...] = (
     "send",
@@ -365,4 +367,32 @@ def empty_output_signals(output_text: str | None, tokens_out: int | None) -> lis
             # — leave the key off and keep the inferred attribution.
             "originates": True,
         }
+    ]
+
+
+def run_failed_signals(status: str | None, error_span_ids: list[str] | None) -> list[dict]:
+    """``run_failed`` (fail) — the run errored, as recorded by the trace itself.
+
+    A hard runtime failure is the least ambiguous evidence in a trace: nobody
+    inferred it, the instrumentation wrote it down. It nonetheless reached the
+    verdict as nothing. The only place it landed was the heuristics component,
+    whose weight (0.15) does not clear the scoring floor on its own — so with no
+    judge in the path the node came back `insufficient_components` and a graph
+    containing a crashed collector was reported INCONCLUSIVE at 0% confidence.
+    An observed crash is not an absence of evidence.
+
+    Deliberately does NOT claim `originates`. A node can fail because something
+    outside it did — a provider returning malformed JSON, an expired key — and
+    "this run errored" says where the failure SURFACED, not where it began.
+    That distinction is the judge's to close, or the operator's; the signal only
+    refuses to let the fact disappear.
+    """
+    failed = status == "failed" or bool(error_span_ids)
+    if not failed:
+        return []
+    return [
+        signal(
+            SIGNAL_RUN_FAILED, "fail", "run_failed",
+            status=status or "error", spans=len(error_span_ids or []),
+        )
     ]

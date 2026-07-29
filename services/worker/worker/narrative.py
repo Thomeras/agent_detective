@@ -175,6 +175,13 @@ _SIGNAL_TEMPLATES: dict[str, tuple[Callable[..., str], Callable[..., str]]] = {
             f"gen_ai.usage.output_tokens={d['tokens_out']}"
         ),
     ),
+    "run_failed": (
+        lambda d: (
+            f"the run is recorded as {d['status']}"
+            + (f" ({d['spans']} error span(s))" if d.get("spans") else "")
+        ),
+        lambda d: "run status from the trace",
+    ),
     "loop_fingerprint": (
         lambda d: (
             f"tool '{d['tool']}' called {d['calls']}x consecutively "

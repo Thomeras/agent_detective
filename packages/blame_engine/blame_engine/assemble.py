@@ -126,7 +126,16 @@ def build_findings(
                     kind="content_score",
                     channel="judged",
                     subject=run_subject(n),
-                    data={"score": ns.score, "agent": inp.agent_names.get(n, n)},
+                    # The judge's own words travel WITH the number. They were
+                    # dropped here, so a reader looking at a finding saw
+                    # "plan scored 0.56" and had no way to learn why — the
+                    # reasoning existed, it just never left the NodeScore. It
+                    # is the only thing on a judged finding a human can check.
+                    data={
+                        "score": ns.score,
+                        "agent": inp.agent_names.get(n, n),
+                        **({"reasoning": ns.judge_note} if ns.judge_note else {}),
+                    },
                     provenance=JudgePrompt(detail=PROV_PER_NODE_QUALITY_JUDGE),
                     certainty=0.7,
                 )
@@ -139,7 +148,11 @@ def build_findings(
                             kind="content_flag",
                             channel="judged",
                             subject=run_subject(n),
-                            data={"flag": flag, "agent": inp.agent_names.get(n, n)},
+                            data={
+                                "flag": flag,
+                                "agent": inp.agent_names.get(n, n),
+                                **({"reasoning": ns.judge_note} if ns.judge_note else {}),
+                            },
                             provenance=JudgePrompt(detail=PROV_PER_NODE_QUALITY_JUDGE),
                             certainty=0.7,
                         )
