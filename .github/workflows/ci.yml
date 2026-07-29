@@ -42,6 +42,10 @@ jobs:
         working-directory: packages/detective_sdk
         run: uv run --package detective-sdk pytest tests
 
+      - name: corpus (foreign traces, replay only)
+        working-directory: corpus
+        run: uv run --package agent-detective-corpus pytest tests
+
       - name: detective_ci
         working-directory: packages/detective_ci
         run: uv run --package detective-ci pytest tests

@@ -1,0 +1,405 @@
+{
+  "resourceSpans": [
+    {
+      "resource": {
+        "attributes": [
+          {
+            "key": "service.name",
+            "value": {
+              "stringValue": "agent-topo-db/21_fan_in_join"
+            }
+          }
+        ]
+      },
+      "scopeSpans": [
+        {
+          "scope": {
+            "name": "agent-detective-corpus"
+          },
+          "spans": [
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "6639ab172d44895f",
+              "parentSpanId": "19ec58fe7cc58c18",
+              "name": "feedback_source",
+              "kind": 0,
+              "startTimeUnixNano": "1785313144874469000",
+              "endTimeUnixNano": "1785313147664320000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "feedback_source"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- zpetna_vazba ---\n\"Export nam padal cely tyden, museli jsme to delat rucne.\" (enterprise)\n\"Nova synchronizace je konecne pouzitelna.\" (mid)\n\"Podpora reaguje rychle, ale problem se opakuje.\" (enterprise)\n\"Cena za Enterprise je proti konkurenci vysoka.\" (mid)\n\"Chybi nam hromadny import.\" (small)\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00014535
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "153"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "204"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "### Třídění zpětné vazby podle témat a segmentů\n\n#### Segment: Enterprise\n1. **Téma: Problémy s exportem**\n   - \"Export nam padal cely tyden, museli jsme to delat rucne.\"\n   \n2. **Téma: Podpora**\n   - \"Podpora reaguje rychle, ale problem se opakuje.\"\n\n3. **Téma: Cena**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\"\n\n#### Segment: Mid\n1. **Téma: Synchronizace**\n   - \"Nova synchronizace je konecne pouzitelna.\"\n\n2. **Téma: Cena**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\" (Toto se může vztahovat i na segment Mid, pokud je relevantní.)\n\n#### Segment: Small\n1. **Téma: Funkcionalita**\n   - \"Chybi nam hromadny import.\""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "20c711a83feb1c11",
+              "parentSpanId": "6639ab172d44895f",
+              "name": "feedback_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785313147664517000",
+              "endTimeUnixNano": "1785313149351986000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "feedback_analyst"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- feedback_source ---\n### Třídění zpětné vazby podle témat a segmentů\n\n#### Segment: Enterprise\n1. **Téma: Problémy s exportem**\n   - \"Export nam padal cely tyden, museli jsme to delat rucne.\"\n   \n2. **Téma: Podpora**\n   - \"Podpora reaguje rychle, ale problem se opakuje.\"\n\n3. **Téma: Cena**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\"\n\n#### Segment: Mid\n1. **Téma: Synchronizace**\n   - \"Nova synchronizace je konecne pouzitelna.\"\n\n2. **Téma: Cena**\n   - \"Cena za Enterprise je proti konkurenci vysoka.\" (Toto se může vztahovat i na segment Mid, pokud je relevantní.)\n\n#### Segment: Small\n1. **Téma: Funkcionalita**\n   - \"Chybi nam hromadny import.\""
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.0001047
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "278"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "105"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "### Hlavní témata zpětné vazby\n\n1. **Problémy s exportem**\n   - Týká se segmentu: Enterprise\n\n2. **Podpora**\n   - Týká se segmentu: Enterprise\n\n3. **Cena**\n   - Týká se segmentů: Enterprise, Mid\n\n4. **Synchronizace**\n   - Týká se segmentu: Mid\n\n5. **Funkcionalita**\n   - Týká se segmentu: Small"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "4174c30a94c70627",
+              "parentSpanId": "19ec58fe7cc58c18",
+              "name": "metrics_source",
+              "kind": 0,
+              "startTimeUnixNano": "1785313144873734000",
+              "endTimeUnixNano": "1785313151679222000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "metrics_source"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metriky ---\nmesic,aktivni_uzivatele,churn_pct,nps,tikety\n2026-05,4120,2.1,41,312\n2026-06,4380,1.8,44,287\n2026-07,4290,3.4,38,401\n"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00029325
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "159"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "449"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Na základě poskytnutých interních metrik pro měsíce květen až červenec 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu za období květen - červenec 2026\n\n#### 1. Aktivní uživatelé\n- **Růst**: \n  - Červen: +260 (z 4120 na 4380)\n- **Pokles**: \n  - Červenec: -90 (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles**: \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst**: \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst**: \n  - Červen: +3 (z 41 na 44)\n- **Pokles**: \n  - Červenec: -6 (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles**: \n  - Červen: -25 (z 312 na 287)\n- **Růst**: \n  - Červenec: +114 (z 287 na 401)\n\n### Shrnutí\n- Aktivní uživatelé v červnu vzrostli, ale v červenci klesli.\n- Churn rate se zlepšil v červnu, ale v červenci vzrostl.\n- NPS vzrostl v červnu, ale v červenci klesl.\n- Počet tiketů klesl v červnu, ale výrazně vzrostl v červenci.\n\nTento přehled ukazuje smíšené výsledky, kde některé metriky vykazují pozitivní trend, zatímco jiné naznačují oblasti, které je třeba zlepšit."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "81438d30c8a91b80",
+              "parentSpanId": "4174c30a94c70627",
+              "name": "metrics_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785313151679428000",
+              "endTimeUnixNano": "1785313161513617000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "metrics_analyst"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metrics_source ---\nNa základě poskytnutých interních metrik pro měsíce květen až červenec 2026, zde je měsíční přehled výkonu:\n\n### Přehled výkonu za období květen - červenec 2026\n\n#### 1. Aktivní uživatelé\n- **Růst**: \n  - Červen: +260 (z 4120 na 4380)\n- **Pokles**: \n  - Červenec: -90 (z 4380 na 4290)\n\n#### 2. Churn rate (procento odchodu uživatelů)\n- **Pokles**: \n  - Červen: -0.3 % (z 2.1 % na 1.8 %)\n- **Růst**: \n  - Červenec: +1.6 % (z 1.8 % na 3.4 %)\n\n#### 3. NPS (Net Promoter Score)\n- **Růst**: \n  - Červen: +3 (z 41 na 44)\n- **Pokles**: \n  - Červenec: -6 (z 44 na 38)\n\n#### 4. Počet tiketů\n- **Pokles**: \n  - Červen: -25 (z 312 na 287)\n- **Růst**: \n  - Červenec: +114 (z 287 na 401)\n\n### Shrnutí\n- Aktivní uživatelé v červnu vzrostli, ale v červenci klesli.\n- Churn rate se zlepšil v červnu, ale v červenci vzrostl.\n- NPS vzrostl v červnu, ale v červenci klesl.\n- Počet tiketů klesl v červnu, ale výrazně vzrostl v červenci.\n\nTento přehled ukazuje smíšené výsledky, kde některé metriky vykazují pozitivní trend, zatímco jiné naznačují oblasti, které je třeba zlepšit."
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "openai/gpt-4o-mini"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.00054015
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "509"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "773"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": "Na základě poskytnutých interních metrik za období květen až červenec 2026 můžeme identifikovat několik klíčových trendů a jejich pravděpodobné příčiny.\n\n### 1. Aktivní uživatelé\n- **Trend**: V červnu došlo k nárůstu aktivních uživatelů o 260, ale v červenci došlo k poklesu o 90.\n- **Možné příčiny**: \n  - Nárůst v červnu může být způsoben marketingovými aktivitami, sezónními akcemi nebo zlepšením produktu/služby, které přilákaly nové uživatele.\n  - Pokles v červenci může naznačovat, že noví uživatelé nebyli dostatečně zapojeni nebo že existující uživatelé ztratili zájem. Může to být také důsledek sezónních faktorů, kdy uživatelé mohou mít méně času na používání služby.\n\n### 2. Churn rate\n- **Trend**: Churn rate se v červnu snížil, ale v červenci vzrostl.\n- **Možné příčiny**: \n  - Snížení v červnu může být důsledkem zlepšení zákaznické podpory nebo nových funkcí, které zvýšily spokojenost uživatelů.\n  - Nárůst v červenci může signalizovat, že uživatelé byli nespokojeni s novinkami, které byly zavedeny, nebo že se objevily technické problémy, které ovlivnily uživatelskou zkušenost.\n\n### 3. NPS (Net Promoter Score)\n- **Trend**: NPS vzrostl v červnu, ale v červenci klesl.\n- **Možné příčiny**: \n  - Růst v červnu může odrážet pozitivní zpětnou vazbu od uživatelů, kteří byli spokojeni s novými funkcemi nebo zlepšením služeb.\n  - Pokles v červenci může být způsoben nespokojeností s nedávnými změnami nebo problémy, které uživatelé zažili, což se odrazilo v jejich ochotě doporučit službu.\n\n### 4. Počet tiketů\n- **Trend**: Počet tiketů klesl v červnu, ale v červenci výrazně vzrostl.\n- **Možné příčiny**: \n  - Pokles v červnu může naznačovat, že uživatelé byli spokojeni a neměli potřebu kontaktovat podporu.\n  - Růst v červenci může být důsledkem problémů, které se objevily po nových aktualizacích nebo změnách, což vedlo k většímu počtu dotazů a stížností.\n\n### Závěr\nCelkově lze říci, že červen byl pozitivním měsícem s růstem v několika metrikách, zatímco červenec ukazuje na zhoršení v několika oblastech. Je důležité analyzovat konkrétní změny, které byly provedeny v červenci, a zjistit, jaké faktory mohly ovlivnit uživatelskou zkušenost. Zaměření na zlepšení zákaznické podpory a udržení uživatelů by mělo být prioritou pro následující měsíce."
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "f77073068b07e116",
+              "parentSpanId": "da26875966a195dd",
+              "name": "read:feedback_analyst",
+              "kind": 0,
+              "startTimeUnixNano": "1785313182411291000",
+              "endTimeUnixNano": "1785313182411306000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "TOOL"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.name",
+                  "value": {
+                    "stringValue": "read:feedback_analyst"
+                  }
+                },
+                {
+                  "key": "gen_ai.tool.target_agent",
+                  "value": {
+                    "stringValue": "feedback_analyst"
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "da26875966a195dd",
+              "parentSpanId": "81438d30c8a91b80",
+              "name": "performance_join",
+              "kind": 0,
+              "startTimeUnixNano": "1785313161513890000",
+              "endTimeUnixNano": "1785313182411358000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "performance_join"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "--- metrics_analyst ---\nNa základě poskytnutých interních metrik za období květen až červenec 2026 můžeme identifikovat několik klíčových trendů a jejich pravděpodobné příčiny.\n\n### 1. Aktivní uživatelé\n- **Trend**: V červnu došlo k nárůstu aktivních uživatelů o 260, ale v červenci došlo k poklesu o 90.\n- **Možné příčiny**: \n  - Nárůst v červnu může být způsoben marketingovými aktivitami, sezónními akcemi nebo zlepšením produktu/služby, které přilákaly nové uživatele.\n  - Pokles v červenci může naznačovat, že noví uživatelé nebyli dostatečně zapojeni nebo že existující uživatelé ztratili zájem. Může to být také důsledek sezónních faktorů, kdy uživatelé mohou mít méně času na používání služby.\n\n### 2. Churn rate\n- **Trend**: Churn rate se v červnu snížil, ale v červenci vzrostl.\n- **Možné příčiny**: \n  - Snížení v červnu může být důsledkem zlepšení zákaznické podpory nebo nových funkcí, které zvýšily spokojenost uživatelů.\n  - Nárůst v červenci může signalizovat, že uživatelé byli nespokojeni s novinkami, které byly zavedeny, nebo že se objevily technické problémy, které ovlivnily uživatelskou zkušenost.\n\n### 3. NPS (Net Promoter Score)\n- **Trend**: NPS vzrostl v červnu, ale v červenci klesl.\n- **Možné příčiny**: \n  - Růst v červnu může odrážet pozitivní zpětnou vazbu od uživatelů, kteří byli spokojeni s novými funkcemi nebo zlepšením služeb.\n  - Pokles v červenci může být způsoben nespokojeností s nedávnými změnami nebo problémy, které uživatelé zažili, což se odrazilo v jejich ochotě doporučit službu.\n\n### 4. Počet tiketů\n- **Trend**: Počet tiketů klesl v červnu, ale v červenci výrazně vzrostl.\n- **Možné příčiny**: \n  - Pokles v červnu může naznačovat, že uživatelé byli spokojeni a neměli potřebu kontaktovat podporu.\n  - Růst v červenci může být důsledkem problémů, které se objevily po nových aktualizacích nebo změnách, což vedlo k většímu počtu dotazů a stížností.\n\n### Závěr\nCelkově lze říci, že červen byl pozitivním měsícem s růstem v několika metrikách, zatímco červenec ukazuje na zhoršení v několika oblastech. Je důležité analyzovat konkrétní změny, které byly provedeny v červenci, a zjistit, jaké faktory mohly ovlivnit uživatelskou zkušenost. Zaměření na zlepšení zákaznické podpory a udržení uživatelů by mělo být prioritou pro následující měsíce.\n\n--- feedback_analyst ---\n### Hlavní témata zpětné vazby\n\n1. **Problémy s exportem**\n   - Týká se segmentu: Enterprise\n\n2. **Podpora**\n   - Týká se segmentu: Enterprise\n\n3. **Cena**\n   - Týká se segmentů: Enterprise, Mid\n\n4. **Synchronizace**\n   - Týká se segmentu: Mid\n\n5. **Funkcionalita**\n   - Týká se segmentu: Small"
+                  }
+                },
+                {
+                  "key": "gen_ai.request.model",
+                  "value": {
+                    "stringValue": "moonshotai/kimi-k2.6"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.cost",
+                  "value": {
+                    "doubleValue": 0.007885
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.input_tokens",
+                  "value": {
+                    "intValue": "1180"
+                  }
+                },
+                {
+                  "key": "gen_ai.usage.output_tokens",
+                  "value": {
+                    "intValue": "2000"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            },
+            {
+              "traceId": "e4183dd589d1bee1c29b5aac7c259e52",
+              "spanId": "19ec58fe7cc58c18",
+              "parentSpanId": "",
+              "name": "21_fan_in_join",
+              "kind": 0,
+              "startTimeUnixNano": "1785313144431060000",
+              "endTimeUnixNano": "1785313182411473000",
+              "attributes": [
+                {
+                  "key": "openinference.span.kind",
+                  "value": {
+                    "stringValue": "AGENT"
+                  }
+                },
+                {
+                  "key": "gen_ai.agent.name",
+                  "value": {
+                    "stringValue": "21_fan_in_join"
+                  }
+                },
+                {
+                  "key": "input.value",
+                  "value": {
+                    "stringValue": "agent_topo_db topology 21_fan_in_join"
+                  }
+                },
+                {
+                  "key": "output.value",
+                  "value": {
+                    "stringValue": ""
+                  }
+                }
+              ],
+              "status": {
+                "code": 0
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

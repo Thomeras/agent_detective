@@ -28,5 +28,7 @@ run packages/detective_cli agent-detective
 run services/ingest       ingest
 run services/api          api
 run services/worker       agent-detective-worker
+# Foreign traces: replay only, no model and no network (see corpus/README.md).
+run corpus                agent-detective-corpus
 
 echo "All unit suites passed."

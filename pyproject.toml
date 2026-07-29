@@ -21,7 +21,7 @@ dependencies = [
 
 # Virtual workspace root: no build-system, so the root itself is never packaged.
 [tool.uv.workspace]
-members = ["packages/*", "services/*"]
+members = ["packages/*", "services/*", "corpus"]
 
 [tool.uv.sources]
 blame-engine = { workspace = true }

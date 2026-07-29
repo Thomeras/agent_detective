@@ -1,0 +1,10 @@
+{
+  "topology": "21_fan_in_join",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": "drop_numbers",
+  "target_agent": "metrics_analyst",
+  "injections_applied": 1,
+  "expect_incident": true,
+  "recorded_at": "2026-07-29T08:22:28+00:00"
+}

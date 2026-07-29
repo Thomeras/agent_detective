@@ -1,0 +1,14 @@
+{
+  "topology": "21_fan_in_join",
+  "source": "agent_topo_db",
+  "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+  "fault": null,
+  "target_agent": null,
+  "injections_applied": 0,
+  "expect_incident": true,
+  "recorded_at": "2026-07-29T08:19:42+00:00",
+  "fault_origin": "not injected — reproduced live",
+  "note": "moonshotai/kimi-k2.6 spent its whole max_tokens budget on reasoning and returned empty content, at 1200 and again at 2000 tokens. The expensive terminal node shipped nothing. Kept as a labelled cell because it is the real-world shape the empty_output signal exists for.",
+  "expect_origin": "performance_join",
+  "expect_signal": "empty_output"
+}

@@ -1,0 +1,144 @@
+"""Record one labelled corpus entry: run a foreign topology, keep the trace.
+
+    uv run python -m corpus.record --topo-db ~/Projekty/agent_topo_db \\
+        --topology 21_fan_in_join --fault rewrite_currency --target metrics_analyst
+
+Recording is a DEVELOPER step, not a CI step: it needs agent_topo_db checked out
+next door and a live OpenRouter key, and it costs money. What CI consumes is the
+result — the trace JSON and its label, both committed under ``corpus/traces/``.
+That split is the point. A corpus that has to call a model to be checked is not
+a regression suite, it is a bill.
+
+Each entry is recorded TWICE, clean and faulted, from byte-identical topology
+code. The clean run is the negative control: without it the suite measures
+detection and says nothing about false positives, which is the number that
+decides whether anyone can put this in front of a build.
+"""
+
+from __future__ import annotations
+
+import argparse
+import importlib.util
+import json
+import sys
+from datetime import datetime, timezone
+from pathlib import Path
+
+from opentelemetry.trace import SpanKind
+
+from .inject import FAULTS, Fault, ResponseInjector
+from .otel_bridge import build_tracer_provider
+from .topolab_adapter import TopolabTracer, install_usage_capture
+
+
+def _load_topology_main(topo_db: Path, topology: str):
+    """Load ``topologies/<name>/main.py`` the way agent_topo_db's own runner does."""
+    main_py = topo_db / "topologies" / topology / "main.py"
+    if not main_py.is_file():
+        raise SystemExit(f"no such topology: {main_py}")
+    spec = importlib.util.spec_from_file_location(f"topo_{topology}", main_py)
+    if spec is None or spec.loader is None:
+        raise SystemExit(f"cannot load {main_py}")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module.main
+
+
+def record(
+    topo_db: Path,
+    topology: str,
+    out_dir: Path,
+    fault_name: str | None = None,
+    target_agent: str | None = None,
+) -> Path:
+    sys.path.insert(0, str(topo_db / "src"))
+
+    label = "clean" if fault_name is None else f"{fault_name}@{target_agent}"
+    slug = f"{topology}__{label.replace('@', '_at_')}"
+    trace_path = out_dir / f"{slug}.json"
+
+    fault = None
+    if fault_name is not None:
+        if fault_name not in FAULTS:
+            raise SystemExit(f"unknown fault {fault_name!r}; have {sorted(FAULTS)}")
+        if not target_agent:
+            raise SystemExit("--fault needs --target <agent name>")
+        fault = Fault(name=fault_name, target_agent=target_agent, apply=FAULTS[fault_name])
+    injector = ResponseInjector(fault)
+
+    provider, exporter = build_tracer_provider(
+        trace_path, service_name=f"agent-topo-db/{topology}"
+    )
+    tracer = provider.get_tracer("agent-detective-corpus")
+
+    topology_main = _load_topology_main(topo_db, topology)
+
+    root = tracer.start_span(topology, kind=SpanKind.INTERNAL)
+    root.set_attribute("openinference.span.kind", "AGENT")
+    root.set_attribute("gen_ai.agent.name", topology)
+    root.set_attribute("input.value", f"agent_topo_db topology {topology}")
+    root.set_attribute("output.value", "")
+
+    install_usage_capture()
+    adapter = TopolabTracer(tracer, root, injector=injector)
+    adapter.install()
+    try:
+        topology_main()
+    except BaseException:
+        # The exporter flushes on shutdown, so a crashed run would otherwise
+        # leave a truncated trace with no label sitting in the corpus —
+        # indistinguishable from a real entry, and wrong. Take it back out.
+        adapter.uninstall()
+        root.end()
+        provider.shutdown()
+        trace_path.unlink(missing_ok=True)
+        raise
+    adapter.uninstall()
+    root.end()
+    provider.shutdown()
+
+    if fault is not None and injector.applied == 0:
+        # A faulted entry whose fault never fired is a clean run wearing a label
+        # that says otherwise — the single worst thing that can enter a corpus.
+        trace_path.unlink(missing_ok=True)
+        raise SystemExit(
+            f"fault {fault_name!r} targeted {target_agent!r}, which never ran in "
+            f"{topology}. No entry written."
+        )
+
+    meta = {
+        "topology": topology,
+        "source": "agent_topo_db",
+        "instrumentation": "opentelemetry-sdk + corpus.topolab_adapter (foreign)",
+        "fault": fault_name,
+        "target_agent": target_agent,
+        "injections_applied": injector.applied,
+        "expect_incident": fault is not None,
+        "recorded_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
+    }
+    (out_dir / f"{slug}.label.json").write_text(
+        json.dumps(meta, indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+    )
+    return trace_path
+
+
+def main() -> int:
+    ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
+    ap.add_argument("--topo-db", type=Path, required=True)
+    ap.add_argument("--topology", required=True)
+    ap.add_argument("--fault", default=None, choices=sorted(FAULTS))
+    ap.add_argument("--target", default=None, help="agent whose output gets the fault")
+    ap.add_argument(
+        "--out", type=Path, default=Path(__file__).resolve().parents[1] / "traces"
+    )
+    args = ap.parse_args()
+
+    path = record(
+        args.topo_db.expanduser(), args.topology, args.out, args.fault, args.target
+    )
+    print(f"wrote {path}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
