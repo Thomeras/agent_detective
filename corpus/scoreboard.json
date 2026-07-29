@@ -325,7 +325,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.39,
+          "confidence": 0.6,
           "culprits": [
             "spec_extractor"
           ],
@@ -333,7 +333,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.39,
+          "confidence": 0.6,
           "culprits": [
             "spec_extractor"
           ],
@@ -341,7 +341,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.39,
+          "confidence": 0.6,
           "culprits": [
             "spec_extractor"
           ],
@@ -349,7 +349,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.39,
+          "confidence": 0.6,
           "culprits": [
             "spec_extractor"
           ],
@@ -357,7 +357,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.39,
+          "confidence": 0.6,
           "culprits": [
             "spec_extractor"
           ],
@@ -439,7 +439,8 @@
         "topology": "05_diamond"
       },
       "report_types": {
-        "composition_failure": 5
+        "clean": 1,
+        "composition_failure": 4
       },
       "verdicts": [
         {
@@ -451,12 +452,10 @@
           "report_type": "composition_failure"
         },
         {
-          "confidence": 0.4,
-          "culprits": [
-            "05_diamond"
-          ],
-          "incident": true,
-          "report_type": "composition_failure"
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
         },
         {
           "confidence": 0.4,
@@ -545,14 +544,25 @@
         "topology": "12_supervisor_multi_subagents"
       },
       "report_types": {
-        "clean": 5
+        "clean": 2,
+        "degraded_recovered": 3
       },
       "verdicts": [
         {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
+          "confidence": 0.95,
+          "culprits": [
+            "changelog_agent"
+          ],
+          "incident": true,
+          "report_type": "degraded_recovered"
+        },
+        {
+          "confidence": 0.95,
+          "culprits": [
+            "changelog_agent"
+          ],
+          "incident": true,
+          "report_type": "degraded_recovered"
         },
         {
           "confidence": 0.0,
@@ -561,16 +571,12 @@
           "report_type": null
         },
         {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
-        },
-        {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
+          "confidence": 0.95,
+          "culprits": [
+            "changelog_agent"
+          ],
+          "incident": true,
+          "report_type": "degraded_recovered"
         },
         {
           "confidence": 0.0,
@@ -593,17 +599,15 @@
         "topology": "20_fixed_review_loop"
       },
       "report_types": {
-        "clean": 3,
-        "composition_failure": 2
+        "clean": 4,
+        "composition_failure": 1
       },
       "verdicts": [
         {
-          "confidence": 0.4,
-          "culprits": [
-            "20_fixed_review_loop"
-          ],
-          "incident": true,
-          "report_type": "composition_failure"
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
         },
         {
           "confidence": 0.0,
@@ -759,11 +763,25 @@
         "topology": "21_fan_in_join"
       },
       "report_types": {
-        "clean": 3,
-        "composition_failure": 2
+        "clean": 2,
+        "composition_failure": 3
       },
       "verdicts": [
         {
+          "confidence": 0.4,
+          "culprits": [
+            "21_fan_in_join"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
+        },
+        {
+          "confidence": 0.0,
+          "culprits": [],
+          "incident": false,
+          "report_type": null
+        },
+        {
           "confidence": 0.0,
           "culprits": [],
           "incident": false,
@@ -784,18 +802,6 @@
           ],
           "incident": true,
           "report_type": "composition_failure"
-        },
-        {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
-        },
-        {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
         }
       ]
     },
@@ -880,7 +886,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.425,
+          "confidence": 0.51,
           "culprits": [
             "performance_join"
           ],
@@ -888,7 +894,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.425,
+          "confidence": 0.51,
           "culprits": [
             "performance_join"
           ],
@@ -896,7 +902,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.425,
+          "confidence": 0.51,
           "culprits": [
             "performance_join"
           ],
@@ -904,7 +910,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.425,
+          "confidence": 0.51,
           "culprits": [
             "performance_join"
           ],
@@ -912,7 +918,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.425,
+          "confidence": 0.51,
           "culprits": [
             "performance_join"
           ],
@@ -982,51 +988,50 @@
   },
   "repeats": 5,
   "summary": {
-    "attribution_accuracy": 0.385,
+    "attribution_accuracy": 0.431,
     "attribution_cells": 13,
     "attribution_ci_over_cells": [
-      0.177,
-      0.645
+      0.232,
+      0.709
     ],
     "blind_cells": [
       "02_pipeline__drop_numbers_at_log_ingestor",
       "02_pipeline__drop_numbers_at_report_writer",
       "02_pipeline__truncate_at_enricher",
-      "05_diamond__hallucinate_at_marketing_writer",
-      "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent",
-      "21_fan_in_join__drop_numbers_at_metrics_analyst"
+      "05_diamond__hallucinate_at_marketing_writer"
     ],
     "cells_total": 18,
     "control_incident_rate": {
       "02_pipeline__clean": 0.0,
       "05_diamond__clean": 1.0,
       "12_supervisor_multi_subagents__clean": 0.0,
-      "20_fixed_review_loop__clean": 0.4,
+      "20_fixed_review_loop__clean": 0.2,
       "21_fan_in_join__clean": 0.0
     },
     "controls": 5,
     "discrimination_ci_over_cells": [
-      0.213,
-      0.72
+      0.354,
+      0.848
     ],
-    "discrimination_rate": 0.491,
+    "discrimination_rate": 0.582,
     "false_positive_ci_over_cells": [
       0.118,
       0.769
     ],
-    "false_positive_rate": 0.28,
+    "false_positive_rate": 0.24,
     "faulted": 11,
     "misattributed_cells": {
       "02_pipeline__drop_numbers_at_log_ingestor": "log_ingestor",
       "02_pipeline__drop_numbers_at_report_writer": "report_writer",
       "02_pipeline__truncate_at_enricher": "enricher",
       "05_diamond__hallucinate_at_marketing_writer": "marketing_writer",
-      "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent": "changelog_agent",
       "21_fan_in_join__drop_numbers_at_metrics_analyst": "metrics_analyst",
       "22_join_external_adapter__clean": "partner_feed_adapter",
       "22_join_external_adapter__rewrite_currency_at_partner_feed_adapter": "partner_feed_adapter"
     },
     "unstable_cells": [
+      "05_diamond__hallucinate_at_marketing_writer",
+      "12_supervisor_multi_subagents__drop_numbers_at_changelog_agent",
       "20_fixed_review_loop__clean",
       "21_fan_in_join__drop_numbers_at_metrics_analyst"
     ]

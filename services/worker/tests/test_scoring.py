@@ -2,6 +2,8 @@
 
 import asyncio
 
+import pytest
+
 from worker.scoring import (
     ARTIFACT_OPAQUE,
     ARTIFACT_PARTIAL,
@@ -59,9 +61,11 @@ def test_composite_unscored_when_remaining_weight_below_floor():
     assert reason == "insufficient_components"
 
 
-def test_score_node_computed_when_judge_fails_but_schema_and_heuristics_present():
-    # Judge always fails -> judge component None, but a passing schema contract
-    # plus heuristics keep the node scored (weight 0.50 == floor).
+def test_score_node_unscored_when_judge_fails_and_only_a_schema_passes():
+    # Judge fails -> judge None. A passing schema contract is real evidence, but
+    # only about SHAPE, and on its own it sits below the floor. It used to clear
+    # the floor with a heuristics 1.0 beside it — a component that had detected
+    # nothing. Conforming JSON plus no complaints is not a quality measurement.
     contract = OutputContract(
         agent_name="scraper",
         agent_version_pattern=None,
@@ -71,8 +75,9 @@ def test_score_node_computed_when_judge_fails_but_schema_and_heuristics_present(
     result = _score(run, '{"price": 5}', FakeJudge(fail=True), contracts=[contract])
     assert result.components["judge"] is None
     assert result.components["schema"] == 1.0
-    assert result.score is not None
-    assert result.unscored_reason is None
+    assert result.components["heuristics"] is None
+    assert result.score is None
+    assert result.unscored_reason == "insufficient_components"
 
 
 def test_score_node_unscored_when_judge_fails_and_no_contract():
@@ -174,8 +179,11 @@ def test_heuristics_penalizes_empty_and_failed_and_repetition():
         error_span_ids=["e1"],
         retry_count=0,
     )
-    assert healthy == 1.0
-    assert failed < healthy
+    # No check fired -> no verdict. A full 1.0 out of a channel that only ever
+    # SUBTRACTS says "nothing I look for is here", which is not the same claim
+    # as "this output is perfect" and must not be averaged in as if it were.
+    assert healthy is None
+    assert failed is not None and failed < 1.0
 
 
 def test_heuristics_token_zscore_outlier():
@@ -1019,3 +1027,25 @@ def test_empty_output_signal_claims_observed_origination():
     run = make_run(1, "validator", output_inline="", tokens_out=1200)
     signal = _score(run, "", FakeJudge()).deterministic_signals[0]
     assert signal["originates"] is True
+
+
+def test_flag_cap_now_survives_the_composite():
+    """A flag cap exists so an admitted criticism shows up in the number. The
+    heuristics 1.0 undid it: judge capped at 0.45 for `factual_error` came out
+    at ~0.60 — above the 0.5 acceptance bar, so the node was not a defect at
+    all and the criticism the judge had written was worth nothing."""
+    run = make_run(1, "adapter")
+    judge = FakeJudge(
+        node_verdicts={
+            "adapter": {
+                "task_score": 0.45,
+                "input_flawed": False,
+                "flags": ["factual_error"],
+                "reasoning": "converted 340 basis points to 1.38 instead of 3.40",
+            }
+        }
+    )
+    result = _score(run, "prevedena tabulka", judge)
+    assert result.components["heuristics"] is None
+    assert result.score == pytest.approx(0.45)
+    assert result.score < 0.5, "a capped node must land below the acceptance bar"

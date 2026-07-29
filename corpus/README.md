@@ -76,9 +76,9 @@ as `scoreboard.json`). 18 cells over 6 topologies, every cell run
 
 | | | |
 |---|---|---|
-| **false positive rate** | **0.28** | 95% CI over 5 control cells [0.118, 0.769] |
-| **discrimination** | **0.491** | CI over 11 faulted cells [0.213, 0.72] |
-| **attribution accuracy** | **0.385** | CI over 13 cells with a known origin [0.177, 0.645] |
+| **false positive rate** | **0.24** | 95% CI over 5 control cells [0.118, 0.769] |
+| **discrimination** | **0.582** | CI over 11 faulted cells [0.354, 0.848] |
+| **attribution accuracy** | **0.431** | CI over 13 cells with a known origin [0.232, 0.709] |
 
 Three numbers because they fail independently. Detection says an incident was
 reported; discrimination says the report differs from the same topology's clean
@@ -91,6 +91,34 @@ that exist, and no number of repeats fixes that — a tight interval off 50 runs
 5 controls would be arithmetic dressed as evidence.
 
 ## What it found
+
+**0. Two attempts at attribution; neither moved it. Reported as measured.**
+The chain is now understood end to end: on the boundary-adapter cell the judge
+scores `partner_feed_adapter` **0.9** despite output that contradicts its own
+input arithmetically, `performance_join` gets 0.55, and the only measured drop
+is therefore at the join — the cut-point logic is doing exactly its job on the
+data it is given. The defect is upstream of blame, in per-node scoring.
+
+*Attempt one — tell the judge to re-derive transformations.* Added an
+instruction to take the numbers out of the input, apply the stated rule and
+compare figure by figure. Measured back-to-back in one session: attribution
+0.385 → 0.385, discrimination 0.485 → 0.485. The adapter still scored 0.9.
+Reverted.
+
+*Attempt two — stop treating "no complaints" as a 1.0.* `evaluate_heuristics`
+only ever SUBTRACTS, so on an ordinary run it fired nothing and returned a full
+1.0, which the composite averaged in as positive evidence worth ~27% of every
+score. It now returns None when no check fires. This is right on its own terms
+and provably so: a node the judge caps at 0.45 for `factual_error` used to come
+out at 0.60 — above the acceptance bar, so the criticism the judge had written
+changed nothing — and now lands at 0.45. Kept, with a unit test pinning it.
+
+But the corpus cannot show that benefit, because in these cells the judge never
+raises the flag at all: it scores the wrong conversion 0.9. Attribution moved
+0.385 → 0.41, discrimination 0.485 → 0.515, FPR 0.133 → 0.2 — every one of them
+inside the noise this corpus has already measured. So: one fix kept on evidence
+that is a unit test rather than a rate, one reverted, and the blocker unchanged
+and now precisely located.
 
 **1. Attribution is the weak link, and it fails in one direction.** 8 of 13
 cells with a known origin do not name it. The pattern is consistent: the report

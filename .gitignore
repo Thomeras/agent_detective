@@ -29,6 +29,7 @@ night_run.md
 agent-detective-design-doc.md
 agent-detective-build-prompt.md
 docs/verdict-refactor-plan.md
+docs/research-architecture-review-2026-07-29.md
 
 # Local experiment harnesses (vendored third-party code, own venv/lockfile)
 harnesses/

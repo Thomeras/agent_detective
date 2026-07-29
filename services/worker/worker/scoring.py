@@ -631,7 +631,26 @@ def evaluate_heuristics(
     error_span_ids: list[str],
     retry_count: int,
 ) -> float | None:
-    """Heuristics component in 0..1; None when there is no output to inspect."""
+    """Heuristics component in 0..1; None when it has nothing to say.
+
+    This channel only ever SUBTRACTS — for repetition, error spans, a failed or
+    degraded status, retries, a token-count outlier. So a full 1.0 does not mean
+    "this output is perfect", it means "none of my checks fired", and returning
+    it as a score turned the absence of evidence into evidence of health — the
+    one move this engine refuses everywhere else.
+
+    It was not harmless. On an ordinary run nothing fires, so every node got a
+    constant 1.0 worth ~27% of its composite, lifting the judge's number toward
+    1.0 by the same amount for good and bad nodes alike. The flag caps exist so
+    an admitted criticism shows up in the number, and this undid them: a node
+    the judge capped at 0.45 for `factual_error` came out at 0.60, above the 0.5
+    acceptance bar, and so was not a defect at all. Measured on the foreign
+    corpus, where a boundary adapter that ran percentages through an exchange
+    rate scored 0.93.
+
+    So: a number only when a check actually fired. No complaints is no evidence,
+    and `composite_score` already knows how to weigh a component that is absent.
+    """
     if output_text is None:
         return None
     stripped = output_text.strip()
@@ -658,6 +677,8 @@ def evaluate_heuristics(
         z = (run.tokens_out - baseline.tokens_out_mean) / baseline.tokens_out_std
         if abs(z) > 3.0:
             score -= 0.2
+    if score == 1.0:
+        return None  # nothing fired: silence, not a verdict of 1.0
     return _clamp(score)
 
 
