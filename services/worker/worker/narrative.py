@@ -146,6 +146,25 @@ _SIGNAL_TEMPLATES: dict[str, tuple[Callable[..., str], Callable[..., str]]] = {
         lambda d: f"{d['path']} is below the minimum plausible size",
         lambda d: f"size check (size={d['size']} < min {d['min_bytes']})",
     ),
+    # --- numeric fidelity (checks_numeric.py) ---
+    "numeric_content_lost": (
+        lambda d: (
+            f"input carried {d['input_numbers']} figures, the output carries none"
+        ),
+        lambda d: (
+            f"no numeric token in {d['output_chars']} chars of output; "
+            f"{d['input_numbers']} in the input"
+        ),
+    ),
+    "number_not_derivable": (
+        lambda d: (
+            f"{d['count']} figure(s) trace back to nothing in the input: {d['values']}"
+        ),
+        lambda d: (
+            f"{d['count']} of {d['checked']} tabular figures are neither present in "
+            "the input nor reachable from one by a rate the input states"
+        ),
+    ),
     # --- behavioral (behavioral.py) ---
     "empty_output_with_spend": (
         lambda d: (

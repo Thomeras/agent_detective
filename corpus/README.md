@@ -76,9 +76,9 @@ as `scoreboard.json`). 18 cells over 6 topologies, every cell run
 
 | | | |
 |---|---|---|
-| **false positive rate** | **0.24** | 95% CI over 5 control cells [0.118, 0.769] |
-| **discrimination** | **0.582** | CI over 11 faulted cells [0.354, 0.848] |
-| **attribution accuracy** | **0.431** | CI over 13 cells with a known origin [0.232, 0.709] |
+| **false positive rate** | **0.2** | 95% CI over 5 control cells [0.036, 0.624] |
+| **discrimination** | **0.927** | CI over 11 faulted cells [0.623, 0.984] |
+| **attribution accuracy** | **0.833** | CI over 12 cells with a known origin [0.552, 0.953] |
 
 Three numbers because they fail independently. Detection says an incident was
 reported; discrimination says the report differs from the same topology's clean
@@ -92,7 +92,35 @@ that exist, and no number of repeats fixes that — a tight interval off 50 runs
 
 ## What it found
 
-**0. Two attempts at attribution; neither moved it. Reported as measured.**
+**0. Attribution fixed by a deterministic check, not by a better judge.**
+0.43 → **0.833**, discrimination 0.58 → **0.927**, and the false positive rate
+went DOWN (0.24 → 0.20) rather than being traded away. Misattributed cells: 8 → 2.
+
+Two checks in `worker/checks_numeric.py`, no model in either:
+
+- `number_not_derivable` (fail) — a figure in a TABULAR output that is neither
+  present in the input nor reachable from an input figure by a constant the
+  input itself states. The boundary adapter's `1.38` and `4538580` are both
+  unreachable from `340`, `184300` and the stated `1 EUR = 24.6 CZK`; the
+  correct table is silent. Scoped to delimited output on purpose — a node that
+  analyses or forecasts legitimately produces figures that copy nothing.
+- `numeric_content_lost` (fail) — the input carried figures and the output
+  carries none. Catches the `drop_numbers` class at the node that dropped them.
+
+Zero false positives across all five clean controls. What remains missed is
+honest about its own scope: truncation and fabrication are not numeric faults,
+and they are the two cells still unattributed.
+
+Two earlier attempts failed and are kept here because the negative results were
+the expensive part. *Telling the judge to re-derive transformations* moved
+attribution 0.385 → 0.385; the adapter still scored 0.9; reverted. *Stopping
+`evaluate_heuristics` returning 1.0 when nothing fired* is right on its own
+terms — a channel that only subtracts was handing out a constant worth ~27% of
+every composite, which lifted a `factual_error`-capped 0.45 to 0.60, above the
+acceptance bar — but it moved the corpus rates only inside their noise, and was
+kept on a unit test rather than on a rate.
+
+**1. Where the miss came from, now that it is fixed.**
 The chain is now understood end to end: on the boundary-adapter cell the judge
 scores `partner_feed_adapter` **0.9** despite output that contradicts its own
 input arithmetically, `performance_join` gets 0.55, and the only measured drop

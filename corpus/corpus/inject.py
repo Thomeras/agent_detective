@@ -102,15 +102,25 @@ class ResponseInjector:
     def __init__(self, fault: Fault | None) -> None:
         self._fault = fault
         self._calls: dict[str, int] = {}
-        self.applied = 0
+        self.applied = 0   # invocations that CHANGED the text
+        self.no_ops = 0    # invocations where the fault matched nothing
 
     def transform(self, agent_name: str, text: str) -> str:
         index = self._calls.get(agent_name, 0)
         self._calls[agent_name] = index + 1
         if self._fault is None or agent_name != self._fault.target_agent:
             return text
+        changed = self._fault.apply(text)
+        if changed == text:
+            # Counting INVOCATIONS was the bug: `rewrite_currency` substitutes
+            # "CZK", the adapter emits the column as `trzby_czk`, the substitution
+            # matched nothing — and the cell still shipped labelled as faulted.
+            # A recorded fault that changed no text is a clean run wearing a
+            # ground truth that is false, which is worse than no cell at all.
+            self.no_ops += 1
+            return text
         self.applied += 1
-        return self._fault.apply(text)
+        return changed
 
 
 FAULTS: dict[str, Callable[[str], str]] = {

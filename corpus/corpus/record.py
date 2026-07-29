@@ -114,9 +114,15 @@ def record(
         # A faulted entry whose fault never fired is a clean run wearing a label
         # that says otherwise — the single worst thing that can enter a corpus.
         trace_path.unlink(missing_ok=True)
+        ran = injector.no_ops > 0
         raise SystemExit(
-            f"fault {fault_name!r} targeted {target_agent!r}, which never ran in "
-            f"{topology}. No entry written."
+            f"fault {fault_name!r} on {target_agent!r} changed nothing"
+            + (
+                f" ({injector.no_ops} invocation(s) matched no text)"
+                if ran
+                else f"; that agent never ran in {topology}"
+            )
+            + ". No entry written."
         )
 
     meta = {

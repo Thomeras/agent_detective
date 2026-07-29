@@ -36,6 +36,10 @@ from .behavioral import (
     retry_storm_signals,
     tool_args_signals,
 )
+from .checks_numeric import (
+    number_not_derivable_signals,
+    numeric_content_lost_signals,
+)
 from .checks_content import (
     language_mismatch_signals,
     required_section_signals,
@@ -919,6 +923,11 @@ async def score_node(
             )
             + sum_invariant_signals(output_text, sum_rules)
             + unit_inconsistency_signals(input_text, output_text)
+            # Numeric fidelity: the "fluent but wrong" class, which the judged
+            # channel reads as good work because a tidy table of wrong figures
+            # looks exactly like a tidy table of right ones.
+            + numeric_content_lost_signals(input_text, output_text)
+            + number_not_derivable_signals(input_text, output_text)
             + temporal_invariant_signals(output_text, run_started_at=run.started_at)
             + language_mismatch_signals(expected_lang, output_text)
         )

@@ -21,7 +21,7 @@ import re
 
 import pytest
 
-from worker import behavioral, checks_content, checks_security, signals
+from worker import behavioral, checks_content, checks_numeric, checks_security, signals
 from worker.narrative import (
     _NOTE_TEMPLATES,
     _SIGNAL_TEMPLATES,
@@ -49,7 +49,7 @@ def _emitted_codes() -> set[str]:
     here the moment it is written, so the coverage claim cannot go stale.
     """
     codes: set[str] = set()
-    for module in (signals, behavioral, checks_content, checks_security):
+    for module in (signals, behavioral, checks_content, checks_numeric, checks_security):
         # Codes are quoted literals at the call sites (`signal(name, sev, CODE)`
         # / `_fail(CODE, ...)`), so a literal scan is enough and stays honest.
         for token in re.findall(r"""["']([a-z_]+)["']""", inspect.getsource(module)):
