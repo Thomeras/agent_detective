@@ -1,5 +1,14 @@
 # Agent Detective full-stack compose file (build spec sections 1, 5, 7).
 # `docker compose up --build` brings up the whole stack; no .env required.
+#
+# Every host binding goes through ${BIND}, which defaults to 127.0.0.1. The
+# stack has no authentication yet and its database holds verbatim agent inputs
+# and outputs, so publishing on all interfaces is a decision, not a default:
+#
+#   BIND=0.0.0.0 docker compose up --build     # reachable from the network
+#
+# Container-to-container traffic is unaffected — services reach each other by
+# service name on the compose network, never through these bindings.
 
 name: agent-detective
 
@@ -43,7 +52,7 @@ services:
   clickhouse:
     image: clickhouse/clickhouse-server:24.8
     ports:
-      - "8123:8123"
+      - "${BIND:-127.0.0.1}:8123:8123"
     volumes:
       # Creates the otel_spans table on first boot (see docker/clickhouse/init.sql).
       - ./docker/clickhouse/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -62,7 +71,7 @@ services:
       POSTGRES_PASSWORD: postgres
       POSTGRES_DB: agent_detective
     ports:
-      - "5432:5432"
+      - "${BIND:-127.0.0.1}:5432:5432"
     volumes:
       - pgdata:/var/lib/postgresql/data
     healthcheck:
@@ -86,7 +95,7 @@ services:
   redis:
     image: redis:7-alpine
     ports:
-      - "6379:6379"
+      - "${BIND:-127.0.0.1}:6379:6379"
     healthcheck:
       test: ["CMD", "redis-cli", "ping"]
       interval: 5s
@@ -100,8 +109,8 @@ services:
       MINIO_ROOT_USER: minioadmin
       MINIO_ROOT_PASSWORD: minioadmin
     ports:
-      - "9000:9000"   # S3 API
-      - "9001:9001"   # console
+      - "${BIND:-127.0.0.1}:9000:9000"   # S3 API
+      - "${BIND:-127.0.0.1}:9001:9001"   # console
     volumes:
       - miniodata:/data
     healthcheck:
@@ -138,7 +147,7 @@ services:
       # Override with A2A_DETECTION=false in .env to restore the old default.
       A2A_DETECTION: "${A2A_DETECTION:-true}"
     ports:
-      - "${INGEST_PORT:-8001}:8001"
+      - "${BIND:-127.0.0.1}:${INGEST_PORT:-8001}:8001"
     depends_on:
       clickhouse:
         condition: service_healthy
@@ -159,7 +168,7 @@ services:
     build:
       context: ./demo/mock_llm
     ports:
-      - "${MOCK_LLM_PORT:-8080}:8080"
+      - "${BIND:-127.0.0.1}:${MOCK_LLM_PORT:-8080}:8080"
     healthcheck:
       test: ["CMD-SHELL", "python -c \"import urllib.request; urllib.request.urlopen('http://localhost:8080/health')\" || exit 1"]
       interval: 5s
@@ -195,7 +204,7 @@ services:
       dockerfile: services/api/Dockerfile
     environment: *app-env
     ports:
-      - "${API_PORT:-8000}:8000"
+      - "${BIND:-127.0.0.1}:${API_PORT:-8000}:8000"
     depends_on:
       postgres:
         condition: service_healthy
@@ -214,7 +223,7 @@ services:
       context: .
       dockerfile: web/Dockerfile
     ports:
-      - "${WEB_PORT:-5173}:80"
+      - "${BIND:-127.0.0.1}:${WEB_PORT:-5173}:80"
     depends_on:
       - api
     healthcheck:

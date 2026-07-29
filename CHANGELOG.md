@@ -8,6 +8,23 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
+## [0.2.2] — 2026-07-29
+
+Self-hosted stack only; no distribution changed. `agent-detective` stays at
+0.2.1 on PyPI.
+
+### Changed
+- **Compose binds every published port to `127.0.0.1` by default** — the UI and
+  API, and Postgres, ClickHouse, Redis and MinIO with them. The stack ships
+  without authentication over a database of verbatim agent payloads, so
+  "reachable from the network" is now a decision (`BIND=0.0.0.0 docker compose
+  up`) rather than what happens if you do nothing on a host with a public
+  interface. Container-to-container traffic is unaffected — services reach each
+  other by name on the compose network, never through a host binding.
+
+  This matches what `detective capture` already did: loopback unless you pass
+  `--host 0.0.0.0` on purpose.
+
 ## [0.2.1] — 2026-07-29
 
 `agent-detective` only. Documentation, no behaviour change.

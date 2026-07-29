@@ -143,11 +143,17 @@ docker compose up --build                 # infra + ingest + worker + api + web
 Web UI at `:5173`, read API at `:8000`, ingest at `:8001`; the bundled mock
 LLM judges, so no external API keys are needed.
 
-> **The self-hosted stack has no authentication yet**, and compose publishes
-> those ports on every interface. What sits behind them is your traces'
-> payloads — agent inputs and outputs verbatim, which is exactly the material
-> you would not want public. Keep it on a trusted network, or bind the ports to
-> loopback (`WEB_PORT=127.0.0.1:5173`) before putting it on a host that has one.
+> **The self-hosted stack has no authentication yet.** Every host binding is
+> therefore on `127.0.0.1` by default — the UI and API, and Postgres, ClickHouse,
+> Redis and MinIO with them. What sits behind those ports is your traces'
+> payloads: agent inputs and outputs verbatim, which is exactly the material you
+> would not want public. Reaching the stack from elsewhere is one deliberate
+> knob, and only belongs behind something that authenticates:
+>
+> ```bash
+> BIND=0.0.0.0 docker compose up --build
+> ```
+>
 > Auth and multi-tenancy are what Cloud is being built for.
 
 ```mermaid
