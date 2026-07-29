@@ -28,20 +28,14 @@ trace back to something.
 from __future__ import annotations
 
 import re
-from decimal import Decimal, InvalidOperation
+from decimal import Decimal
 
 from .narrative import signal
+from .payload import Payload, normalize, parse_number
 
 SIGNAL_NUMERIC_CONTENT_LOST = "numeric_content_lost"
 SIGNAL_NUMBER_NOT_DERIVABLE = "number_not_derivable"
 
-# A figure: optional sign, digits, optional thousands separators, optional
-# decimal part. Deliberately not matching bare years inside words or ids.
-_NUMBER_RE = re.compile(r"(?<![\w.])-?\d{1,3}(?:[  ]\d{3})*(?:[.,]\d+)?(?![\w])|(?<![\w.])-?\d+(?:[.,]\d+)?(?![\w])")
-
-# "1 EUR = 24.6 CZK", "kurz 24,6", "1 USD = 22 CZK" — the constant the output is
-# allowed to have applied. Only rates the INPUT states count: a constant the
-# node brought with it is exactly what we cannot verify.
 # Two forms, and the explicit one must be tried on its own: a single alternation
 # starting at "Kurz" captured the 1 out of "Kurz: 1 EUR = 24.6 CZK" and every
 # conversion then looked underivable — including the correct ones.
@@ -63,69 +57,20 @@ _MIN_OUTPUT_CHARS = 200     # below this the output is too short to judge
 _TOLERANCE = Decimal("0.0001")
 
 
-def _to_decimal(token: str) -> Decimal | None:
-    cleaned = token.replace(" ", "").replace(" ", "").replace(" ", "")
-    # A comma is a decimal separator in these payloads; a dot may be either, but
-    # "1.38" and "1,38" must both parse to the same value.
-    if "," in cleaned and "." in cleaned:
-        cleaned = cleaned.replace(".", "").replace(",", ".")
-    else:
-        cleaned = cleaned.replace(",", ".")
-    try:
-        return Decimal(cleaned)
-    except InvalidOperation:
-        return None
-
-
-_DELIMS = (";", "|", "\t", ",")
-
-
-def _cells(line: str) -> list[str]:
-    """A delimited row split into cells, or the whole line when it is prose.
-
-    Splitting FIRST is what makes a comma safe. In `2026-06,4380,1.8,44` the
-    comma is a field separator, but it is also the Czech decimal mark, and a
-    scan over the raw line merged `06,4380` into 6.4380 — which corrupted every
-    input figure and then reported the whole output as underivable. A cell can
-    only hold one number, so per-cell parsing removes the ambiguity instead of
-    guessing at it.
-    """
-    for delim in _DELIMS:
-        if line.count(delim) >= 2:
-            return line.split(delim)
-    return [line]
-
-
-def _numbers(text: str) -> list[Decimal]:
-    out = []
-    for line in text.splitlines():
-        for cell in _cells(line):
-            for match in _NUMBER_RE.finditer(cell):
-                value = _to_decimal(match.group())
-                if value is not None:
-                    out.append(value)
-    return out
+def _as_payload(value: "str | Payload | None") -> Payload:
+    return value if isinstance(value, Payload) else normalize(value)
 
 
 def _stated_rates(text: str) -> list[Decimal]:
     rates = []
     for form in _RATE_FORMS:
         for match in form.finditer(text):
-            value = _to_decimal(match.group(1))
+            value = parse_number(match.group(1))
             # A rate of 1 is not a conversion and would only widen what counts
             # as derivable; 1 is already among the universal factors.
             if value is not None and value > 0 and value != 1:
                 rates.append(value)
     return rates
-
-
-def _looks_tabular(text: str) -> bool:
-    """At least two lines sharing a delimiter and a consistent column count."""
-    for delim in (";", ",", "\t", "|"):
-        rows = [ln for ln in text.splitlines() if ln.count(delim) >= 2]
-        if len(rows) >= 2 and len({ln.count(delim) for ln in rows}) == 1:
-            return True
-    return False
 
 
 def _close(a: Decimal, b: Decimal) -> bool:
@@ -135,28 +80,27 @@ def _close(a: Decimal, b: Decimal) -> bool:
 
 
 def numeric_content_lost_signals(
-    input_text: str | None, output_text: str | None
+    input_text: "str | Payload | None", output_text: "str | Payload | None"
 ) -> list[dict]:
     """``numeric_content_lost`` (fail) — figures in, no figures out."""
-    if not isinstance(input_text, str) or not isinstance(output_text, str):
+    src, out = _as_payload(input_text), _as_payload(output_text)
+    if len(out.text.strip()) < _MIN_OUTPUT_CHARS:
         return []
-    if len(output_text.strip()) < _MIN_OUTPUT_CHARS:
-        return []
-    in_numbers = _numbers(input_text)
-    if len(in_numbers) < _MIN_INPUT_NUMBERS:
-        return []
-    if _numbers(output_text):
+    if len(src.numbers) < _MIN_INPUT_NUMBERS or out.numbers:
         return []
     return [
         signal(
             SIGNAL_NUMERIC_CONTENT_LOST, "fail", "numeric_content_lost",
-            input_numbers=len(in_numbers), output_chars=len(output_text.strip()),
+            input_numbers=len(src.numbers), output_chars=len(out.text.strip()),
         )
     ]
 
 
 def number_not_derivable_signals(
-    input_text: str | None, output_text: str | None, *, max_reported: int = 3
+    input_text: "str | Payload | None",
+    output_text: "str | Payload | None",
+    *,
+    max_reported: int = 3,
 ) -> list[dict]:
     """``number_not_derivable`` (fail) — a tabular figure traceable to nothing.
 
@@ -165,22 +109,22 @@ def number_not_derivable_signals(
     scale factor. Everything else in a converted table is either invented or
     miscomputed.
     """
-    if not isinstance(input_text, str) or not isinstance(output_text, str):
+    src, out = _as_payload(input_text), _as_payload(output_text)
+    # Only a delimited table claims every cell traces back to something. A node
+    # that analyses or forecasts legitimately produces figures that copy
+    # nothing, and blaming it for that would be worse than the miss.
+    if not out.is_tabular:
         return []
-    if not _looks_tabular(output_text):
-        return []
-    in_numbers = _numbers(input_text)
-    out_numbers = _numbers(output_text)
-    if len(in_numbers) < _MIN_INPUT_NUMBERS or not out_numbers:
+    if len(src.numbers) < _MIN_INPUT_NUMBERS or not out.numbers:
         return []
 
-    factors = list(_UNIVERSAL_FACTORS) + _stated_rates(input_text)
+    factors = list(_UNIVERSAL_FACTORS) + _stated_rates(src.text)
     orphans = []
-    for value in out_numbers:
-        if any(_close(value, source) for source in in_numbers):
+    for value in out.numbers:
+        if any(_close(value, source) for source in src.numbers):
             continue
         derivable = False
-        for source in in_numbers:
+        for source in src.numbers:
             for factor in factors:
                 if _close(value, source * factor) or (
                     factor != 0 and _close(value, source / factor)
@@ -198,6 +142,6 @@ def number_not_derivable_signals(
     return [
         signal(
             SIGNAL_NUMBER_NOT_DERIVABLE, "fail", "number_not_derivable",
-            count=len(orphans), values=shown, checked=len(out_numbers),
+            count=len(orphans), values=shown, checked=len(out.numbers),
         )
     ]

@@ -58,7 +58,7 @@ from .narrative import (
     signal,
 )
 from .graph_ops import build_blame_input, build_config, deliverable_run
-from .judge_client import JudgeClient, judge_json_with_retries
+from .judge_client import NullJudge, JudgeClient, judge_json_with_retries
 from .policy import (
     STREAM_CONTROL_SIGNALS,
     evaluate_policies,
@@ -578,6 +578,24 @@ def escalate_shipped_latent_defect(
     return derive_escalation(report_type, contract_results)
 
 
+_NULL_JUDGE = NullJudge()
+
+
+def _localises(score: NodeScore) -> bool:
+    """The deterministic half already named this node as the ORIGIN.
+
+    Not merely "found something wrong": a signal has to claim it observed the
+    fault ORIGINATE here (`originates`), which is what earns the deterministic
+    attribution headline. A signal that only says the output is bad — an
+    injection signature may well have arrived from upstream — leaves the
+    question of where it came from open, and that question is the judge's.
+    """
+    return any(
+        s.get("severity") == "fail" and s.get("originates")
+        for s in score.deterministic_signals
+    )
+
+
 class Tier2Processor:
     """Score, blame, enrich and persist one graph."""
 
@@ -626,7 +644,7 @@ class Tier2Processor:
         _deliverable = deliverable_run(bundle)
         _deliverable_id = _deliverable.run_id if _deliverable is not None else None
 
-        async def _one(run: RunRecord) -> NodeScore:
+        async def _one(run: RunRecord, judge=None) -> NodeScore:
             input_text, output_text = payloads[run.run_id]
             template = (
                 self._verifier_prompt if _is_verifier(run.agent_name) else self._judge_prompt
@@ -637,7 +655,7 @@ class Tier2Processor:
                 output_text,
                 contracts,
                 baselines.get(run.agent_name),
-                self._judge,
+                self._judge if judge is None else judge,
                 semaphore,
                 self._weights,
                 self._settings.score_min_weight,
@@ -649,6 +667,19 @@ class Tier2Processor:
                 graph_type=bundle.graph_type,
                 is_deliverable_producer=(run.run_id == _deliverable_id),
             )
+
+        if self._settings.judge_gate:
+            # Deterministic half first — no model, so this pass is free. When it
+            # already localised a defect whose ORIGIN it observed, the per-node
+            # judged pass has nothing left to decide about where the fault came
+            # from, and its N calls are pure cost and pure exposure to a channel
+            # measured to disagree with itself between sessions.
+            pre = await asyncio.gather(*(_one(r, _NULL_JUDGE) for r in bundle.runs))
+            if any(_localises(ns) for ns in pre):
+                return (
+                    {str(r.run_id): ns for r, ns in zip(bundle.runs, pre)},
+                    {r.run_id: payloads[r.run_id] for r in bundle.runs},
+                )
 
         results = await asyncio.gather(*(_one(r) for r in bundle.runs))
         scores = {str(r.run_id): ns for r, ns in zip(bundle.runs, results)}

@@ -99,6 +99,17 @@ def extract_json(text: str) -> dict[str, Any]:
     raise JudgeError("unbalanced JSON object in judge response")
 
 
+class NullJudge:
+    """A judge that never answers, so `score_node` runs its deterministic half
+    and nothing else. Used by the CLI's --no-judge and by the tier2 gate."""
+
+    async def complete_json(self, prompt: str, *, system: str | None = None) -> dict:
+        raise PermanentJudgeError("judge disabled")
+
+    async def close(self) -> None:
+        return None
+
+
 class OpenAIJudgeClient:
     """chat/completions client built from Settings. httpx.AsyncClient is
     constructed lazily on first use so importing this module never connects."""

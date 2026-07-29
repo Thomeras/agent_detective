@@ -10,11 +10,11 @@ instead of the node that made them.
 from __future__ import annotations
 
 from worker.checks_numeric import (
-    _numbers,
     _stated_rates,
     number_not_derivable_signals,
     numeric_content_lost_signals,
 )
+from worker.payload import normalize
 
 # The real payloads, verbatim.
 ADAPTER_INPUT = """--- partnersky_feed ---
@@ -56,8 +56,11 @@ class TestNumberNotDerivable:
     def test_a_csv_comma_is_a_separator_not_a_decimal_point(self) -> None:
         """`2026-06,4380,1.8,44` parsed as 6.4380 when scanned as one string,
         which corrupted every input figure and made the whole output look
-        underivable — a false positive on a node that had done nothing wrong."""
-        assert 4380 in _numbers("mesic,aktivni_uzivatele\n2026-06,4380,1.8,44")
+        underivable — a false positive on a node that had done nothing wrong.
+
+        Now decided once in `payload.normalize`, so no check can reopen the
+        question and answer it differently."""
+        assert 4380 in normalize("mesic,aktivni_uzivatele\n2026-06,4380,1.8,44").numbers
 
     def test_prose_output_is_not_checked(self) -> None:
         """A node that analyses or forecasts legitimately produces figures that

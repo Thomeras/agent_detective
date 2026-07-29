@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     # effort — temperature=0 + seed still does not guarantee bitwise-identical
     # completions on most backends; measure with scripts/determinism_probe.py.
     judge_seed: int | None = None
+    # Deterministic-first gate. With it on, tier2 runs its deterministic half
+    # over every node FIRST — which costs no model calls at all — and skips the
+    # per-node judged pass when that half already localised a defect it observed
+    # the origin of. The saving is the whole per-node fan-out, N calls down to
+    # zero, on exactly the graphs where the judge had nothing left to decide.
+    # OFF by default: it trades the judged score column (and any SECOND,
+    # independent origin only the judge would have found) for cost, and that is
+    # an operator's call, not a default.
+    judge_gate: bool = False
 
     # Scoring weights and the renormalization floor (spec 4.3 step 2).
     score_w_schema: float = 0.35
