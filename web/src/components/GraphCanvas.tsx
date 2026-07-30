@@ -9,6 +9,7 @@ import { useEffect, useRef } from "react";
 
 import type { GraphDetail } from "../api/types";
 import { scoreColor } from "../format";
+import { useTheme } from "../ui/theme";
 
 interface GraphCanvasProps {
   graph: GraphDetail;
@@ -20,32 +21,54 @@ interface GraphCanvasProps {
   onNodeSelect: (runId: string) => void;
 }
 
-const stylesheet: Stylesheet[] = [
+// Canvas colours come from the same CSS custom properties as the rest of the
+// app, read at build time — cytoscape cannot resolve var() itself, so a
+// hardcoded palette here would keep the graph dark inside a light page.
+function palette() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name: string, fallback: string) =>
+    css.getPropertyValue(name).trim() || fallback;
+  return {
+    text: v("--ad-text", "#e6edf3"),
+    outline: v("--ad-bg", "#0d1117"),
+    border: v("--ad-border", "#30363d"),
+    edgeLine: v("--ad-text-faint", "#484f58"),
+    accent: v("--ad-accent-fg", "#58a6ff"),
+    ok: v("--ad-ok-fg", "#3fb950"),
+    warn: v("--ad-warn-fg", "#d29922"),
+    fail: v("--ad-fail-fg", "#f85149"),
+    purple: v("--ad-judged-fg", "#bc8cff"),
+  };
+}
+
+function buildStylesheet(): Stylesheet[] {
+  const p = palette();
+  return [
   {
     selector: "node",
     style: {
       "background-color": (ele) => scoreColor(ele.data("quality_score") as number | null),
       label: "data(agent_name)",
-      color: "#e6edf3",
+      color: p.text,
       "font-size": "11px",
       "font-family": "ui-monospace, Menlo, Consolas, monospace",
       "text-valign": "bottom",
       "text-halign": "center",
       "text-margin-y": 6,
-      "text-outline-color": "#0d1117",
+      "text-outline-color": p.outline,
       "text-outline-width": 2,
       width: 34,
       height: 34,
       "border-width": 2,
-      "border-color": "#30363d",
+      "border-color": p.border,
     },
   },
   {
     selector: "node.culprit",
     style: {
       "border-width": 5,
-      "border-color": "#f85149",
-      "overlay-color": "#f85149",
+      "border-color": p.fail,
+      "overlay-color": p.fail,
       "overlay-opacity": 0.12,
       "overlay-padding": 8,
     },
@@ -53,14 +76,14 @@ const stylesheet: Stylesheet[] = [
   {
     selector: "node.on-path",
     style: {
-      "border-color": "#d29922",
+      "border-color": p.warn,
       "border-width": 3,
     },
   },
   {
     selector: "node.selected",
     style: {
-      "border-color": "#58a6ff",
+      "border-color": p.accent,
       "border-width": 4,
     },
   },
@@ -84,8 +107,8 @@ const stylesheet: Stylesheet[] = [
     selector: "edge",
     style: {
       width: 2,
-      "line-color": "#484f58",
-      "target-arrow-color": "#484f58",
+      "line-color": p.edgeLine,
+      "target-arrow-color": p.edgeLine,
       "target-arrow-shape": "triangle",
       "curve-style": "bezier",
       "arrow-scale": 1,
@@ -94,24 +117,24 @@ const stylesheet: Stylesheet[] = [
   {
     selector: 'edge[type = "SPAWN"]',
     style: {
-      "line-color": "#3fb950",
-      "target-arrow-color": "#3fb950",
+      "line-color": p.ok,
+      "target-arrow-color": p.ok,
       "line-style": "solid",
     },
   },
   {
     selector: 'edge[type = "A2A_MESSAGE"]',
     style: {
-      "line-color": "#58a6ff",
-      "target-arrow-color": "#58a6ff",
+      "line-color": p.accent,
+      "target-arrow-color": p.accent,
       "line-style": "dashed",
     },
   },
   {
     selector: 'edge[type = "TOOL_DELEGATION"]',
     style: {
-      "line-color": "#bc8cff",
-      "target-arrow-color": "#bc8cff",
+      "line-color": p.purple,
+      "target-arrow-color": p.purple,
       "line-style": "dotted",
     },
   },
@@ -119,8 +142,8 @@ const stylesheet: Stylesheet[] = [
     selector: "edge.on-path",
     style: {
       width: 4,
-      "line-color": "#d29922",
-      "target-arrow-color": "#d29922",
+      "line-color": p.warn,
+      "target-arrow-color": p.warn,
       "z-index": 10,
     },
   },
@@ -129,7 +152,7 @@ const stylesheet: Stylesheet[] = [
     selector: "node.in-loop",
     style: {
       "border-style": "dashed",
-      "border-color": "#bc8cff",
+      "border-color": p.purple,
       "border-width": 3,
     },
   },
@@ -137,21 +160,22 @@ const stylesheet: Stylesheet[] = [
     // The edge that closes the cycle (loop-back): curved, labelled "loop".
     selector: "edge.loop-edge",
     style: {
-      "line-color": "#bc8cff",
-      "target-arrow-color": "#bc8cff",
+      "line-color": p.purple,
+      "target-arrow-color": p.purple,
       "line-style": "dashed",
       "curve-style": "unbundled-bezier",
       "control-point-distances": [-55],
       "control-point-weights": [0.5],
       label: "loop",
       "font-size": "9px",
-      color: "#bc8cff",
-      "text-outline-color": "#0d1117",
+      color: p.purple,
+      "text-outline-color": p.outline,
       "text-outline-width": 2,
       "z-index": 9,
     },
   },
-];
+  ];
+}
 
 // Nodes that lie on a directed cycle, and the edges that close those cycles.
 // Robust to how the loop is encoded (SPAWN chain + TOOL back-edge): we look at
@@ -206,8 +230,9 @@ export default function GraphCanvas({
   const cyRef = useRef<Core | null>(null);
   const onSelectRef = useRef(onNodeSelect);
   onSelectRef.current = onNodeSelect;
+  const [theme] = useTheme();
 
-  // (Re)build the cytoscape instance when the graph structure changes.
+  // (Re)build the cytoscape instance when the graph structure or theme changes.
   useEffect(() => {
     if (!containerRef.current) return;
 
@@ -223,7 +248,7 @@ export default function GraphCanvas({
     const cy = cytoscape({
       container: containerRef.current,
       elements,
-      style: stylesheet,
+      style: buildStylesheet(),
       layout: {
         name: "breadthfirst",
         directed: true,
@@ -270,7 +295,7 @@ export default function GraphCanvas({
       cy.destroy();
       cyRef.current = null;
     };
-  }, [graph]);
+  }, [graph, theme]);
 
   // Apply culprit / path / selection highlight classes reactively.
   useEffect(() => {

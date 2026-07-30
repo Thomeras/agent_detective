@@ -27,6 +27,19 @@ require `blame-engine>=0.4.0` — the worker writes fields the engine reads, and
 an unbounded partial upgrade would silently keep the old behaviour.
 
 ### Added
+- **Rebuilt web UI.** A design-token system (`web/src/ui/tokens.css`) is the
+  single source of colour, spacing and elevation, with an explicit light/dark
+  theme written to `<html>` before first paint so a pre-JS render is never
+  white-on-white; the graph canvas rebuilds its cytoscape stylesheet from the
+  same signal. The screens are built from a shared primitive set — record
+  lists, `Page`, `Toolbar`, `StatTile`, `Segmented`, `Drawer` — instead of
+  tables, because the data this app shows (ids, agent names, judge prose) does
+  not fit fixed columns and a table answers that by clipping. The app shell
+  keeps the sidebar and page header fixed and scrolls only the body. Legacy
+  `--bg` / `--text` / `--accent` names remain as aliases onto the new scale, so
+  components written before the token system became theme-aware unchanged.
+  A new **Contracts** screen registers an output contract from an agent's own
+  stored payloads in one click, or shows why the samples do not support one.
 - **Every score records what measured it.** `judge_model` is stored on the run
   whose judge component it produced and on both verdict tables beside the
   existing `judge_prompt_hash`; `/calibration` slices by the pair. Until now
