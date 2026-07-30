@@ -22,7 +22,15 @@ import pytest
 
 from ingest.config import Settings
 from ingest.main import Dependencies, create_app
-from ingest.types import EdgeRow, FinalizeResult, GraphActivity, IngestBatch, RunRow, SpanRow
+from ingest.types import (
+    EdgeRow,
+    FinalizeResult,
+    GraphActivity,
+    IngestBatch,
+    RunRef,
+    RunRow,
+    SpanRow,
+)
 
 TESTDATA_DIR = (
     Path(__file__).resolve().parents[3] / "packages" / "otel_mapper" / "testdata"
@@ -94,6 +102,18 @@ class FakeRepo:
         return sorted(
             {r.trace_id for r in self.runs.values() if r.graph_id == graph_id and r.trace_id}
         )
+
+    async def runs_for_graph(self, graph_id: UUID) -> list[RunRef]:
+        return [
+            RunRef(
+                run_id=r.run_id,
+                agent_name=r.agent_name,
+                trace_id=r.trace_id,
+                started_at=r.started_at,
+            )
+            for r in self.runs.values()
+            if r.graph_id == graph_id
+        ]
 
     async def list_active_graph_activity(self) -> list[GraphActivity]:
         out: list[GraphActivity] = []

@@ -113,7 +113,8 @@ predecessors explain its quality).
   span, because the target's output flows back into the caller. The target
   run is resolved by agent name among the runs seen in the same mapping call
   (same trace preferred, then earliest start time, then run key). If no run
-  matches the target name, no edge is emitted — endpoints are never invented.
+  matches the target name, no edge is emitted — endpoints are never invented —
+  but the delegation is recorded in ``MappingResult.unresolved_delegations``.
 - ``A2A_MESSAGE`` (only with ``a2a_detection=True``, default off): a span
   carrying ``a2a.task_id``, or an HTTP client span whose path ends with
   ``/.well-known/agent.json`` (A2A agent-card discovery). The peer run is
@@ -148,7 +149,13 @@ from datetime import datetime, timedelta, timezone
 from typing import Any, Callable, Iterable
 from urllib.parse import urlsplit
 
-from .types import AgentRunCandidate, EdgeCandidate, EdgeType, MappingResult
+from .types import (
+    AgentRunCandidate,
+    EdgeCandidate,
+    EdgeType,
+    MappingResult,
+    UnresolvedDelegation,
+)
 
 __all__ = ["map_spans", "flatten_export_request"]
 
@@ -279,10 +286,13 @@ def map_spans(
             accs[key].members.append(s)
 
     candidates = {key: _build_run(acc) for key, acc in accs.items()}
-    edges = _detect_edges(norm, candidates, by_id, opener_run, owner_run_key, a2a_detection)
+    edges, unresolved = _detect_edges(
+        norm, candidates, by_id, opener_run, owner_run_key, a2a_detection
+    )
 
     runs_sorted = sorted(candidates.values(), key=lambda c: (c.start_time or _MIN_TIME, c.run_key))
     edges_sorted = sorted(edges.values(), key=lambda e: (e.from_run_key, e.to_run_key, e.type.value))
+    unresolved_sorted = sorted(unresolved, key=lambda d: (d.owner_run_key, d.target_name))
     graph_ids = {c.graph_id for c in runs_sorted}
     # Cohort key per graph: the resource-level service.name (e.g.
     # "generative-simon") of the runs exported under it. Every graph gets a key
@@ -294,7 +304,11 @@ def map_spans(
         if graph_types.get(c.graph_id) is None:
             graph_types[c.graph_id] = service_name
     return MappingResult(
-        runs=runs_sorted, edges=edges_sorted, graph_ids=graph_ids, graph_types=graph_types
+        runs=runs_sorted,
+        edges=edges_sorted,
+        graph_ids=graph_ids,
+        graph_types=graph_types,
+        unresolved_delegations=unresolved_sorted,
     )
 
 
@@ -811,8 +825,10 @@ def _detect_edges(
     opener_run: dict[tuple[str, str], str],
     owner_run_key: Callable[[_Span], str | None],
     a2a_detection: bool,
-) -> dict[tuple[str, str, EdgeType], EdgeCandidate]:
+) -> tuple[dict[tuple[str, str, EdgeType], EdgeCandidate], list[UnresolvedDelegation]]:
     edges: dict[tuple[str, str, EdgeType], EdgeCandidate] = {}
+    unresolved: list[UnresolvedDelegation] = []
+    unresolved_seen: set[tuple[str, str]] = set()
 
     def emit(edge: EdgeCandidate) -> None:
         # Dedup on (from, to, type); first rule to fire wins. Processing
@@ -865,7 +881,21 @@ def _detect_edges(
         if owner_key is None:
             continue
         target_run = resolve_by_name(target.strip(), s.trace_id)
-        if target_run is None or target_run.run_key == owner_key:
+        if target_run is None:
+            # Not resolvable within this call's candidates: record it so a
+            # re-map over a wider span set can still close the edge.
+            if (owner_key, target.strip()) not in unresolved_seen:
+                unresolved_seen.add((owner_key, target.strip()))
+                unresolved.append(
+                    UnresolvedDelegation(
+                        owner_run_key=owner_key,
+                        target_name=target.strip(),
+                        trace_id=s.trace_id,
+                        span_id=s.span_id,
+                    )
+                )
+            continue
+        if target_run.run_key == owner_key:
             continue
         emit(
             EdgeCandidate(
@@ -936,4 +966,4 @@ def _detect_edges(
             )
             emit(EdgeCandidate(from_key, to_key, EdgeType.A2A_MESSAGE, method))
 
-    return edges
+    return edges, unresolved

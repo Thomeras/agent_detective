@@ -26,6 +26,7 @@ __all__ = [
     "IngestBatch",
     "FinalizeResult",
     "RunRow",
+    "RunRef",
     "SpanRow",
     "StoredPayload",
     "graph_id_from_str",
@@ -124,6 +125,16 @@ class EdgeRow:
     to_run_id: UUID
     type: str  # 'SPAWN' | 'A2A_MESSAGE' | 'TOOL_DELEGATION'
     detection_method: str
+
+
+@dataclass(frozen=True)
+class RunRef:
+    """Minimal run identity for deferred delegation resolution at finalization."""
+
+    run_id: UUID
+    agent_name: str | None
+    trace_id: str | None
+    started_at: datetime | None
 
 
 @dataclass(frozen=True)

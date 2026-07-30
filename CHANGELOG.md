@@ -8,6 +8,25 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
+## [0.4.0] — Unreleased
+
+`otel-mapper` (0.2.0 → 0.3.0), ingest service (self-host stack).
+
+### Added
+- `MappingResult.unresolved_delegations` — a TOOL_DELEGATION whose target
+  agent name matched no run in the mapping call is recorded (owner run key,
+  target name, trace id, span id) instead of vanishing. Additive field with
+  a default; the `runs` / `edges` output is unchanged.
+
+### Fixed
+- **A delegation split across POSTs of one trace now produces its edge.** The
+  ingest finalization re-map retries the delegations it still could not
+  resolve against the graph's stored runs, so the TOOL_DELEGATION edge is
+  closed even when the target layer's raw spans are unavailable at remap
+  time. A delegation whose target exists nowhere in the graph still yields
+  no edge — endpoints are never invented — but now leaves one warning per
+  graph naming the missing target.
+
 ## [0.3.0] — 2026-07-29
 
 `agent-detective`, `agent-detective-worker`, `blame-engine`. Verdicts change on

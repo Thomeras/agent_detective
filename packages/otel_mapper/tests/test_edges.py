@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import pytest
 
-from otel_mapper import EdgeType, flatten_export_request, map_spans
+from otel_mapper import EdgeType, UnresolvedDelegation, flatten_export_request, map_spans
 
 SPAWN_TRACE = "4bf92f3577b34da6a3ce929d0e0e4736"
 ORCH_KEY = f"{SPAWN_TRACE}:00000000000000a1"
@@ -107,6 +107,20 @@ def test_tool_delegation_edges(fixture_json) -> None:
 
     # The tool span targeting the nonexistent ghost-agent yields no edge.
     assert all("ghost-agent" not in e.detection_method for e in result.edges)
+
+
+def test_unresolved_delegation_recorded(fixture_json) -> None:
+    result = map_spans(flatten_export_request(fixture_json("tool_delegation.json")))
+    # The resolvable target (scraper-agent) became an edge above; only the
+    # unresolvable one is recorded, with the identity needed to retry later.
+    assert result.unresolved_delegations == [
+        UnresolvedDelegation(
+            owner_run_key=TOOL_COMPLIANCE_KEY,
+            target_name="ghost-agent",
+            trace_id=TOOL_TRACE,
+            span_id="0000000000000c05",
+        )
+    ]
 
 
 def test_tool_delegation_error_propagates_to_run_status(fixture_json) -> None:

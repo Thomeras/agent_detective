@@ -79,6 +79,21 @@ class EdgeCandidate:
 
 
 @dataclass(frozen=True)
+class UnresolvedDelegation:
+    """A TOOL_DELEGATION whose target name matched no run in the mapping call.
+
+    Recorded instead of silently dropping the edge, so a later re-map over a
+    wider span set (or the ingest finalizer over the graph's stored runs) can
+    still resolve it.
+    """
+
+    owner_run_key: str
+    target_name: str
+    trace_id: str
+    span_id: str
+
+
+@dataclass(frozen=True)
 class MappingResult:
     """Output of :func:`otel_mapper.map_spans`.
 
@@ -91,9 +106,14 @@ class MappingResult:
     the runs exported under it (the cohort key ingest stores as
     ``execution_graphs.graph_type``); ``None`` when the resource carried no
     service.name. First non-empty value in deterministic run order wins.
+
+    ``unresolved_delegations`` lists TOOL_DELEGATION rules whose target agent
+    name matched no run in this call (deduplicated per owner run and target,
+    sorted by ``(owner_run_key, target_name)``).
     """
 
     runs: list[AgentRunCandidate] = field(default_factory=list)
     edges: list[EdgeCandidate] = field(default_factory=list)
     graph_ids: set[str] = field(default_factory=set)
     graph_types: dict[str, str | None] = field(default_factory=dict)
+    unresolved_delegations: list[UnresolvedDelegation] = field(default_factory=list)

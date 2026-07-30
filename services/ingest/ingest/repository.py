@@ -37,7 +37,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.dialects.postgresql import insert as pg_insert
 
-from .types import EdgeRow, FinalizeResult, GraphActivity, IngestBatch
+from .types import EdgeRow, FinalizeResult, GraphActivity, IngestBatch, RunRef
 
 metadata = MetaData()
 
@@ -116,6 +116,10 @@ class Repo(Protocol):
 
     async def trace_ids_for_graph(self, graph_id: UUID) -> list[str]:
         """Distinct trace ids of the graph's runs (re-map span lookup)."""
+        ...
+
+    async def runs_for_graph(self, graph_id: UUID) -> list[RunRef]:
+        """Run identities of the graph (deferred delegation resolution)."""
         ...
 
     async def list_active_graph_activity(self) -> list[GraphActivity]: ...
@@ -266,6 +270,25 @@ class PgRepo:
         async with self._engine.connect() as conn:
             rows = (await conn.execute(stmt)).all()
         return sorted(row.trace_id for row in rows if row.trace_id)
+
+    async def runs_for_graph(self, graph_id: UUID) -> list[RunRef]:
+        stmt = select(
+            agent_runs.c.run_id,
+            agent_runs.c.agent_name,
+            agent_runs.c.trace_id,
+            agent_runs.c.started_at,
+        ).where(agent_runs.c.graph_id == graph_id)
+        async with self._engine.connect() as conn:
+            rows = (await conn.execute(stmt)).all()
+        return [
+            RunRef(
+                run_id=row.run_id,
+                agent_name=row.agent_name,
+                trace_id=row.trace_id,
+                started_at=row.started_at,
+            )
+            for row in rows
+        ]
 
     async def list_active_graph_activity(self) -> list[GraphActivity]:
         activity_stmt = (

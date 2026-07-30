@@ -9,7 +9,10 @@ assert the re-map heals what per-request mapping structurally cannot see.
 """
 
 import asyncio
+import logging
 from datetime import datetime, timezone
+
+import pytest
 
 from ingest.spans import _EPOCH, _dedupe_latest, mappable_span
 from ingest.types import SpanRow, graph_id_from_str, run_id_from_key
@@ -140,6 +143,125 @@ def test_remap_is_a_noop_for_single_batch_graphs(harness: Harness) -> None:
     assert harness.repo.runs == before_runs
     assert harness.repo.edges == before_edges
     assert [m["run_count"] for _, m in harness.publisher.messages] == [3]
+
+
+DELEG_TRACE = "eeee0000000000000000000000000001"
+DELEG_ORCH_KEY = f"{DELEG_TRACE}:00000000000000e1"
+DELEG_WRITER_KEY = f"{DELEG_TRACE}:00000000000000e3"
+DELEG_WRITER_SPAN = "00000000000000e3"
+
+
+def _deleg_batches(target: str = "writer") -> tuple[dict, dict]:
+    """One trace in two exports: the caller and its TOOL span delegating to
+    ``target`` ship first; the target agent's layer arrives in a later flush."""
+
+    def _attr(key: str, value: str) -> dict:
+        return {"key": key, "value": {"stringValue": value}}
+
+    orch = {
+        "traceId": DELEG_TRACE,
+        "spanId": "00000000000000e1",
+        "name": "orch.run",
+        "startTimeUnixNano": "1751371200000000000",
+        "endTimeUnixNano": "1751371300000000000",
+        "attributes": [
+            _attr("openinference.span.kind", "AGENT"),
+            _attr("gen_ai.agent.name", "orchestrator"),
+        ],
+    }
+    tool = {
+        "traceId": DELEG_TRACE,
+        "spanId": "00000000000000e2",
+        "parentSpanId": "00000000000000e1",
+        "name": "orch.delegate",
+        "startTimeUnixNano": "1751371210000000000",
+        "endTimeUnixNano": "1751371220000000000",
+        "attributes": [
+            _attr("openinference.span.kind", "TOOL"),
+            _attr("gen_ai.tool.target_agent", target),
+        ],
+    }
+    writer = {
+        "traceId": DELEG_TRACE,
+        "spanId": DELEG_WRITER_SPAN,
+        "name": "writer.run",
+        "startTimeUnixNano": "1751371215000000000",
+        "endTimeUnixNano": "1751371219000000000",
+        "attributes": [
+            _attr("openinference.span.kind", "AGENT"),
+            _attr("gen_ai.agent.name", "writer"),
+        ],
+    }
+
+    def _export(spans: list[dict]) -> dict:
+        return {
+            "resourceSpans": [
+                {
+                    "resource": {"attributes": [_attr("service.name", "deleg-svc")]},
+                    "scopeSpans": [{"spans": spans}],
+                }
+            ]
+        }
+
+    return _export([orch, tool]), _export([writer])
+
+
+def test_finalization_resolves_delegation_split_across_posts(harness: Harness) -> None:
+    batch1, batch2 = _deleg_batches()
+    asyncio.run(harness.post_traces(batch1))
+    asyncio.run(harness.post_traces(batch2))
+    # Redelivery of both POSTs must not change the outcome.
+    asyncio.run(harness.post_traces(batch1))
+    asyncio.run(harness.post_traces(batch2))
+
+    # The delegating and target layers never met in one mapping pass.
+    assert harness.repo.edges == []
+
+    asyncio.run(harness.finalizer.scan_once())
+
+    deleg = [e for e in harness.repo.edges if e.type == "TOOL_DELEGATION"]
+    assert [(e.from_run_id, e.to_run_id) for e in deleg] == [
+        (run_id_from_key(DELEG_WRITER_KEY), run_id_from_key(DELEG_ORCH_KEY))
+    ]
+
+
+def test_finalization_resolves_delegation_against_stored_runs(harness: Harness) -> None:
+    batch1, batch2 = _deleg_batches()
+    asyncio.run(harness.post_traces(batch1))
+    asyncio.run(harness.post_traces(batch2))
+    # The target's raw spans are gone from the sink, so the full-set re-map
+    # cannot see the writer run; the deferred pass closes the edge from the
+    # graph's stored runs instead.
+    harness.sink.rows = [r for r in harness.sink.rows if r.span_id != DELEG_WRITER_SPAN]
+
+    asyncio.run(harness.finalizer.scan_once())
+
+    deleg = [e for e in harness.repo.edges if e.type == "TOOL_DELEGATION"]
+    assert [(e.from_run_id, e.to_run_id) for e in deleg] == [
+        (run_id_from_key(DELEG_WRITER_KEY), run_id_from_key(DELEG_ORCH_KEY))
+    ]
+    assert "resolved at finalization" in deleg[0].detection_method
+
+
+def test_unresolvable_delegation_warns_once_without_edge(
+    harness: Harness, caplog: pytest.LogCaptureFixture
+) -> None:
+    batch1, _ = _deleg_batches(target="ghost")
+    asyncio.run(harness.post_traces(batch1))
+
+    with caplog.at_level(logging.WARNING, logger="ingest.pipeline"):
+        asyncio.run(harness.finalizer.scan_once())
+
+    # Endpoints are never invented: no edge, exactly one warning per graph.
+    assert harness.repo.edges == []
+    warnings = [
+        r.getMessage()
+        for r in caplog.records
+        if r.levelno == logging.WARNING and "unresolved delegations" in r.getMessage()
+    ]
+    assert len(warnings) == 1
+    assert "ghost" in warnings[0]
+    assert str(graph_id_from_str(DELEG_TRACE)) in warnings[0]
 
 
 def _row(**overrides) -> SpanRow:

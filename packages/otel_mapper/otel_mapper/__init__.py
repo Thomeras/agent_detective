@@ -8,15 +8,22 @@ limitation.
 
 from .ids import graph_id_from_str, run_id_from_key
 from .mapper import flatten_export_request, map_spans
-from .types import AgentRunCandidate, EdgeCandidate, EdgeType, MappingResult
+from .types import (
+    AgentRunCandidate,
+    EdgeCandidate,
+    EdgeType,
+    MappingResult,
+    UnresolvedDelegation,
+)
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "AgentRunCandidate",
     "EdgeCandidate",
     "EdgeType",
     "MappingResult",
+    "UnresolvedDelegation",
     "flatten_export_request",
     "graph_id_from_str",
     "map_spans",
