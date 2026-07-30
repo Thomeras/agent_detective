@@ -594,6 +594,12 @@ _NOTE_TEMPLATES: dict[str, Callable[[Mapping[str, Any]], str]] = {
         "They stay unscored (there is no work to grade), but the emptiness "
         "itself is evidence against the node, not against the exporter"
     ),
+    "zero_result_set": lambda d: (
+        f"zero_result_set: node(s) {d['agents']} returned a well-formed output "
+        "carrying no records — an observed absence, not a defect and not a "
+        "blind spot. They stay unscored (nothing to grade) and do not serve "
+        "as drop reference points or hide a culprit upstream"
+    ),
     "topology": lambda d: (
         f"topology: graph has {d['components']} weakly-connected "
         "components — runs share membership but lack instrumented edges "

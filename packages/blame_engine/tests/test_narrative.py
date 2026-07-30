@@ -244,6 +244,19 @@ def _scenarios(mk):
             },
             terminal_verdict=BAD,
         ),
+        # 16. a node whose well-formed output carries no records: unscored as an
+        #     observed absence — not a defect, not a blind spot, and not a drop
+        #     reference (a separate note from empty_output, scenario 15)
+        mk(
+            nodes=["query", "collect", "report"],
+            edges=[("query", "collect"), ("collect", "report")],
+            scores={
+                "query": _ns("query", 0.9),
+                "collect": _ns("collect", None, unscored="zero_result_set"),
+                "report": _ns("report", 0.9),
+            },
+            terminal_verdict=BAD,
+        ),
     ]
 
 

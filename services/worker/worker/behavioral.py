@@ -19,6 +19,8 @@ Signals emitted here:
   rolling baseline;
 - ``empty_output``          (fail) — the run recorded an empty output while its
   own usage says the model emitted tokens: it spent and shipped nothing;
+- ``zero_result_set``       (warn) — the output parses and is well-formed but
+  carries no records: an observed absence, neither good nor bad;
 - ``run_failed``            (fail) — the trace records the run as errored.
 
 All functions are pure and identity-free; the caller stamps run_id/agent.
@@ -27,6 +29,8 @@ All functions are pure and identity-free; the caller stamps run_id/agent.
 from __future__ import annotations
 
 import json
+import re
+import unicodedata
 from typing import Any
 
 from .types import AgentStat
@@ -39,6 +43,7 @@ SIGNAL_TOOL_ARGS_INVALID = "tool_args_invalid"
 SIGNAL_COST_ANOMALY = "cost_anomaly"
 SIGNAL_TOKEN_ANOMALY = "token_anomaly"
 SIGNAL_EMPTY_OUTPUT = "empty_output"
+SIGNAL_ZERO_RESULT_SET = "zero_result_set"
 SIGNAL_RUN_FAILED = "run_failed"
 
 DEFAULT_SIDE_EFFECT_MARKERS: tuple[str, ...] = (
@@ -368,6 +373,81 @@ def empty_output_signals(output_text: str | None, tokens_out: int | None) -> lis
             "originates": True,
         }
     ]
+
+
+def zero_result_set_signals(output_text: str | None, input_text: str | None) -> list[dict]:
+    """``zero_result_set`` (warn) — the output parses and is well-formed but carries no records.
+
+    The structural sibling of ``empty_output``: the exporter worked, the shape
+    is valid, and what it captured is "nothing to report" — an observed
+    absence, not a defect and not a pass. Warn severity because nothing here
+    is a fault; the signal exists so the report can say what was measured.
+    Whether the SOURCE had data is unknowable from the trace, so the name and
+    text claim nothing about it — only about the payload.
+    """
+    parsed = _parse_json_tolerant(output_text)
+    if parsed is None:
+        return []
+    if _carries_record(parsed, _norm_text(input_text)):
+        return []
+    return [
+        signal(
+            SIGNAL_ZERO_RESULT_SET, "warn", "wellformed_no_records",
+            chars=len(output_text or ""),
+        )
+    ]
+
+
+def _parse_json_tolerant(text: str | None) -> object | None:
+    """Parse JSON, tolerating prose wrapping a single {...} object."""
+    if not text:
+        return None
+    try:
+        return json.loads(text)
+    except ValueError:
+        match = re.search(r"\{.*\}", text, re.DOTALL)
+        if match:
+            try:
+                return json.loads(match.group(0))
+            except ValueError:
+                return None
+    return None
+
+
+def _norm_text(text: str | None) -> str | None:
+    if not text:
+        return None
+    return unicodedata.normalize("NFC", text).strip().casefold()
+
+
+def _carries_record(value: object, input_norm: str | None) -> bool:
+    """True when any leaf of the parsed payload is a record, not a carried scalar.
+
+    A record is a non-empty collection or a nonzero count. A scalar string is
+    a record only when it does not echo the input — an identifier the node
+    carried through (an ICO, a source name) is not something the node produced.
+    With no input to compare against, every scalar counts: the gate must not
+    fire unless the absence is certain.
+    """
+    if value is None or isinstance(value, bool):
+        return False
+    if isinstance(value, (int, float)):
+        return value != 0
+    if isinstance(value, str):
+        literal = _norm_text(value)
+        return bool(literal) and not _echoes_input(literal, input_norm)
+    if isinstance(value, list):
+        return len(value) > 0
+    if isinstance(value, dict):
+        return any(_carries_record(v, input_norm) for v in value.values())
+    return True
+
+
+def _echoes_input(literal: str, input_norm: str | None) -> bool:
+    """True when the literal appears in the input as a bounded token."""
+    if not input_norm:
+        return False
+    return re.search(rf"(?<!\w){re.escape(literal)}(?!\w)", input_norm) is not None
 
 
 def run_failed_signals(status: str | None, error_span_ids: list[str] | None) -> list[dict]:

@@ -15,7 +15,7 @@ class NodeScore:
     score: float | None                    # None = UNKNOWN, never defaults to 1.0
     components: dict[str, float | None]    # {"schema": .., "judge": .., "heuristics": ..}
     input_flawed: bool | None              # judge verdict: was the node's INPUT already flawed?
-    unscored_reason: str | None            # "judge_error" | "payload_missing" | "insufficient_components"
+    unscored_reason: str | None            # "judge_error" | "payload_missing" | "empty_output" | "zero_result_set" | "insufficient_components"
     judge_note: str | None
     # Structured judge/heuristic flags ("missing_required_content",
     # "unverifiable_artifact", ...). They cap the judge component deterministically

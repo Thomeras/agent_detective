@@ -175,6 +175,13 @@ _SIGNAL_TEMPLATES: dict[str, tuple[Callable[..., str], Callable[..., str]]] = {
             f"gen_ai.usage.output_tokens={d['tokens_out']}"
         ),
     ),
+    "wellformed_no_records": (
+        lambda d: "output is well-formed but carries no records",
+        lambda d: (
+            f"output parses as JSON ({d['chars']} chars); every collection "
+            "empty, every count zero, every scalar carried through from the input"
+        ),
+    ),
     "run_failed": (
         lambda d: (
             f"the run is recorded as {d['status']}"

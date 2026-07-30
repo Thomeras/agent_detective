@@ -344,7 +344,7 @@ def test_contract_preserved_is_not_penalised():
         score_node(
             run,
             '{"file_type": "md", "note": "x"}',
-            '{"plan": {"file_type": "md"}}',
+            '{"plan": {"file_type": "md", "steps": ["outline", "draft"]}}',
             [],
             None,
             FakeJudge(),

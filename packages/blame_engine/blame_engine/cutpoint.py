@@ -185,12 +185,23 @@ def _analyze(cond: Condensation, inp: BlameInput) -> CutAnalysis:
         preds = list(dag.predecessors(sid))
         return bool(preds) and all(_is_structural_root_sid(p) for p in preds)
 
+    # A zero_result_set node is likewise not a hidden origin: its output was
+    # observed, well-formed, and carried no records — there is nothing behind
+    # it a culprit could hide in.
+    def _is_zero_result_sid(sid: int) -> bool:
+        sn = cond.super_nodes[sid]
+        ns = inp.scores.get(sn.exit_node)
+        return ns is not None and ns.unscored_reason == "zero_result_set"
+
     # Unknown upstream = a genuinely UNKNOWN scored-None ancestor that could hide
-    # a culprit. Structural roots are excluded: their unscored-ness is by design,
-    # not a blind spot, so they must NOT suppress confidence.
+    # a culprit. Structural roots and zero-result nodes are excluded: their
+    # unscored-ness is by design or observed, not a blind spot, so they must
+    # NOT suppress confidence.
     def _unknown_upstream(sid: int) -> bool:
         return any(
-            cond.super_nodes[a].score is None and not _is_structural_root_sid(a)
+            cond.super_nodes[a].score is None
+            and not _is_structural_root_sid(a)
+            and not _is_zero_result_sid(a)
             for a in nx.ancestors(dag, sid)
         )
     drop_origins: list[Candidate] = []       # dropped from a healthy predecessor

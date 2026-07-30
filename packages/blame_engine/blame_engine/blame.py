@@ -349,10 +349,19 @@ def find_blame(
         emitted tokens was measured, and the measurement says "no work came out
         of here": there is no room behind it for a defect nobody saw. Counting
         it as an unknown suppressed the classification on the strength of a node
-        we know more about than most.
+        we know more about than most. A well-formed output carrying no records
+        (``zero_result_set``) is the same shape one step up: we saw exactly what
+        the node passed on, and it was nothing.
         """
         ns = inp.scores.get(n)
-        return ns is not None and ns.unscored_reason == "empty_output"
+        return ns is not None and ns.unscored_reason in (
+            "empty_output",
+            "zero_result_set",
+        )
+
+    def _is_zero_result(n: str) -> bool:
+        ns = inp.scores.get(n)
+        return ns is not None and ns.unscored_reason == "zero_result_set"
 
     hidden_unscored = [
         n for n in unscored if not _is_structural_root(n) and not _observed_empty(n)
@@ -1187,6 +1196,20 @@ def find_blame(
     if empty_output:
         notes.append(NoteRecord("empty_output", {"agents": empty_output}))
 
+    # A well-formed output that carries no records is also an observed absence,
+    # but it is NOT the empty-output finding: nothing failed and nothing was
+    # spent into a void — the node reported "no records" in a valid shape. The
+    # note exists so the report says what was measured instead of letting the
+    # unscored NULL read as a blind spot.
+    zero_result = sorted(
+        inp.agent_names.get(n, n)
+        for n in graph_nodes
+        if (zns := inp.scores.get(n)) is not None
+        and zns.unscored_reason == "zero_result_set"
+    )
+    if zero_result:
+        notes.append(NoteRecord("zero_result_set", {"agents": zero_result}))
+
     # Topology-driven instrumentation-quality warning (same family as
     # payload_missing). The ONLY behavioral use of the advisory classification:
     # a disconnected graph means edges between components were never recorded.
@@ -1582,7 +1605,9 @@ def find_blame(
             unknown_ancestors.update(
                 n
                 for n in nx.ancestors(cond.graph, c)
-                if score_map.get(n) is None and not _is_structural_root(n)
+                if score_map.get(n) is None
+                and not _is_structural_root(n)
+                and not _is_zero_result(n)
             )
 
     # Cross-check: a deterministic contract breach vs the terminal verdict. The

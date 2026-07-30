@@ -36,6 +36,7 @@ from .behavioral import (
     parse_tool_calls,
     retry_storm_signals,
     tool_args_signals,
+    zero_result_set_signals,
 )
 from .checks_numeric import (
     number_not_derivable_signals,
@@ -770,6 +771,33 @@ async def score_node(
             flags=tuple(s["name"] for s in empty_signals),
             deterministic_signals=tuple(empty_signals),
         )
+
+    # A well-formed output carrying NO records is the empty-payload case one
+    # step up: the exporter worked, the shape parses, and what it captured is
+    # "nothing to report". The judge cannot tell the difference — it rates
+    # emptiness as worthless, so letting it see this shape manufactures a bad
+    # score out of an observed absence (and eight such scores deflate the
+    # graph median enough to fabricate a culprit downstream). Same answer as
+    # above: the number is not produced at all and the observation rides the
+    # deterministic channel as a warn signal. Guarded both ways: a failed run
+    # or an errored tool call means the emptiness may be the failure's own
+    # footprint, which belongs to the fail channel, not here.
+    if run.status != "failed" and not any(
+        c.get("status") == "error" for c in parse_tool_calls(run.tool_calls)
+    ):
+        zero_signals = zero_result_set_signals(output_text, input_text)
+        if zero_signals:
+            return NodeScore(
+                run_id=run_id,
+                score=None,
+                components={"schema": None, "judge": None, "heuristics": None},
+                input_flawed=None,
+                unscored_reason="zero_result_set",
+                judge_note=None,
+                flags=tuple(s["name"] for s in zero_signals),
+                deterministic_signals=tuple(zero_signals),
+            )
+
 
     schema_component = evaluate_schema(
         output_text, contracts, run.agent_name, run.agent_version
