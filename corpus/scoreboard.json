@@ -123,7 +123,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.0,
+          "confidence": 0.498,
           "culprits": [
             "report_writer"
           ],
@@ -131,7 +131,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.498,
           "culprits": [
             "report_writer"
           ],
@@ -139,7 +139,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.498,
           "culprits": [
             "report_writer"
           ],
@@ -147,7 +147,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.498,
           "culprits": [
             "report_writer"
           ],
@@ -155,7 +155,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.498,
           "culprits": [
             "report_writer"
           ],
@@ -181,7 +181,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.0,
+          "confidence": 0.208,
           "culprits": [
             "log_ingestor",
             "normalizer"
@@ -190,7 +190,7 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.136,
+          "confidence": 0.093,
           "culprits": [
             "log_ingestor",
             "normalizer",
@@ -218,11 +218,10 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.136,
+          "confidence": 0.208,
           "culprits": [
             "log_ingestor",
-            "normalizer",
-            "report_writer"
+            "normalizer"
           ],
           "incident": true,
           "report_type": "multi_culprit"
@@ -362,7 +361,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.6,
+          "confidence": 0.57,
           "culprits": [
             "spec_extractor"
           ],
@@ -370,7 +369,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.6,
+          "confidence": 0.57,
           "culprits": [
             "spec_extractor"
           ],
@@ -378,7 +377,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.6,
+          "confidence": 0.57,
           "culprits": [
             "spec_extractor"
           ],
@@ -386,7 +385,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.6,
+          "confidence": 0.57,
           "culprits": [
             "spec_extractor"
           ],
@@ -394,7 +393,7 @@
           "report_type": "cut_point"
         },
         {
-          "confidence": 0.6,
+          "confidence": 0.57,
           "culprits": [
             "spec_extractor"
           ],
@@ -476,15 +475,16 @@
         "topology": "05_diamond"
       },
       "report_types": {
-        "clean": 1,
-        "composition_failure": 4
+        "composition_failure": 5
       },
       "verdicts": [
         {
-          "confidence": 0.0,
-          "culprits": [],
-          "incident": false,
-          "report_type": null
+          "confidence": 0.4,
+          "culprits": [
+            "05_diamond"
+          ],
+          "incident": true,
+          "report_type": "composition_failure"
         },
         {
           "confidence": 0.4,
@@ -804,7 +804,7 @@
       },
       "verdicts": [
         {
-          "confidence": 0.0,
+          "confidence": 0.318,
           "culprits": [
             "metrics_analyst",
             "metrics_source"
@@ -813,7 +813,7 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.318,
           "culprits": [
             "metrics_analyst",
             "metrics_source"
@@ -822,7 +822,7 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.282,
           "culprits": [
             "metrics_analyst",
             "metrics_source"
@@ -831,7 +831,7 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.318,
           "culprits": [
             "metrics_analyst",
             "metrics_source"
@@ -840,7 +840,7 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.0,
+          "confidence": 0.282,
           "culprits": [
             "metrics_analyst",
             "metrics_source"
@@ -931,7 +931,37 @@
       },
       "verdicts": [
         {
-          "confidence": 0.204,
+          "confidence": 0.142,
+          "culprits": [
+            "partner_analyst",
+            "partner_feed_adapter",
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.1,
+          "culprits": [
+            "partner_analyst",
+            "partner_feed_adapter",
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.114,
+          "culprits": [
+            "partner_analyst",
+            "partner_feed_adapter",
+            "performance_join"
+          ],
+          "incident": true,
+          "report_type": "multi_culprit"
+        },
+        {
+          "confidence": 0.15,
           "culprits": [
             "partner_feed_adapter",
             "performance_join"
@@ -940,35 +970,9 @@
           "report_type": "multi_culprit"
         },
         {
-          "confidence": 0.204,
+          "confidence": 0.142,
           "culprits": [
-            "partner_feed_adapter",
-            "performance_join"
-          ],
-          "incident": true,
-          "report_type": "multi_culprit"
-        },
-        {
-          "confidence": 0.204,
-          "culprits": [
-            "partner_feed_adapter",
-            "performance_join"
-          ],
-          "incident": true,
-          "report_type": "multi_culprit"
-        },
-        {
-          "confidence": 0.204,
-          "culprits": [
-            "partner_feed_adapter",
-            "performance_join"
-          ],
-          "incident": true,
-          "report_type": "multi_culprit"
-        },
-        {
-          "confidence": 0.204,
-          "culprits": [
+            "partner_analyst",
             "partner_feed_adapter",
             "performance_join"
           ],
@@ -1002,7 +1006,7 @@
       0.623,
       0.984
     ],
-    "discrimination_rate": 0.927,
+    "discrimination_rate": 0.909,
     "false_positive_ci_over_cells": [
       0.036,
       0.624
@@ -1013,8 +1017,6 @@
       "02_pipeline__truncate_at_enricher": "enricher",
       "05_diamond__hallucinate_at_marketing_writer": "marketing_writer"
     },
-    "unstable_cells": [
-      "05_diamond__hallucinate_at_marketing_writer"
-    ]
+    "unstable_cells": []
   }
 }

@@ -20,6 +20,18 @@ localised on a single scoring channel is capped at 0.7, and a well-formed empty
 result is no longer scored as a defect. The exit-code contract (`0` / `1` / `2`)
 is unchanged.
 
+**Measured: the numbers held.** Unlike 0.3.0, this release does not claim an
+accuracy gain — it is about reaching the tool at all, and the corpus exists
+here to prove that making it usable did not cost anything. Over the same
+foreign corpus (17 cells, 6 topologies, 5 runs each): attribution accuracy
+**0.833 → 0.833**, false positive rate **0.20 → 0.20**, discrimination
+0.927 → 0.909. Sixteen of the seventeen cells produce a byte-identical verdict
+distribution to 0.3.0. The one that moved,
+`05_diamond__hallucinate_at_marketing_writer`, went from 4 of 5 runs reporting
+a fault to 5 of 5 — which removed the last unstable cell (1 → 0) and cost the
+0.018 of discrimination, because that cell's clean twin reports the same
+verdict, so agreeing with itself more consistently means discriminating less.
+
 **Upgrade note.** Migrations 0014 and 0015 are additive and nullable, so a
 0.3.0 deployment runs against the 0.4.0 schema unchanged; rollback is a
 redeploy, not a down-migration. `agent-detective-worker` and `agent-detective`
@@ -165,9 +177,7 @@ an unbounded partial upgrade would silently keep the old behaviour.
   how many sibling nodes of the same run also returned a well-formed empty
   result. The judge was guessing at facts the same function had already
   established, and a lone collector that found nothing looks negligent until
-  you know four siblings found nothing either. The scoring rubric also asks for
-  two decimal places and forbids falling back on the round anchors, because
-  when many steps land on the same number the ranking between them is lost.
+  you know four siblings found nothing either.
 - **The worker states which judge it is using at startup** — model, base URL,
   and whether the verdicts are canned mock answers or a real model.
 - New `unscored_reason` values: `zero_result_set`,
