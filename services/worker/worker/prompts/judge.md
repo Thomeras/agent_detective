@@ -61,12 +61,7 @@ Respond with a single JSON object and nothing else:
 
 - `task_score`: how well this step did its job. **Be strict and let the number
   match your words** — if your reasoning names a real shortcoming, the score
-  must drop below the "good" band. Report **two decimals**, and place the score
-  *within* the band by how severe the shortcoming is: the bands below are
-  ranges to position inside, not a menu of values to pick. Do not fall back on
-  the round anchors (0.40, 0.70, 0.80) — when many steps of one run all land on
-  the same round number, the ranking between them is lost and whichever node
-  the clock happens to reach first is blamed for a fault it may share.
+  must drop below the "good" band. Use these calibration anchors:
 
   - **0.9–1.0** — correct, complete, and specific; nothing you would change.
   - **0.7–0.85** — correct but with a *minor* cosmetic issue only; no missing
