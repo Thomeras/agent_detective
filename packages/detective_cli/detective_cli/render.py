@@ -212,6 +212,24 @@ class _GraphView:
             counts[state] = counts.get(state, 0) + 1
         return counts
 
+    def _components_note(self, run_id: str) -> str:
+        """The deterministic remnant of an unscored node, marked as partial.
+
+        A node can carry real measurements (a fired heuristic, a schema
+        verdict) and still have no quality score — the present weights did not
+        reach the floor. Showing those components, labelled partial, keeps the
+        report from reading as "nothing was measured" without dressing the
+        remnant up as a score.
+        """
+        row = self.analysis.node_scores_by_str.get(run_id)
+        if row is None:
+            return ""
+        present = {k: v for k, v in (row.score_components or {}).items() if v is not None}
+        if not present:
+            return ""
+        parts = ", ".join(f"{name} {value:.2f}" for name, value in present.items())
+        return f"partial deterministic measurement: {parts}"
+
     def node_rows(self) -> list[tuple[str, str, str]]:
         """(name, score, annotation) per run, in the engine's topological order."""
         culprits = {str(c) for c in self.culprits}
@@ -238,6 +256,9 @@ class _GraphView:
                 notes.append("not analyzed")
             elif state != "scored":
                 notes.append(f"unscored ({state})")
+                partial = self._components_note(run_id)
+                if partial:
+                    notes.append(partial)
             notes.extend(node_flags.get(run_id, []))
             rows.append((self.label(run_id), _score(score), ", ".join(notes)))
         return rows

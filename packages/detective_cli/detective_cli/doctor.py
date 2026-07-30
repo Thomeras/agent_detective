@@ -47,9 +47,10 @@ from dataclasses import dataclass, field
 from typing import Any, Literal
 
 from otel_mapper import flatten_export_request, map_spans, run_id_from_key
+from worker.config import Settings
 from worker.graph_ops import deliverable_run
-from worker.scoring import opaque_artifact_refs
-from worker.types import GraphBundle, RunRecord
+from worker.scoring import _select_contract, opaque_artifact_refs
+from worker.types import GraphBundle, OutputContract, RunRecord
 
 from .bundle import bundles_from_mapping
 from .render import Painter
@@ -932,6 +933,70 @@ def _check_deliverable(bundle: GraphBundle) -> Check:
     )
 
 
+def _check_score_floor(
+    bundle: GraphBundle,
+    *,
+    judge_detail: str,
+    contracts: list[OutputContract],
+    settings: Settings,
+) -> Check | None:
+    """Say BEFORE the analysis runs which nodes can get a quality score at all.
+
+    Only emitted when the judged channel is off: with a judge, scoring behaves
+    as it always did and there is nothing to pre-empt. Without one, an offline
+    run ended with every node ``insufficient_components`` and nothing said the
+    rule up front, so a deliberate design — no number is manufactured from a
+    0.15-weight remnant — read as a malfunction.
+    """
+    if not bundle.runs:
+        return None
+    w_schema = settings.score_w_schema
+    w_judge = settings.score_w_judge
+    w_heur = settings.score_w_heuristics
+    floor = settings.score_min_weight
+    contracted = [
+        r
+        for r in bundle.runs
+        if _select_contract(contracts, r.agent_name, r.agent_version) is not None
+    ]
+    total = len(bundle.runs)
+    head = f"judged channel off ({judge_detail})"
+    if len(contracted) == total:
+        return Check(
+            id="score_floor",
+            title="score floor",
+            level="ok",
+            detail=(
+                f"{head} — all {total} runs match a registered output contract and "
+                f"can reach the {floor} score floor without it "
+                f"(schema {w_schema} + a fired heuristic {w_heur})"
+            ),
+        )
+    names = f": {_labels(contracted)}" if contracted else ""
+    return Check(
+        id="score_floor",
+        title="score floor",
+        level="warn",
+        detail=(
+            f"{head} — {len(contracted)} of {total} runs match a registered "
+            f"output contract{names}"
+        ),
+        consequence=(
+            f"nodes without a contract report unscored (insufficient_components): "
+            f"without the judge's {w_judge} weight, reaching the {floor} floor takes "
+            f"a registered output contract (schema {w_schema}) plus a fired heuristic "
+            f"({w_heur}). Those nodes are still measured deterministically — signals, "
+            f"flags and contract checks land in the report marked partial — but no "
+            f"quality number is manufactured for them"
+        ),
+        fix=(
+            "set JUDGE_BASE_URL and JUDGE_MODEL to add per-node judging, or register "
+            "an output contract per agent (deployed service). Lowering SCORE_MIN_WEIGHT "
+            "is an operator trade-off, not a default"
+        ),
+    )
+
+
 # ---------------------------------------------------------------------------
 # Claims
 # ---------------------------------------------------------------------------
@@ -1062,7 +1127,14 @@ def _claims(bundle: GraphBundle, checks: dict[str, Check]) -> list[Claim]:
 
 
 def diagnose(
-    exports: list[dict[str, Any]], source: str, *, a2a_detection: bool = False
+    exports: list[dict[str, Any]],
+    source: str,
+    *,
+    a2a_detection: bool = False,
+    judge_available: bool = True,
+    judge_detail: str = "",
+    contracts: list[OutputContract] | None = None,
+    settings: Settings | None = None,
 ) -> Diagnosis:
     """Read a trace the way the analysis will, and report what it can support."""
     spans = [span for export in exports for span in flatten_export_request(export)]
@@ -1091,6 +1163,15 @@ def diagnose(
             _check_model(bundle, models),
             _check_deliverable(bundle),
         ]
+        if not judge_available:
+            score_floor = _check_score_floor(
+                bundle,
+                judge_detail=judge_detail,
+                contracts=list(contracts or []),
+                settings=settings or Settings(),
+            )
+            if score_floor is not None:
+                checks.append(score_floor)
         by_id = {c.id: c for c in checks}
         diagnosis.graphs.append(
             GraphDiagnosis(

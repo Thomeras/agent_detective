@@ -28,6 +28,7 @@ from .analyze import AnalysisRun, analyze, local_settings
 from .bundle import TraceFormatError, bundles_from_exports, load_trace
 from .capture import Capture, serve
 from .doctor import diagnose, render_doctor_json, render_doctor_terminal, unreadable_diagnosis
+from .judge import select_judge
 from .render import (
     color_enabled,
     render_json,
@@ -319,7 +320,16 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             str(args.trace), f"{args.trace} is not UTF-8 text (binary, e.g. protobuf)"
         )
     else:
-        diagnosis = diagnose(exports, str(args.trace), a2a_detection=args.a2a)
+        settings = local_settings()
+        judge = select_judge(settings)
+        diagnosis = diagnose(
+            exports,
+            str(args.trace),
+            a2a_detection=args.a2a,
+            judge_available=judge.enabled,
+            judge_detail=judge.description,
+            settings=settings,
+        )
 
     if args.json:
         print(json.dumps(render_doctor_json(diagnosis), indent=2, ensure_ascii=False))
