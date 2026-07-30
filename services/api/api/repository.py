@@ -20,6 +20,7 @@ from .models import (
     execution_graphs,
     ground_truth_labels,
     incidents,
+    output_contracts,
     policy_decisions,
     tier1_verdicts,
 )
@@ -49,6 +50,11 @@ class Repository(Protocol):
     async def calibration_rows(self) -> list[Row]: ...
     async def list_breakers(self) -> list[Row]: ...
     async def list_ledger_rows(self) -> list[Row]: ...
+    async def list_output_contracts(self) -> list[Row]: ...
+    async def replace_output_contract(
+        self, agent_name: str, agent_version_pattern: str, json_schema: dict[str, Any]
+    ) -> Row: ...
+    async def list_agent_outputs(self, agent_name: str, limit: int) -> list[Row]: ...
 
 
 class SqlRepository:
@@ -56,8 +62,21 @@ class SqlRepository:
         self._session_factory = session_factory
 
     async def list_graphs(self, limit: int, offset: int) -> list[Row]:
+        # total_cost_usd is SUM(cost_usd), and SQL SUM skips NULLs — so a graph
+        # whose runs were never priced reports a total indistinguishable from a
+        # complete one. The count of priced runs travels with it.
+        priced_runs = (
+            sa.select(sa.func.count())
+            .select_from(agent_runs)
+            .where(
+                agent_runs.c.graph_id == execution_graphs.c.graph_id,
+                agent_runs.c.cost_usd.isnot(None),
+            )
+            .scalar_subquery()
+            .label("priced_run_count")
+        )
         stmt = (
-            sa.select(execution_graphs)
+            sa.select(execution_graphs, priced_runs)
             .order_by(sa.nullslast(execution_graphs.c.started_at.desc()), execution_graphs.c.graph_id)
             .limit(limit)
             .offset(offset)
@@ -114,6 +133,10 @@ class SqlRepository:
                 blame_reports.c.culprit_run_ids,
                 blame_reports.c.confidence,
                 blame_reports.c.downstream_cost_usd,
+                # The inbox SUMS these costs; without coverage it would add up
+                # lower bounds and print one confident total.
+                blame_reports.c.cost_coverage,
+                blame_reports.c.judge_model,
             )
             .select_from(
                 incidents.outerjoin(
@@ -167,12 +190,18 @@ class SqlRepository:
         # puts those last so a real spender always outranks an unmeasured one.
         total_cost = sa.func.sum(agent_runs.c.cost_usd).label("total_cost_usd")
         run_count = sa.func.count().label("run_count")
+        # COUNT(column) skips NULLs, which is exactly the denominator the total
+        # needs: without it an unpriced run reads as a free one.
+        priced_run_count = sa.func.count(agent_runs.c.cost_usd).label("priced_run_count")
         failure_rate = (
             sa.cast(sa.func.count().filter(agent_runs.c.status == "failed"), sa.Float) / sa.func.count()
         ).label("failure_rate")
         avg_score = sa.func.avg(agent_runs.c.quality_score).label("avg_quality_score")
         stmt = (
-            sa.select(agent_runs.c.agent_name, total_cost, run_count, failure_rate, avg_score)
+            sa.select(
+                agent_runs.c.agent_name, total_cost, run_count, priced_run_count,
+                failure_rate, avg_score,
+            )
             .group_by(agent_runs.c.agent_name)
             .order_by(total_cost.desc().nullslast(), agent_runs.c.agent_name)
         )
@@ -184,6 +213,9 @@ class SqlRepository:
         """Leaderboard grouped by the full version identity tuple (roadmap 2.1)."""
         total_cost = sa.func.sum(agent_runs.c.cost_usd).label("total_cost_usd")
         run_count = sa.func.count().label("run_count")
+        # COUNT(column) skips NULLs, which is exactly the denominator the total
+        # needs: without it an unpriced run reads as a free one.
+        priced_run_count = sa.func.count(agent_runs.c.cost_usd).label("priced_run_count")
         failure_rate = (
             sa.cast(sa.func.count().filter(agent_runs.c.status == "failed"), sa.Float) / sa.func.count()
         ).label("failure_rate")
@@ -195,7 +227,7 @@ class SqlRepository:
             agent_runs.c.prompt_hash,
         ]
         stmt = (
-            sa.select(*identity, total_cost, run_count, failure_rate, avg_score)
+            sa.select(*identity, total_cost, run_count, priced_run_count, failure_rate, avg_score)
             .group_by(*identity)
             .order_by(total_cost.desc().nullslast(), *identity)
         )
@@ -331,6 +363,55 @@ class SqlRepository:
     async def list_ledger_rows(self) -> list[Row]:
         # The whole chain, in insertion (id) order — verification walks it start to target.
         stmt = sa.select(evidence_ledger).order_by(evidence_ledger.c.id)
+        async with self._session_factory() as session:
+            result = await session.execute(stmt)
+            return [row._mapping for row in result]
+
+    async def list_output_contracts(self) -> list[Row]:
+        stmt = sa.select(output_contracts).order_by(
+            output_contracts.c.agent_name, output_contracts.c.agent_version_pattern
+        )
+        async with self._session_factory() as session:
+            result = await session.execute(stmt)
+            return [row._mapping for row in result]
+
+    async def replace_output_contract(
+        self, agent_name: str, agent_version_pattern: str, json_schema: dict[str, Any]
+    ) -> Row:
+        """Delete-then-insert: scoring picks the FIRST matching contract, so a
+        second row for the same (name, pattern) would silently shadow this one."""
+        delete_stmt = sa.delete(output_contracts).where(
+            output_contracts.c.agent_name == agent_name,
+            output_contracts.c.agent_version_pattern == agent_version_pattern,
+        )
+        insert_stmt = (
+            sa.insert(output_contracts)
+            .values(
+                agent_name=agent_name,
+                agent_version_pattern=agent_version_pattern,
+                json_schema=json_schema,
+            )
+            .returning(output_contracts)
+        )
+        async with self._session_factory() as session:
+            replaced = (await session.execute(delete_stmt)).rowcount
+            row = (await session.execute(insert_stmt)).first()
+            await session.commit()
+            return dict(row._mapping) | {"replaced": int(replaced or 0)}
+
+    async def list_agent_outputs(self, agent_name: str, limit: int) -> list[Row]:
+        """Output payload handles for schema inference — newest runs first."""
+        stmt = (
+            sa.select(
+                agent_runs.c.run_id,
+                agent_runs.c.status,
+                agent_runs.c.output_inline,
+                agent_runs.c.output_overflow_ref,
+            )
+            .where(agent_runs.c.agent_name == agent_name)
+            .order_by(sa.nullslast(agent_runs.c.started_at.desc()), agent_runs.c.run_id)
+            .limit(limit)
+        )
         async with self._session_factory() as session:
             result = await session.execute(stmt)
             return [row._mapping for row in result]

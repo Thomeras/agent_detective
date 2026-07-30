@@ -91,6 +91,11 @@ agent_runs = Table(
     Column("output_bytes", Integer),
     Column("quality_score", REAL),
     Column("score_components", JSONB),
+    # What actually produced the number (migration 0014): the weights AFTER
+    # renormalization, and the model behind the judge component. Without them a
+    # single-channel score is indistinguishable from a three-channel one.
+    Column("score_weights", JSONB),
+    Column("judge_model", Text),
     Column("unscored_reason", Text),
     Column("input_flawed", Boolean),
     Column("cost_usd", Numeric),
@@ -115,6 +120,9 @@ agent_runs = Table(
     # thing that lets the loop check count rounds instead of cycle size.
     Column("attempt", Integer),
     Column("attempt_of", Text),
+    # Declared by the trace (migration 0015): a deterministic step skips the
+    # judge instead of being graded against an agent rubric it never ran under.
+    Column("node_kind", Text),
 )
 
 edges = Table(
@@ -144,9 +152,10 @@ tier1_verdicts = Table(
     # Fingerprint of the rule set the deterministic verdict basis ran under
     # (migration 0008) — reconciliation provenance.
     Column("check_rules_hash", Text),
-    # Worker judge-prompt fingerprint (migration 0009) — calibration slicing.
-    # The judge MODEL is not recorded, a known limitation.
+    # Worker judge-prompt fingerprint (migration 0009) and the judge model
+    # (0014) — together they are the calibration slice key.
     Column("judge_prompt_hash", Text),
+    Column("judge_model", Text),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
     Column("updated_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
@@ -192,8 +201,13 @@ blame_reports = Table(
     Column("downstream_cost_usd", Numeric),
     Column("unscored_run_ids", ARRAY(Uuid)),
     Column("evidence", JSONB),
-    # Worker judge-prompt fingerprint (migration 0009).
+    # Worker judge-prompt fingerprint (migration 0009) + judge model (0014):
+    # a report that cannot name its instrument is not reproducible.
     Column("judge_prompt_hash", Text),
+    Column("judge_model", Text),
+    # {"priced": n, "total": m} behind downstream_cost_usd (migration 0014) —
+    # a total summed over 6 of 28 runs is a lower bound, not the price.
+    Column("cost_coverage", JSONB),
     Column("created_at", DateTime(timezone=True), server_default=func.now(), nullable=False),
 )
 
@@ -336,6 +350,7 @@ class PgRepo:
                 contract_params=r.contract_params,
                 attempt=r.attempt,
                 attempt_of=r.attempt_of,
+                node_kind=r.node_kind,
             )
             for r in run_rows
         ]
@@ -572,6 +587,8 @@ class PgRepo:
                     .values(
                         quality_score=row.quality_score,
                         score_components=row.score_components,
+                        score_weights=row.score_weights,
+                        judge_model=row.judge_model,
                         unscored_reason=row.unscored_reason,
                         input_flawed=row.input_flawed,
                     )
@@ -651,6 +668,8 @@ class PgRepo:
                                 unscored_run_ids=blame.unscored_run_ids,
                                 evidence=blame.evidence,
                                 judge_prompt_hash=blame.judge_prompt_hash,
+                                judge_model=blame.judge_model,
+                                cost_coverage=blame.cost_coverage,
                             )
                             .returning(blame_reports.c.id)
                         )

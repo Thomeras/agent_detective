@@ -26,6 +26,85 @@ export function formatScore(value: number | null | undefined): string {
   return value.toFixed(2);
 }
 
+// The full quality-score channel set (services/worker scoring weights). Coverage
+// is counted against THIS set, so a blend fed by one channel can never present
+// itself as a three-channel composite.
+export const SCORE_CHANNELS = ["schema", "judge", "heuristics"] as const;
+
+export interface ChannelCoverage {
+  reported: number;
+  total: number;
+}
+
+export function channelCoverage(
+  components: Record<string, number | null> | null | undefined,
+): ChannelCoverage {
+  // An unrecognised channel widens the denominator rather than being dropped.
+  const channels = new Set<string>(SCORE_CHANNELS);
+  Object.keys(components ?? {}).forEach((key) => channels.add(key));
+  const reported = Object.values(components ?? {}).filter(
+    (v) => v !== null && v !== undefined,
+  ).length;
+  return { reported, total: channels.size };
+}
+
+// The EFFECTIVE weights (post-renormalization) as recorded. Never derived from
+// nominal weights — this client does not know them, and guessing would invent
+// provenance.
+export function formatWeights(
+  weights: Record<string, number> | null | undefined,
+): string | null {
+  if (!weights) return null;
+  const entries = Object.entries(weights).filter(([, w]) => Number.isFinite(w));
+  if (entries.length === 0) return null;
+  return entries
+    .sort((a, b) => b[1] - a[1])
+    .map(([channel, w]) => `${channel} ${Math.round(w * 100)}%`)
+    .join(" · ");
+}
+
+// A cost names the coverage it was summed over: anything short of full coverage
+// is a lower bound, because an unpriced run is unknown spend, not free.
+export function formatCoverage(
+  coverage: { priced: number; total: number } | null | undefined,
+): string | null {
+  if (!coverage || !Number.isFinite(coverage.total) || coverage.total <= 0) return null;
+  const bound = coverage.priced < coverage.total ? " · lower bound" : "";
+  return `${coverage.priced}/${coverage.total} runs${bound}`;
+}
+
+// Sum a set of rows whose costs may be unmeasured. Returns the total AND what
+// it covers, because `?? 0` on an unpriced row silently asserts it was free.
+export function sumWithCoverage(
+  rows: { cost: number | null | undefined; priced?: number | null; total?: number | null }[],
+): { total: number | null; coverage: { priced: number; total: number } } {
+  let sum = 0;
+  let seen = false;
+  let priced = 0;
+  let runs = 0;
+  for (const row of rows) {
+    if (typeof row.cost === "number" && Number.isFinite(row.cost)) {
+      sum += row.cost;
+      seen = true;
+    }
+    // Row-level run coverage when the API knows it; otherwise the row itself
+    // is the unit and it counts as priced only if it carried a cost.
+    if (typeof row.total === "number" && row.total > 0) {
+      runs += row.total;
+      priced += typeof row.priced === "number" ? row.priced : 0;
+    } else {
+      runs += 1;
+      priced += typeof row.cost === "number" ? 1 : 0;
+    }
+  }
+  return { total: seen ? sum : null, coverage: { priced, total: runs } };
+}
+
+// One wording for a missing instrument, everywhere — never imply a model.
+export function judgeLabel(model: string | null | undefined): string {
+  return model && model.trim() ? model.trim() : "judge not recorded";
+}
+
 export function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined) return "-";
   return `${(value * 100).toFixed(1)}%`;

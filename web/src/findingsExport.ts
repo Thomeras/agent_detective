@@ -3,6 +3,8 @@
 // fact propagation and loop info — everything needed to locate and fix the bug.
 
 import type { GraphDetail, ReportDetail, RunNodeData } from "./api/types";
+import { channelCoverage, judgeLabel } from "./format";
+import { explainUnscored } from "./nodeReasons";
 
 function fmtScore(s: number | null | undefined): string {
   return s === null || s === undefined ? "unknown" : s.toFixed(2);
@@ -97,9 +99,15 @@ export function buildFindingsMarkdown(
 
   // --- Per-node quality ---
   L.push(`## Node quality`);
-  L.push(`_Score is the blended composite (schema + judge + heuristics), not any single component._`);
-  L.push(`| Agent | Composite score | Drop | Status | Tokens in/out | Cost |`);
-  L.push(`|---|---|---|---|---|---|`);
+  // The blend covers only the channels that reported; an absent channel handed
+  // its weight to the rest, so "schema + judge + heuristics" was a claim the
+  // number often could not support. Coverage is printed per node instead.
+  L.push(
+    `_Score is the weighted blend of the channels that REPORTED for that node ` +
+      `(of schema / judge / heuristics), renormalized over them — the Channels column says how many did._`,
+  );
+  L.push(`| Agent | Composite score | Channels | Drop | Status | Tokens in/out | Cost |`);
+  L.push(`|---|---|---|---|---|---|---|`);
   const rows = [...graph.nodes].sort(
     (a, b) => (a.data.quality_score ?? 2) - (b.data.quality_score ?? 2),
   );
@@ -109,12 +117,17 @@ export function buildFindingsMarkdown(
     const cost = d.cost_usd != null ? "$" + d.cost_usd.toFixed(4) : "";
     const tok = `${d.tokens_in ?? "-"}/${d.tokens_out ?? "-"}`;
     // An unscored node prints its reason, never a number it does not have.
+    // A deliberately withheld number is not a gap for the reader to go fix.
+    const unscored = explainUnscored(d.unscored_reason);
     const score =
-      d.quality_score == null && d.unscored_reason
-        ? `unscored (${d.unscored_reason})`
+      d.quality_score == null && unscored
+        ? `${unscored.deliberate ? "not scored by design" : "unscored"} (${d.unscored_reason})`
         : fmtScore(d.quality_score);
+    // An unscored node blended nothing, so it has no coverage to report.
+    const cov = channelCoverage(d.score_components);
+    const channels = d.quality_score == null ? "-" : `${cov.reported}/${cov.total}`;
     L.push(
-      `| \`${d.agent_name ?? "-"}\` | ${score} | ${drop} | ${d.status} | ${tok} | ${cost} |`,
+      `| \`${d.agent_name ?? "-"}\` | ${score} | ${channels} | ${drop} | ${d.status} | ${tok} | ${cost} |`,
     );
   }
   L.push("");
@@ -142,6 +155,17 @@ export function buildFindingsMarkdown(
   const noteEntries = Object.entries(notes);
   if (noteEntries.length) {
     L.push(`## Judge findings (what is wrong)`);
+    // A judged number that cannot name its instrument is not reproducible; the
+    // per-node model wins over the report's when they were recorded separately.
+    const nodeJudges = Array.from(
+      new Set(
+        noteEntries
+          .map(([id]) => dataById.get(id)?.judge_model)
+          .filter((m): m is string => Boolean(m)),
+      ),
+    );
+    const instrument = nodeJudges.length ? nodeJudges.join(", ") : report?.judge_model;
+    L.push(`_Judged by: ${judgeLabel(instrument)}._`);
     for (const [id, note] of noteEntries) {
       L.push(`- **${nameOf(id)}** (${judgeScoreOf(id)}): ${note}`);
     }

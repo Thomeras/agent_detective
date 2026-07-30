@@ -21,6 +21,10 @@ async def test_list_incidents(client, ids):
         "culprit_run_ids": [str(ids.RUN_A)],
         "confidence": pytest.approx(0.87),
         "downstream_cost_usd": pytest.approx(0.31),
+        # The inbox sums these costs, so the coverage behind each one and the
+        # judge that produced the scores travel with the summary.
+        "cost_coverage": None,
+        "judge_model": None,
     }
 
 

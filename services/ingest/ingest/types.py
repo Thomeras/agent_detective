@@ -116,6 +116,13 @@ class RunRow:
     tokens_out: int | None
     started_at: datetime | None
     ended_at: datetime | None
+    # agent_detective.node_kind: how the node works, declared by the caller
+    # ("deterministic", "tool", ...). Role is otherwise inferred from the agent
+    # NAME, which cannot carry it — a plan_node making no model call gets a
+    # planner rubric and is scored for prose it never produced. NULL means
+    # undeclared, never "llm". Appended with a default so existing positional
+    # construction stays valid.
+    node_kind: str | None = None
 
 
 @dataclass(frozen=True)

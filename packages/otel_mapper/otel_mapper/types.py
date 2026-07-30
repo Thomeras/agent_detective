@@ -63,6 +63,14 @@ class AgentRunCandidate:
     start_time: datetime | None
     end_time: datetime | None
     status: str  # "ok" | "failed"; "degraded" is a downstream quality judgement
+    # Declared node kind, from ``agent_detective.node_kind`` on the opening
+    # span. Role is otherwise inferred from the agent NAME, so a `plan_node`
+    # that makes no model call is judged against a planner rubric for prose it
+    # never produced. Free string — "deterministic" and "tool" are the ones
+    # acted on downstream, and an unknown value from a newer SDK is carried
+    # through rather than rejected. None means UNDECLARED, not "llm".
+    # Appended with a default so existing positional construction stays valid.
+    node_kind: str | None = None
 
 
 @dataclass(frozen=True)

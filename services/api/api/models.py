@@ -51,6 +51,11 @@ agent_runs = sa.Table(
     sa.Column("output_summary", sa.Text()),
     sa.Column("quality_score", sa.REAL()),
     sa.Column("score_components", postgresql.JSONB()),
+    # What produced the number (0014) and what the trace declared the node to
+    # be (0015) — a score has to be able to name its instrument.
+    sa.Column("score_weights", postgresql.JSONB()),
+    sa.Column("judge_model", sa.Text()),
+    sa.Column("node_kind", sa.Text()),
     sa.Column("unscored_reason", sa.Text()),
     sa.Column("input_flawed", sa.Boolean()),
     sa.Column("cost_usd", sa.Numeric()),
@@ -58,6 +63,16 @@ agent_runs = sa.Table(
     sa.Column("tokens_out", sa.Integer()),
     sa.Column("started_at", sa.DateTime(timezone=True)),
     sa.Column("ended_at", sa.DateTime(timezone=True)),
+)
+
+output_contracts = sa.Table(
+    "output_contracts",
+    metadata,
+    sa.Column("id", sa.BigInteger(), primary_key=True, autoincrement=True),
+    sa.Column("agent_name", sa.Text()),
+    sa.Column("agent_version_pattern", sa.Text()),
+    sa.Column("json_schema", postgresql.JSONB()),
+    sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 
 edges = sa.Table(
@@ -111,9 +126,13 @@ blame_reports = sa.Table(
     sa.Column("propagation_path", postgresql.ARRAY(sa.Uuid())),
     sa.Column("confidence", sa.REAL()),
     sa.Column("downstream_cost_usd", sa.Numeric()),
+    # Coverage behind the cost (0014): a total over 6 of 28 priced runs is a
+    # lower bound, so it travels with the number it qualifies.
+    sa.Column("cost_coverage", postgresql.JSONB()),
     sa.Column("unscored_run_ids", postgresql.ARRAY(sa.Uuid())),
     sa.Column("evidence", postgresql.JSONB()),
     sa.Column("judge_prompt_hash", sa.Text()),
+    sa.Column("judge_model", sa.Text()),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 

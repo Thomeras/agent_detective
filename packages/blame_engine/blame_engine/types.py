@@ -15,7 +15,7 @@ class NodeScore:
     score: float | None                    # None = UNKNOWN, never defaults to 1.0
     components: dict[str, float | None]    # {"schema": .., "judge": .., "heuristics": ..}
     input_flawed: bool | None              # judge verdict: was the node's INPUT already flawed?
-    unscored_reason: str | None            # "judge_error" | "payload_missing" | "empty_output" | "zero_result_set" | "insufficient_components"
+    unscored_reason: str | None            # "judge_error" | "payload_missing" | "empty_output" | "zero_result_set" | "insufficient_components" | "judge_skipped_deterministic_node" | "judge_budget_exhausted"
     judge_note: str | None
     # Structured judge/heuristic flags ("missing_required_content",
     # "unverifiable_artifact", ...). They cap the judge component deterministically
@@ -34,6 +34,16 @@ class NodeScore:
     # artifact_integrity_fail from the [artifact_meta] block); the engine only
     # carries them into Evidence — provenance stays with the check, never the LLM.
     deterministic_signals: tuple[dict, ...] = ()
+    # The weights actually used to blend ``components`` into ``score``, AFTER
+    # renormalization over the channels that reported. A missing channel silently
+    # redistributed its weight (schema absent -> judge 0.40 becomes 0.727), so a
+    # single-channel score wore three-channel clothes and nothing in the report
+    # said so. None when no blend happened (unscored node).
+    effective_weights: dict[str, float] | None = None
+    # Which model produced ``components["judge"]``. A forensic number that cannot
+    # name its instrument is not reproducible: 0.4 from a cheap model and 0.4
+    # from a frontier one were indistinguishable in the database.
+    judge_model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -95,6 +105,20 @@ class BlameConfig:
     unknown_confidence_cap: float = 0.6
     scc_confidence_penalty: float = 0.8
     multi_culprit_penalty: float = 0.8
+    # A channel that never reported must not hand its authority to the ones that
+    # did. Fewer channels is less evidence, so it discounts attribution instead
+    # of letting the surviving channel speak louder than it earned.
+    single_channel_penalty: float = 0.75
+    # In a chain-shaped graph (one path, no branching) topology has no
+    # discriminating power: every interior node is an articulation point, so
+    # "this node is the cut point" rests on ordering, not structure. This is the
+    # FULL penalty, reached only once the chain is long enough to say nothing
+    # at all; short chains are discounted proportionally (see confidence.py).
+    chain_confidence_penalty: float = 0.8
+    # Interior length at which a chain's shape carries no information whatever.
+    # A 3-step pipeline still narrows the field to one interior node; an 18-step
+    # one narrows it to seventeen, which is not narrowing.
+    chain_full_penalty_depth: int = 18
 
 
 @dataclass(frozen=True)
@@ -223,10 +247,15 @@ class Evidence:                             # worker serializes to JSONB
     # way: {"name", "run_id", "agent", "severity", "detail", "basis",
     # "provenance": "deterministic"}.
     deterministic_signals: list[dict] = field(default_factory=list)
-    # Advisory topology classification (blame_engine.topology.classify_topology):
-    # structural attributes + "primary" archetype. Presentational only — it
-    # never drives verdicts, confidence, culprits or candidacy.
+    # Topology classification (blame_engine.topology.classify_topology):
+    # structural attributes + "primary" archetype. It never picks culprits, but
+    # a shape that cannot discriminate between them does discount attribution
+    # confidence — see BlameConfig.chain_confidence_penalty.
     topology: dict = field(default_factory=dict)
+    # Coverage behind ``downstream_cost_usd``: {"priced": n, "total": m}. A total
+    # summed over 6 of 28 runs is a lower bound, and printing it bare reads as
+    # the price of the run. Empty when nothing downstream was priced at all.
+    cost_coverage: dict = field(default_factory=dict)
     # --- Schema-2 typed layers (verdict refactor §2.5, dual-write) ----------
     # ``schema`` gates the renderer: legacy (schema 1) reports keep rendering
     # through the old path; schema-2 reports carry the typed streams below

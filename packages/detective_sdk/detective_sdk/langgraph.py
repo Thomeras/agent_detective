@@ -57,6 +57,13 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
     that node resolved to a priced model with full token counts — a partial
     sum reads as the whole, so anything less stays unknown (``null``), never
     ``$0``.
+
+    ``node_kinds`` declares how named nodes work (``{"plan_node":
+    "deterministic"}``) — the adapter opens the spans, so a LangGraph
+    integrator has no ``r.step(node_kind=...)`` call site of their own. These
+    are the caller's declarations keyed by node name, NOT an inference from how
+    the name is spelled: guessing a role from the name is the bug this exists
+    to fix.
     """
 
     def __init__(
@@ -65,6 +72,8 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
         *,
         run: Optional[Run] = None,
         pricing: "Optional[dict[str, tuple[float, float]]]" = None,
+        node_kinds: "Optional[dict[str, str]]" = None,
+        detect_deterministic: bool = False,
         **run_kwargs: Any,
     ) -> None:
         if BaseCallbackHandler is object:
@@ -80,11 +89,23 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
         # 1M tokens. Optional by design — without it token counts are still
         # recorded and the node's cost stays honestly unknown, never $0.
         self._pricing = pricing or {}
+        # Node name -> declared kind, from the integrator. Applied when the
+        # span opens; always beats anything `detect_deterministic` concluded.
+        self._node_kinds = dict(node_kinds or {})
+        # OPT-IN, and off by default on purpose. What this handler can observe
+        # is "no LLM/chat callback fired inside that node" — which is NOT the
+        # same claim as "that node made no model call". A node that calls a
+        # provider SDK directly, or runs a model in a thread the config never
+        # reached, fires nothing here and would be labelled deterministic while
+        # producing prose. Switch it on when every model call in the graph goes
+        # through LangChain; that precondition is the integrator's to assert.
+        self._detect_deterministic = bool(detect_deterministic)
         self._graph_run_id: Any = None
         self._open: dict[Any, Span] = {}  # callback run_id -> the span it opened
         self._arms: list[Span] = []       # fan-out arms not yet merged by a join
         self._parents: dict[Any, Any] = {}  # nested run_id -> parent run_id
         self._usage: dict[Any, list] = {}  # node run_id -> [(tokens_in, tokens_out, model)]
+        self._llm_nodes: set[Any] = set()  # node run_ids an LLM/chat call ran inside
         self._lock = threading.Lock()
 
     @property
@@ -127,7 +148,38 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
         except Exception:  # noqa: BLE001
             logger.warning("detective_sdk.langgraph: chain error skipped", exc_info=True)
 
-    # -- llm callbacks (usage capture) ---------------------------------------- #
+    # -- llm callbacks (usage capture, model-call evidence) ------------------- #
+
+    def on_llm_start(
+        self,
+        serialized: Any,
+        prompts: Any,
+        *,
+        run_id: Any = None,
+        parent_run_id: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        try:
+            self._note_model_call(parent_run_id)
+        except Exception:  # noqa: BLE001 - never raise into the running graph
+            logger.warning("detective_sdk.langgraph: llm start skipped", exc_info=True)
+
+    def on_chat_model_start(
+        self,
+        serialized: dict,
+        messages: list,
+        *,
+        run_id: Any = None,
+        parent_run_id: Any = None,
+        **kwargs: Any,
+    ) -> None:
+        # Declared explicitly (not via *args, and not left unimplemented): the
+        # callback manager's fallback would otherwise re-route every chat call
+        # through on_llm_start behind a warning on each call.
+        try:
+            self._note_model_call(parent_run_id)
+        except Exception:  # noqa: BLE001
+            logger.warning("detective_sdk.langgraph: chat model start skipped", exc_info=True)
 
     def on_llm_end(
         self,
@@ -144,18 +196,34 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
 
     # -- internals ------------------------------------------------------------ #
 
+    def _owner(self, parent_run_id: Any) -> Any:
+        """The open node span's run_id an inner callback belongs to, else None.
+
+        A call may sit several nested runs below the node, so the parent chain
+        recorded in ``_parents`` is walked until an open node turns up. Caller
+        holds the lock.
+        """
+        owner = parent_run_id
+        while owner is not None and owner not in self._open:
+            owner = self._parents.get(owner)
+        return owner
+
+    def _note_model_call(self, parent_run_id: Any) -> None:
+        """Record that a model call started inside a node — positive evidence
+        only, which is why the absence of it is not proof of determinism."""
+        with self._lock:
+            owner = self._owner(parent_run_id)
+            if owner is not None:
+                self._llm_nodes.add(owner)
+
     def _capture_usage(self, response: Any, parent_run_id: Any) -> None:
         """Add one LLM call's usage to the node it ran inside.
 
-        The call may sit several nested runs below the node, so the parent
-        chain recorded in ``_parents`` is walked until an open node span turns
-        up. Calls outside any node (e.g. directly under the graph root) have
-        no step to charge and are skipped.
+        Calls outside any node (e.g. directly under the graph root) have no
+        step to charge and are skipped.
         """
         with self._lock:
-            owner = parent_run_id
-            while owner is not None and owner not in self._open:
-                owner = self._parents.get(owner)
+            owner = self._owner(parent_run_id)
             if owner is None:
                 return
             usage = _usage_of(response)
@@ -217,6 +285,7 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
                 self._arms = []
             else:
                 span = self._run.step(node, input=inputs)
+            span.node_kind(self._node_kinds.get(node))
             self._open[run_id] = span
 
     def _finish(self, run_id: Any, *, output: Any = None, error: Any = None) -> None:
@@ -224,8 +293,13 @@ class DetectiveLangGraphHandler(BaseCallbackHandler):  # type: ignore[valid-type
             span = self._open.pop(run_id, None)
             calls = self._usage.pop(run_id, None)
             self._parents.pop(run_id, None)
+            saw_model_call = run_id in self._llm_nodes
+            self._llm_nodes.discard(run_id)
+            declared = span is not None and span.name in self._node_kinds
         if span is None:
             return  # the graph root or a skipped nested run
+        if self._detect_deterministic and not saw_model_call and not declared:
+            span.node_kind("deterministic")
         if calls:
             self._apply_usage(span, calls)
         if error is not None:

@@ -1,6 +1,7 @@
 """Per-node scoring: renormalization floor, truncation, schema, heuristics."""
 
 import asyncio
+from dataclasses import replace
 
 import pytest
 
@@ -17,6 +18,7 @@ from worker.scoring import (
     score_node,
     truncate_for_judge,
 )
+from worker.judge_client import JudgeSpendExhausted
 from worker.types import FLAG_UNINSPECTED_MEDIA, AgentStat, OutputContract
 
 from conftest import FakeJudge, make_run
@@ -45,20 +47,22 @@ def _score(run, output, judge, contracts=None, baseline=None, min_weight=0.5,
 
 def test_composite_renormalizes_when_judge_none_but_weight_at_floor():
     # schema + heuristics = 0.35 + 0.15 = 0.50 == floor -> not below -> computed.
-    score, reason = composite_score(
+    blend = composite_score(
         {"schema": 1.0, "judge": None, "heuristics": 0.0}, WEIGHTS, 0.5
     )
-    assert reason is None
-    assert score == 0.7  # (0.35*1 + 0.15*0) / 0.50
+    assert blend.unscored_reason is None
+    assert blend.score == 0.7  # (0.35*1 + 0.15*0) / 0.50
+    assert blend.effective_weights == pytest.approx({"schema": 0.7, "heuristics": 0.3})
 
 
 def test_composite_unscored_when_remaining_weight_below_floor():
     # Only heuristics present (0.15) with judge None -> below floor -> None.
-    score, reason = composite_score(
+    blend = composite_score(
         {"schema": None, "judge": None, "heuristics": 0.2}, WEIGHTS, 0.5
     )
-    assert score is None
-    assert reason == "insufficient_components"
+    assert blend.score is None
+    assert blend.unscored_reason == "insufficient_components"
+    assert blend.effective_weights is None
 
 
 def test_score_node_unscored_when_judge_fails_and_only_a_schema_passes():
@@ -1095,3 +1099,66 @@ def test_flag_cap_now_survives_the_composite():
     assert result.components["heuristics"] is None
     assert result.score == pytest.approx(0.45)
     assert result.score < 0.5, "a capped node must land below the acceptance bar"
+
+
+# --- Score provenance, declared node kinds, spend cap (P1 / P4 / P7) --------
+
+
+def test_composite_reports_the_weights_it_actually_renormalized_to():
+    # The silent half of the old behaviour: with schema absent the judge's 0.40
+    # became 0.727 of the blend and nothing downstream could tell.
+    blend = composite_score(
+        {"schema": None, "judge": 0.7, "heuristics": 0.75}, WEIGHTS, 0.5
+    )
+    assert blend.effective_weights == pytest.approx(
+        {"judge": 0.4 / 0.55, "heuristics": 0.15 / 0.55}
+    )
+    assert sum(blend.effective_weights.values()) == pytest.approx(1.0)
+
+
+def test_full_channel_blend_reports_the_nominal_weights():
+    blend = composite_score({"schema": 1.0, "judge": 0.5, "heuristics": 0.5}, WEIGHTS, 0.5)
+    assert blend.effective_weights == pytest.approx(
+        {k: w / 0.9 for k, w in WEIGHTS.items()}
+    )
+
+
+def test_declared_deterministic_node_is_not_judged():
+    judge = FakeJudge(node_verdicts={"plan_node": {"task_score": 0.2}})
+    run = replace(make_run(1, "plan_node"), node_kind="deterministic")
+    result = _score(run, "a well formed output", judge)
+    assert result.components["judge"] is None
+    assert result.judge_note is None
+    assert result.judge_model is None
+
+
+def test_declared_deterministic_node_names_why_it_has_no_score():
+    # With no registered contract only heuristics remain, which is below the
+    # floor — correct, but "insufficient_components" would read as an accident.
+    run = replace(make_run(1, "plan_node"), node_kind="deterministic")
+    result = _score(run, "a well formed output", FakeJudge())
+    assert result.unscored_reason == "judge_skipped_deterministic_node"
+
+
+def test_undeclared_node_kind_is_judged_exactly_as_before():
+    judge = FakeJudge(node_verdicts={"writer": {"task_score": 0.9}})
+    result = _score(make_run(1, "writer"), "a well formed output", judge)
+    assert result.components["judge"] == pytest.approx(0.9)
+
+
+def test_judged_component_names_the_model_that_produced_it():
+    judge = FakeJudge(node_verdicts={"writer": {"task_score": 0.9}})
+    judge.model = "some/judge-model"
+    result = _score(make_run(1, "writer"), "a well formed output", judge)
+    assert result.judge_model == "some/judge-model"
+
+
+def test_exhausted_budget_is_not_reported_as_an_unreachable_judge():
+    # One is an operator's spending decision, the other is a fault to go fix.
+    class _Broke:
+        async def complete_json(self, prompt, system=None):
+            raise JudgeSpendExhausted("cap reached")
+
+    result = _score(make_run(1, "writer"), "a well formed output", _Broke())
+    assert result.unscored_reason == "judge_budget_exhausted"
+    assert result.components["judge"] is None

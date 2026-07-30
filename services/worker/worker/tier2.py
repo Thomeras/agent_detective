@@ -58,13 +58,19 @@ from .narrative import (
     signal,
 )
 from .graph_ops import build_blame_input, build_config, deliverable_run
-from .judge_client import NullJudge, JudgeClient, judge_json_with_retries
+from .judge_client import (
+    NullJudge,
+    JudgeClient,
+    judge_json_with_retries,
+    judge_spend_scope,
+)
 from .policy import (
     STREAM_CONTROL_SIGNALS,
     evaluate_policies,
     judge_prompts_fingerprint,
 )
 from .repository import Repo
+from .behavioral import zero_result_set_signals
 from .checks_content import required_section_signals, section_present
 from .signals import artifact_integrity_signals, check_rules_fingerprint
 from .scoring import (
@@ -644,6 +650,26 @@ class Tier2Processor:
         _deliverable = deliverable_run(bundle)
         _deliverable_id = _deliverable.run_id if _deliverable is not None else None
 
+        # Which peers came back well-formed but empty. Costs no model call (a
+        # pure text check), and it is the one thing the per-node judge provably
+        # cannot see: alone, a collector that found nothing looks negligent;
+        # beside four siblings that also found nothing, the source was dry.
+        _empty_peers = {
+            r.run_id
+            for r in bundle.runs
+            if zero_result_set_signals(payloads[r.run_id][1], payloads[r.run_id][0])
+        }
+
+        def _peer_facts(run: RunRecord) -> list[str]:
+            others = len(_empty_peers - {run.run_id})
+            if not others:
+                return []
+            total = len(bundle.runs) - 1
+            return [
+                f"{others} of {total} other node(s) in this run also produced a "
+                "well-formed output carrying no records."
+            ]
+
         async def _one(run: RunRecord, judge=None) -> NodeScore:
             input_text, output_text = payloads[run.run_id]
             template = (
@@ -666,6 +692,7 @@ class Tier2Processor:
                 check_rules=check_rules,
                 graph_type=bundle.graph_type,
                 is_deliverable_producer=(run.run_id == _deliverable_id),
+                peer_facts=_peer_facts(run),
             )
 
         if self._settings.judge_gate:
@@ -915,15 +942,20 @@ class Tier2Processor:
             check_rules = await self._repo.read_check_rules()
 
             semaphore = asyncio.Semaphore(self._settings.judge_concurrency)
-            scores, payloads = await self._score_graph(
-                bundle, baselines, contracts, semaphore, check_rules
-            )
+            # One ledger per analysis: the per-node fan-out inherits it, so the
+            # spend of this graph is one logged number and the cap binds here.
+            with judge_spend_scope(str(graph_id)):
+                scores, payloads = await self._score_graph(
+                    bundle, baselines, contracts, semaphore, check_rules
+                )
 
             node_scores = [
                 NodeScoreRow(
                     run_id=r.run_id,
                     quality_score=scores[str(r.run_id)].score,
                     score_components=scores[str(r.run_id)].components,
+                    score_weights=scores[str(r.run_id)].effective_weights,
+                    judge_model=scores[str(r.run_id)].judge_model,
                     unscored_reason=scores[str(r.run_id)].unscored_reason,
                     input_flawed=scores[str(r.run_id)].input_flawed,
                 )
@@ -1295,9 +1327,12 @@ class Tier2Processor:
                     downstream_cost_usd=report.downstream_cost_usd,
                     unscored_run_ids=[UUID(r) for r in report.unscored_run_ids],
                     evidence=evidence,
-                    # The worker's OWN judge-prompt fingerprint (migration
-                    # 0009); the judge MODEL is not recorded — known limitation.
+                    # The worker's OWN judge-prompt fingerprint (migration 0009)
+                    # and the model that answered them (0014). Both, or the
+                    # score cannot say what measured it.
                     judge_prompt_hash=judge_prompts_fingerprint(),
+                    judge_model=self._settings.judge_model,
+                    cost_coverage=report.evidence.cost_coverage or None,
                 )
 
             # Shadow policy gates (roadmap 2.2), evaluated post-blame — a

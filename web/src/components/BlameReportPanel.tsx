@@ -3,7 +3,14 @@
 // drops, judge reasoning, fact propagation, unscored nodes, downstream cost.
 
 import type { ReportDetail } from "../api/types";
-import { formatConfidence, formatCost, formatScore, shortId } from "../format";
+import {
+  formatConfidence,
+  formatCost,
+  formatCoverage,
+  formatScore,
+  judgeLabel,
+  shortId,
+} from "../format";
 import { scoreColor } from "../format";
 import { Panel, TypeBadge } from "./ui";
 
@@ -214,6 +221,8 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
   // Named reproducible checks with provenance "deterministic" (never the LLM
   // judge) — see docs/deterministic-signals.md for the signal contract.
   const deterministicSignals = evidence?.deterministic_signals ?? [];
+  // How many of the affected runs carried a price behind downstream_cost_usd.
+  const costCoverage = formatCoverage(report.cost_coverage);
   const topoOrder = evidence?.topo_order;
   const verifierIds = new Set(evidence?.verifier_run_ids ?? []);
   const nodeFlags = evidence?.node_flags ?? {};
@@ -439,6 +448,13 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
                   there is nothing to attribute, and "$0.00" reads as a claim. */}
               {culprits.length === 0 ? "—" : formatCost(report.downstream_cost_usd)}
             </span>
+            {/* A total summed over the runs that carried a price is a lower
+                bound; unpriced runs are unknown spend, not free. */}
+            {culprits.length > 0 && (
+              <span className="muted small">
+                {costCoverage ?? "cost coverage not recorded"}
+              </span>
+            )}
           </div>
         </div>
 
@@ -834,6 +850,9 @@ export default function BlameReportPanel({ report, labelFor, onSelectRun }: Blam
 
       {judgeEntries.length > 0 && (
         <Panel title="Judge reasoning">
+          {/* The prose and the judged numbers name their instrument, or say
+              plainly that it was never recorded. */}
+          <p className="muted small">judged by {judgeLabel(report.judge_model)}</p>
           <div className="judge-list">
             {judgeEntries.map(([runId, note]) => (
               <div key={runId} className="judge-item">

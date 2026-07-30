@@ -667,6 +667,44 @@ _NOTE_TEMPLATES: dict[str, Callable[[Mapping[str, Any]], str]] = {
         "content, not independent evidence of quality"
     ),
     "contract_vs_terminal": _contract_vs_terminal,
+    "single_channel": lambda d: (
+        f"single_channel: '{d['agent']}' was scored on {d['reported']} alone — "
+        f"{d['missing']} never reported. A channel that is absent hands its "
+        "weight to the ones that are (schema absent -> the judge's 0.40 becomes "
+        "0.727 of the blend), so the surviving channel spoke with an authority "
+        "it did not earn. Fewer channels is LESS evidence: attribution is "
+        f"discounted by {d['penalty']:.2f}"
+        + (
+            f" and, because naming ONE origin needs corroboration, capped at "
+            f"{d['cap']:.2f}"
+            if d.get("cap") is not None and d["cap"] < 1.0
+            else ""
+        )
+        + ". The verdict type is unchanged — the localisation still rests on a "
+        "measured drop, only less of one"
+    ),
+    "chain_topology": lambda d: (
+        f"chain_topology: the graph is an unbranched line of {d['depth']} steps, "
+        "so every interior node is an articulation point and the structure "
+        "cannot discriminate between them — 'the cut point is HERE' rests on "
+        f"execution ORDER. Attribution is discounted by {d['penalty']:.2f}; the "
+        "observation (this output is defective) is untouched, and the named "
+        "culprit is unchanged"
+    ),
+    "origin_tie": lambda d: (
+        f"origin_tie: {d['count']} nodes ({d['agents']}) carry IDENTICAL "
+        f"evidence (score {d['score']:.2f}) and '{d['named']}' is named by the "
+        "deterministic chronological tie-break, not by anything the evidence "
+        "prefers. The attribution is split across the whole set (see the "
+        "competing-origin hypotheses) instead of being claimed for one of them"
+    ),
+    "cost_coverage": lambda d: (
+        f"cost_coverage: the downstream cost total covers {d['priced']} of "
+        f"{d['total']} affected run(s); the other {d['total'] - d['priced']} "
+        "carry no price at all. The figure is therefore a LOWER BOUND, not the "
+        "price of the run — instrument gen_ai.usage.cost on every run to close "
+        "the gap (an unpriced run is unknown, never a measured $0)"
+    ),
     "attribution_capped": lambda d: (
         "attribution_capped: content_degradation — the origin sits at the "
         "observability boundary (no scored predecessor; the baseline is "
@@ -732,6 +770,34 @@ def render_attribution_basis(defect: str, data: Mapping[str, Any]) -> str:
             f"is assumed (capped at {data['cap']:.2f})"
         )
     return "measured drop from a scored predecessor"
+
+
+# --- Origin hypotheses: a tie stated as a tie ----------------------------
+#
+# Same vocabulary the worker uses for competing origins (Evidence.hypotheses,
+# weights summing to 1.0 with an explicit unresolved remainder). The engine
+# fills it for its own case: several origins whose evidence is IDENTICAL, where
+# only the deterministic tie-break separated them. Both writers stay independent
+# — the worker's stream-disagreement use is untouched.
+
+HYPOTHESIS_SCORE_TIE = "score_tie"
+HYPOTHESIS_UNRESOLVED = "unresolved"
+
+_HYPOTHESIS_TEMPLATES: dict[str, Callable[[Mapping[str, Any]], str]] = {
+    HYPOTHESIS_SCORE_TIE: lambda d: (
+        "tied on the evidence — same score and the same qualifying criterion as "
+        "every other origin in this set; only the chronological tie-break "
+        "separates them"
+    ),
+    HYPOTHESIS_UNRESOLVED: lambda d: (
+        "unresolved — the confidence the tied origins do not account for"
+    ),
+}
+
+
+def render_hypothesis_basis(code: str, params: Mapping[str, Any] | None = None) -> str:
+    template = _HYPOTHESIS_TEMPLATES.get(code)
+    return template(params or {}) if template is not None else code
 
 
 def render_score_override_reason() -> str:

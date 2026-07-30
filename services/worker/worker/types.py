@@ -91,6 +91,14 @@ class RunRecord:
     # agents — and the loop check ends up counting cycle SIZE instead of rounds.
     attempt: int | None = None
     attempt_of: str | None = None
+    # Declared node kind from ``agent_detective.node_kind`` (migration 0015):
+    # how the node works, said by the caller. Role is otherwise inferred from
+    # the agent NAME alone, so a plan_node making zero model calls is judged
+    # against a planner rubric for prose it never produced. Free text —
+    # "deterministic" and "tool" are the ones scoring acts on, and an unknown
+    # value from a newer SDK is carried, not rejected. None = UNDECLARED, which
+    # is not the same as "llm".
+    node_kind: str | None = None
 
 
 @dataclass(frozen=True)
@@ -197,6 +205,11 @@ class NodeScoreRow:
     score_components: dict[str, float | None]
     unscored_reason: str | None
     input_flawed: bool | None
+    # What produced the number (migration 0014): the weights AFTER
+    # renormalization, and the model behind the judge component. None on every
+    # unscored path — nothing was blended, so there is nothing to attribute.
+    score_weights: dict[str, float] | None = None
+    judge_model: str | None = None
 
 
 @dataclass(frozen=True)
@@ -226,8 +239,13 @@ class BlameDraft:
     downstream_cost_usd: float | None
     unscored_run_ids: list[UUID]
     evidence: dict[str, Any]
-    # Judge-prompt fingerprint the blame analysis ran under (migration 0009).
+    # Judge-prompt fingerprint the blame analysis ran under (migration 0009)
+    # and the model that answered it (0014) — the calibration slice key.
     judge_prompt_hash: str | None = None
+    judge_model: str | None = None
+    # {"priced": n, "total": m} behind downstream_cost_usd: a total over 6 of 28
+    # priced runs is a lower bound, and bare it reads as the price of the run.
+    cost_coverage: dict[str, Any] | None = None
 
 
 @dataclass(frozen=True)

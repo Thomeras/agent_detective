@@ -40,6 +40,9 @@ export interface GraphSummary {
   ended_at: string | null;
   total_cost_usd: number | null;
   run_count: number | null;
+  // Runs that actually carried a price. total_cost_usd is a SQL SUM, which
+  // skips NULLs, so without this an unpriced run reads as a free one.
+  priced_run_count?: number | null;
 }
 
 export interface GraphListResponse {
@@ -63,6 +66,16 @@ export interface RunNodeData {
   status: RunStatus;
   quality_score: number | null;
   score_components: Record<string, number | null> | null;
+  // The weights ACTUALLY used to blend `score_components`, after renormalizing
+  // over the channels that reported (schema absent -> the judge's 0.40 becomes
+  // 0.727). Optional: rows written before migration 0014 carry no key at all,
+  // and absent must render as "not recorded" — never as the nominal weights,
+  // which this client does not know.
+  score_weights?: Record<string, number> | null;
+  // Which model produced `score_components.judge`. A forensic number that
+  // cannot name its instrument is not reproducible; absent means "judge not
+  // recorded", never a default model.
+  judge_model?: string | null;
   unscored_reason: string | null;
   input_flawed: boolean | null;
   cost_usd: number | null;
@@ -342,12 +355,23 @@ export interface Evidence {
   topology?: TopologyClassification | null;
 }
 
+// Coverage behind `downstream_cost_usd`: `priced` of `total` affected runs
+// carried a price. priced < total means the figure is a LOWER BOUND — the
+// unpriced runs are unknown spend, not free. Absent on older reports.
+export interface CostCoverage {
+  priced: number;
+  total: number;
+}
+
 // serializers.report_summary
 export interface ReportSummary {
   report_type: ReportType | null;
   culprit_run_ids: string[] | null;
   confidence: number | null;
   downstream_cost_usd: number | null;
+  cost_coverage?: CostCoverage | null;
+  // Which model judged this report's judged numbers (migration 0014).
+  judge_model?: string | null;
 }
 
 // serializers.report_detail
@@ -362,6 +386,8 @@ export interface ReportDetail {
   propagation_path: string[] | null;
   confidence: number | null;
   downstream_cost_usd: number | null;
+  cost_coverage?: CostCoverage | null;
+  judge_model?: string | null;
   unscored_run_ids: string[] | null;
   evidence: Evidence | null;
   created_at: string;
@@ -402,6 +428,7 @@ export interface LeaderboardAgent {
   agent_name: string | null;
   total_cost_usd: number | null;
   run_count: number | null;
+  priced_run_count?: number | null;
   failure_rate: number | null;
   avg_quality_score: number | null;
   // Present only with ?group_by=version — rows then group by all four identity
@@ -486,4 +513,56 @@ export interface BreakerRow {
 
 export interface BreakersResponse {
   breakers: BreakerRow[];
+}
+
+// --- Output contracts (GET/POST /contracts, GET /contracts/suggest) ---------
+// The deterministic schema channel. With none registered it is null on every
+// node, and the judge's weight silently renormalizes to cover the hole.
+
+export interface OutputContract {
+  id: number | null;
+  agent_name: string | null;
+  agent_version_pattern: string | null;
+  json_schema: Record<string, unknown> | null;
+  created_at: string | null;
+}
+
+export interface ContractsResponse {
+  contracts: OutputContract[];
+}
+
+export interface ContractBody {
+  agent_name: string;
+  agent_version_pattern?: string | null;
+  json_schema: Record<string, unknown>;
+}
+
+// One inferred key and the evidence behind it. `included` is false when the
+// samples disagreed on the type — the key is reported but left out of the
+// schema, because a wrong property type scores a good output 0.0.
+export interface SuggestedKey {
+  key: string;
+  present_in: number;
+  observed_types: string[];
+  required: boolean;
+  type: string | null;
+  included: boolean;
+  note: string | null;
+}
+
+export interface ContractSuggestion {
+  agent_name: string;
+  min_samples: number;
+  samples: {
+    runs_examined: number;
+    runs_with_output: number;
+    usable_samples: number;
+    failed_runs: number;
+  };
+  keys: SuggestedKey[];
+  // Null when the payloads did not support a contract; `reason` says what they
+  // failed to agree on. A permissive schema that passes everything is worse
+  // than none — it manufactures a 0.35-weight channel out of nothing.
+  contract: ContractBody | null;
+  reason: string | null;
 }

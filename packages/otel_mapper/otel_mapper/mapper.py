@@ -723,6 +723,7 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
     contract_params = _first_str(opener.attrs.get("agent_detective.contract_params"))
     attempt_of = _first_str(opener.attrs.get("agent_detective.attempt_of"))
     attempt = _num(opener.attrs.get("agent_detective.attempt"))
+    node_kind = _first_str(opener.attrs.get("agent_detective.node_kind"))
     prompt_hash = _first_str(
         opener.attrs.get("agent_detective.prompt_hash"),
         opener.resource_attrs.get("agent_detective.prompt_hash"),
@@ -760,6 +761,7 @@ def _build_run(acc: _RunAcc) -> AgentRunCandidate:
         # cannot be grouped, and a group with no ordinal cannot be counted.
         attempt=int(attempt) if attempt is not None and attempt_of else None,
         attempt_of=attempt_of if attempt is not None and attempt_of else None,
+        node_kind=node_kind,
         tokens_in=tokens_in if tokens_in is None else int(tokens_in),
         tokens_out=tokens_out if tokens_out is None else int(tokens_out),
         cost_usd=cost if cost is None else float(cost),

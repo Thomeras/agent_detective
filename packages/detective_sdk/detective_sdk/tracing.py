@@ -19,8 +19,8 @@ OpenTelemetry SDK in with it. The payload is a plain dict; `json` can build it.
 Four shapes, because topology changes the analysis:
 
     with run("intel", task="pre-call dossier for Alza.cz") as r:
-        with r.step("resolve") as s:        # PIPELINE: parent = previous step
-            s.output = company
+        with r.step("resolve", node_kind="deterministic") as s:  # PIPELINE:
+            s.output = company                       # parent = previous step
         with r.step("collect") as s:        # input defaults to resolve's output
             s.output = docs
             s.cost(usd=0.004, tokens_in=1200, tokens_out=340, model="gpt-4o")
@@ -113,6 +113,12 @@ _SERVICE_ENV = "AGENT_DETECTIVE_SERVICE_NAME"
 # reconstructs as three disconnected nodes. Measured, not assumed: see
 # tests/test_fanin_and_retry.py::TestRetryLoopReconstructs.
 ATTEMPT_SEPARATOR = "#"
+
+# Declared node kind (see `Span.node_kind`). Downstream infers a node's ROLE
+# from its agent name, so a `plan_node` that makes no model call at all is
+# still judged against a planner rubric — for prose it never produced. Only
+# the caller knows; this is where they say it.
+NODE_KIND_ATTRIBUTE = "agent_detective.node_kind"
 
 
 def _hex(nbytes: int) -> str:
@@ -340,6 +346,25 @@ class Span:
         )
         return self
 
+    def node_kind(self, kind: str | None) -> "Span":
+        """Declare HOW this step works, e.g. ``span.node_kind("deterministic")``.
+
+        Nothing in a trace distinguishes a node that reasons from one that runs
+        code, so role is inferred from the agent NAME — and a ``plan_node`` that
+        makes zero model calls then gets scored on the quality of a plan it
+        never wrote. The name cannot carry this and never could; only the
+        caller knows.
+
+        Free string, matched downstream: ``"deterministic"`` (code, no model
+        call) and ``"tool"`` are the ones that change how a node is judged.
+        Omitted stays UNDECLARED rather than defaulting to "llm" — an
+        unmeasured kind and a measured one must not read alike.
+        """
+        value = str(kind or "").strip()
+        if value:
+            self._attrs[NODE_KIND_ATTRIBUTE] = value
+        return self
+
     def version(self, *, agent: str | None = None, prompt_hash: str | None = None) -> "Span":
         """Version stamps, so scores stay comparable across prompt revisions."""
         if agent:
@@ -498,7 +523,7 @@ class Retry:
 
     # -- the loop body --------------------------------------------------------- #
 
-    def attempt(self, agent: str, *, input: Any = None) -> Span:
+    def attempt(self, agent: str, *, input: Any = None, node_kind: str | None = None) -> Span:
         """One pass at ``agent``, numbered: ``write#1``, ``write#2``, ...
 
         The first attempt hangs off the controller and starts from the loop's
@@ -519,6 +544,7 @@ class Retry:
         if input is None:
             input = previous.output if previous is not None else self.span._input
         span = Span(self._run, f"{agent}{ATTEMPT_SEPARATOR}{number}", parent, input=input)
+        span.node_kind(node_kind)
         # The numbered name is the node identity; these keep the fact that the
         # attempts belong to ONE agent, which the name alone no longer carries.
         # Nothing reads them today — they exist so a later baseline does not
@@ -671,12 +697,15 @@ class Run:
 
     # -- opening steps -------------------------------------------------------- #
 
-    def step(self, name: str, *, input: Any = None) -> Span:
+    def step(self, name: str, *, input: Any = None, node_kind: str | None = None) -> Span:
         """A step in a PIPELINE: its parent is the previous step.
 
         When ``input`` is omitted it defaults to the previous step's output —
         the handoff really did carry that value, and without it every node looks
         like it started from nothing, leaving blame nothing to compare.
+
+        ``node_kind="deterministic"`` says this step is code, not reasoning (see
+        :meth:`Span.node_kind`); omitted, the kind stays undeclared.
         """
         with self._lock:
             last = self._last_step
@@ -684,17 +713,19 @@ class Run:
             if input is None:
                 input = last.output if last is not None else self._task
             span = Span(self, name, parent, input=input)
+            span.node_kind(node_kind)
             self._track(span)
             self._last_step = span
         return span
 
-    def span(self, name: str, *, input: Any = None) -> Span:
+    def span(self, name: str, *, input: Any = None, node_kind: str | None = None) -> Span:
         """A NESTED step: its parent is the innermost span still open."""
         with self._lock:
             parent = self._open[-1].span_id if self._open else self._root_id
             if input is None:
                 input = self._open[-1]._input if self._open else self._task
             span = Span(self, name, parent, input=input)
+            span.node_kind(node_kind)
             self._track(span)
         return span
 
@@ -712,7 +743,14 @@ class Run:
                     return span
             return self._last_step
 
-    def branch(self, name: str, *, input: Any = None, of: Span | None = None) -> Span:
+    def branch(
+        self,
+        name: str,
+        *,
+        input: Any = None,
+        of: Span | None = None,
+        node_kind: str | None = None,
+    ) -> Span:
         """One arm of a FAN-OUT: parallel with its siblings, not chained to them.
 
         ``step`` would chain the arms into a false pipeline (arm 2 reading arm
@@ -746,11 +784,19 @@ class Run:
             if input is None and point is None:
                 input = self._task
             span = Span(self, name, parent, input=input)
+            span.node_kind(node_kind)
             span._parallel = True
             self._track(span)
         return span
 
-    def join(self, name: str, sources: "Iterable[Span | str]", *, input: Any = None) -> Span:
+    def join(
+        self,
+        name: str,
+        sources: "Iterable[Span | str]",
+        *,
+        input: Any = None,
+        node_kind: str | None = None,
+    ) -> Span:
         """The FAN-IN: one step that merges what several others produced.
 
         The shape span nesting cannot express. Each source contributes an edge
@@ -776,6 +822,7 @@ class Run:
             if input is None:
                 input = self._join_input(collected)
             span = Span(self, name, parent, input=input)
+            span.node_kind(node_kind)
             self._track(span)
             span.reads_from(*collected, tool="collect")
             # The pipeline resumes here: a following `step` continues from the
@@ -829,6 +876,7 @@ class Run:
         input: Any = None,
         of: Span | None = None,
         parallel: bool = False,
+        node_kind: str | None = None,
     ) -> "Retry":
         """A LOOP: repeated attempts at the same work, under one controller.
 
@@ -865,6 +913,10 @@ class Run:
             if input is None:
                 input = point.output if point is not None else self._task
             span = Span(self, name, parent, input=input)
+            # The controller, not the attempts: a `while` loop that dispatches
+            # model calls is itself deterministic, and each attempt declares
+            # its own kind through `Retry.attempt(node_kind=...)`.
+            span.node_kind(node_kind)
             span._parallel = parallel
             self._track(span)
             if not parallel:
@@ -1130,4 +1182,5 @@ __all__ = [
     "deliver",
     "MAX_PAYLOAD_CHARS",
     "ATTEMPT_SEPARATOR",
+    "NODE_KIND_ATTRIBUTE",
 ]

@@ -38,8 +38,10 @@ def test_unknown_between_healthy_and_bad(mk) -> None:
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["c"]
-    # All predecessors unknown -> base None -> drop None -> only severity term.
-    assert report.confidence == pytest.approx(0.3 * 0.4)
+    # All predecessors unknown -> base None -> drop None -> only severity term,
+    # then discounted for the chain shape: on an unbranched 3-step line the
+    # topology cannot say WHICH node it was (0.12 * 0.95).
+    assert report.confidence == pytest.approx(0.114)
     assert report.confidence <= 0.6
     assert report.unscored_run_ids == ["b"]
     assert report.evidence.unknown_ancestors == ["b"]
@@ -84,8 +86,10 @@ def test_structural_root_ancestor_does_not_cap_confidence(mk) -> None:
 
     assert report.report_type == "cut_point"
     assert report.culprit_run_ids == ["c"]
-    # NOT capped: raw 0.88 stands (gap=1.0, severity=0.6, pred=1.0).
-    assert report.confidence == pytest.approx(0.88)
+    # NOT capped by the unknown ancestor: raw 0.88 stands (gap=1.0,
+    # severity=0.6, pred=1.0). It is only discounted for the 4-step chain shape
+    # (0.88 * 0.9293) — a different reason, applied elsewhere.
+    assert report.confidence == pytest.approx(0.8178, abs=1e-4)
     # The structural root is excluded from the hidden-origin set.
     assert report.evidence.unknown_ancestors == []
 

@@ -312,6 +312,9 @@ def test_scenarios_cover_the_note_and_candidacy_tables(mk):
     covered_elsewhere = {
         "escalation", "multi_culprit", "loop_detected", "independent_origins",
         "terminal_defect_unlocalized", "attribution_capped", "no_scores",
+        # Discount and coverage notes: raised from the confidence and cost
+        # paths, not from any classification scenario.
+        "single_channel", "chain_topology", "origin_tie", "cost_coverage",
     }
     assert set(_NOTE_TEMPLATES) - seen_notes <= covered_elsewhere
 

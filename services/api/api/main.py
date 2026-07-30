@@ -10,7 +10,18 @@ from .config import Settings
 from .db import create_engine, create_session_factory
 from .payloads import MinioPayloadStore
 from .repository import SqlRepository
-from .routers import agents, audit, calibration, control, graphs, health, incidents
+from .routers import (
+    agents,
+    audit,
+    calibration,
+    contracts,
+    control,
+    graphs,
+    health,
+    incidents,
+    traces,
+)
+from .routers.traces import IngestProxy
 from .streams import RedisStreamPublisher
 
 
@@ -24,7 +35,10 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         app.state.payload_store = MinioPayloadStore(settings)
         publisher = RedisStreamPublisher(settings.redis_url)
         app.state.publisher = publisher
+        proxy = IngestProxy(settings)
+        app.state.ingest_proxy = proxy
         yield
+        await proxy.close()
         await publisher.close()
         await engine.dispose()
 
@@ -32,7 +46,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.state.settings = settings
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=[settings.web_origin],
+        allow_origins=[settings.web_origin, settings.web_origin2],
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],
@@ -43,7 +57,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     app.include_router(agents.router)
     app.include_router(calibration.router)
     app.include_router(control.router)
+    app.include_router(contracts.router)
     app.include_router(audit.router)
+    app.include_router(traces.router)
     return app
 
 

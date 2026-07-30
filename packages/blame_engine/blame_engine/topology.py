@@ -3,9 +3,15 @@
 ``classify_topology`` implements the frozen topology contract: a pure,
 deterministic description of the graph's SHAPE (pipeline, star, mesh, ...).
 The classification is presentational metadata for the UI and reports — it must
-NEVER change report_type, confidence, culprits or candidacy. The single
-behavioral use allowed is the ``disconnected`` instrumentation-quality note
-appended in blame.py (same family as payload_missing warnings).
+NEVER change report_type, culprits or candidacy. Two behavioral uses are
+allowed, both stated here so no third can be smuggled in:
+
+- ``disconnected`` — an instrumentation-quality note in blame.py (same family
+  as payload_missing warnings);
+- ``chain`` — discounts ATTRIBUTION confidence (never observation, never the
+  culprit): on an unbranched line every interior node is an articulation
+  point, so "the cut point is HERE" is a statement about ordering, and a
+  shape with no discriminating power may not be sold as one that has some.
 
 Tolerant by design: edges naming unknown nodes are ignored.
 """
@@ -93,8 +99,8 @@ def classify_topology(
 
     Returns a dict with the structural attributes (node_count, edge_count,
     components, max_fan_out, depth, scc_count, bidirectional_pairs,
-    articulation_points) plus "primary": the archetype decided by the frozen
-    first-match-wins order (disconnected > single_node > mesh >
+    articulation_points, chain) plus "primary": the archetype decided by the
+    frozen first-match-wins order (disconnected > single_node > mesh >
     pipeline_with_feedback > cyclic_graph > pipeline > star > hierarchy > dag).
     """
     g = _build(nodes, edges)
@@ -151,6 +157,15 @@ def classify_topology(
         else:
             primary = "dag"
 
+    # CHAIN — decided by the same table, from the same predicate: an unbranched
+    # line of 3+ steps through the condensation is exactly what "pipeline" and
+    # "pipeline_with_feedback" already mean (``_is_simple_path`` on ``cond``),
+    # and depth < 3 has no interior node for the shape to be silent about.
+    # It is a PROPERTY of those archetypes, not a rival of them: the frozen
+    # first-match-wins order above and every ``primary`` value it can return are
+    # untouched, so the contract's mirrors keep classifying identically.
+    chain = depth >= 3 and primary in ("pipeline", "pipeline_with_feedback")
+
     return {
         "node_count": n,
         "edge_count": e,
@@ -161,4 +176,7 @@ def classify_topology(
         "bidirectional_pairs": bidirectional_pairs,
         "articulation_points": articulation_points,
         "primary": primary,
+        # True when the shape cannot discriminate between nodes at all: blame
+        # then rests on ordering, and attribution says so (see module docstring).
+        "chain": chain,
     }

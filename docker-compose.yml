@@ -46,6 +46,17 @@ x-app-env: &app-env
   JUDGE_TIMEOUT_S: "${JUDGE_TIMEOUT_S:-30}"
   JUDGE_CONCURRENCY: "${JUDGE_CONCURRENCY:-4}"
   JUDGE_SEED: "${JUDGE_SEED:-}"
+  # Judge spend: uncapped and unpriced by default, so existing deployments are
+  # unchanged. Set the prices to make the cap enforceable on endpoints that do
+  # not price the call themselves (OpenRouter reports usage.cost and needs
+  # neither). At the cap the worker stops calling and the remaining nodes come
+  # back unjudged instead of the analysis failing.
+  JUDGE_MAX_SPEND_USD: "${JUDGE_MAX_SPEND_USD:-}"
+  JUDGE_PRICE_PROMPT_USD_PER_1K: "${JUDGE_PRICE_PROMPT_USD_PER_1K:-}"
+  JUDGE_PRICE_COMPLETION_USD_PER_1K: "${JUDGE_PRICE_COMPLETION_USD_PER_1K:-}"
+  # Trace intake lives in ingest; the API forwards POST /v1/traces here so a
+  # client pointed at the API port is not silently 404'd.
+  INGEST_BASE_URL: "${INGEST_BASE_URL:-http://ingest:8001}"
   SLACK_WEBHOOK_URL: "${SLACK_WEBHOOK_URL:-}"
 
 services:

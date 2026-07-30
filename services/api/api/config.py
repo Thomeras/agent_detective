@@ -17,6 +17,14 @@ class Settings(BaseSettings):
 
     api_port: int = 8000
     web_origin: str = "http://localhost:5173"
+    web_origin2: str = "http://127.0.0.1:5173"
+
+    # Trace intake lives in the ingest service, but "the API" is where a client
+    # told to use port 8000 will POST; the API forwards /v1/traces there rather
+    # than owning a second span-mapping implementation.
+    ingest_base_url: str = "http://ingest:8001"
+    # Generous: a large OTLP batch costs ClickHouse + Postgres writes upstream.
+    ingest_proxy_timeout_s: float = 60.0
 
     # HMAC key for evidence-ledger signature verification (env AUDIT_HMAC_KEY).
     # The default is deliberately insecure and MUST be overridden in production:

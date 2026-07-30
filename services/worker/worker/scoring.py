@@ -50,7 +50,12 @@ from .checks_content import (
     unit_inconsistency_signals,
 )
 from .checks_security import injection_signature_signals, sensitive_data_signals
-from .judge_client import JudgeClient, judge_json_with_retries
+from .judge_client import (
+    JudgeClient,
+    JudgeSpendExhausted,
+    PermanentJudgeError,
+    judge_json_with_retries,
+)
 from .signals import artifact_integrity_signals
 from .types import (
     FLAG_UNINSPECTED_MEDIA,
@@ -703,26 +708,135 @@ def evaluate_heuristics(
     return _clamp(score)
 
 
+@dataclass(frozen=True)
+class CompositeScore:
+    """The blend, plus the weights it was actually computed with.
+
+    ``effective_weights`` is None exactly when ``score`` is None: an unscored
+    node blended nothing, so there is no weighting to report.
+    """
+
+    score: float | None
+    unscored_reason: str | None
+    effective_weights: dict[str, float] | None = None
+
+
 def composite_score(
     components: dict[str, float | None],
     weights: dict[str, float],
     min_weight: float,
-) -> tuple[float | None, str | None]:
+) -> CompositeScore:
     """Weighted mean over non-None components with the judge-floor rule.
 
-    Returns ``(score, unscored_reason)``. When the judge is None and the sum of
-    the remaining present weights is below ``min_weight`` the node is unscored.
+    When the judge is None and the sum of the remaining present weights is
+    below ``min_weight`` the node is unscored.
+
+    The renormalization used to be invisible: a channel that never reported
+    handed its weight to the ones that did (schema absent -> the judge's 0.40
+    becomes 0.727 of the blend) and nothing downstream could tell a
+    single-channel number from a three-channel one. The divisor is now reported
+    as the per-channel weights actually used, keyed like ``components``.
     """
     present = {k: v for k, v in components.items() if v is not None}
     if components.get("judge") is None:
         remaining = sum(weights.get(k, 0.0) for k in present)
         if remaining < min_weight:
-            return None, "insufficient_components"
+            return CompositeScore(None, "insufficient_components")
     total_weight = sum(weights.get(k, 0.0) for k in present)
     if not present or total_weight == 0.0:
-        return None, "insufficient_components"
+        return CompositeScore(None, "insufficient_components")
     value = sum(weights.get(k, 0.0) * v for k, v in present.items()) / total_weight
-    return _clamp(value), None
+    effective = {k: weights.get(k, 0.0) / total_weight for k in present}
+    return CompositeScore(_clamp(value), None, effective)
+
+
+# Node kinds the trace declares as having made no LLM call. Judging a
+# deterministic step with an agent rubric grades a `for` loop on how well it
+# reasoned: the role is inferred from the NAME alone, so a hand-written
+# `plan_node` is handed the PLANNER rubric and its verdict is fiction. Declared
+# kinds skip the judge entirely; anything else (including nothing declared)
+# behaves exactly as before.
+_NO_JUDGE_NODE_KINDS = frozenset({"deterministic", "tool"})
+
+# Per-fact cap in the judge prompt: enough to identify what fired, not enough
+# for one verbose check detail to crowd out the payload it is about.
+_FACT_DETAIL_CHARS = 240
+
+
+def _judge_model_name(judge: JudgeClient) -> str | None:
+    """Name the instrument behind the judge component; clients expose it differently."""
+    for source in (judge, getattr(judge, "_settings", None)):
+        for attr in ("model", "judge_model"):
+            value = getattr(source, attr, None)
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+    return None
+
+
+def _shorten(text: object) -> str:
+    """One-line, bounded rendering of a check detail for the prompt."""
+    flat = " ".join(str(text).split())
+    return flat if len(flat) <= _FACT_DETAIL_CHARS else flat[: _FACT_DETAIL_CHARS - 1] + "…"
+
+
+def render_deterministic_facts(
+    violations: list[tuple[str, object, object]],
+    signals: list[dict],
+    visibility: ArtifactVisibility,
+    peer_facts: list[str] | None = None,
+) -> str:
+    """The deterministic half's findings, stated to the judge as ground truth.
+
+    The judge was being asked to guess at things this function had already
+    established for certain on the same payload — whether the artifact it is
+    reading is actually present, whether a carried-through parameter was
+    rewritten — and it guessed, in prose, with a number attached. Facts it
+    cannot see are stated instead, in their own delimited block so a fact can
+    never be mistaken for the judge's own inference. Empty string when no check
+    fired: silence, not a clean bill of health (the block says so, because a
+    judge told "no facts" reads it as approval).
+    """
+    lines: list[str] = []
+    for key, before, after in violations:
+        lines.append(
+            f"- contract parameter `{key}`: the INPUT carried "
+            f"{_shorten(before)!r}, this node's OUTPUT carries {_shorten(after)!r} "
+            "— the node rewrote a parameter it was given to carry through."
+        )
+    if visibility.state == ARTIFACT_OPAQUE:
+        lines.append(
+            "- the OUTPUT names file artifact(s) "
+            f"{', '.join(visibility.opaque_refs)} whose CONTENT is not in the "
+            "payload: what you are reading is a claim about that file, not the "
+            "work itself."
+        )
+    elif visibility.state == ARTIFACT_PARTIAL:
+        lines.append(
+            "- the OUTPUT's own text is readable, but the media it embeds "
+            f"({', '.join(visibility.uninspected_refs)}) was never opened by "
+            "anyone: judge the text, and say nothing about the images."
+        )
+    for signal in signals:
+        lines.append(
+            f"- check `{signal.get('name')}` fired [{signal.get('severity')}]: "
+            f"{_shorten(signal.get('detail'))}"
+        )
+    # Peer facts are about SIBLING nodes, so they are labelled apart: they say
+    # whether a shortcoming here is this node's own or the run's. Judging a
+    # collector in isolation, blind to five siblings that also came back empty,
+    # scores a dry source as five separate failures of diligence.
+    for fact in peer_facts or ():
+        lines.append(f"- (about OTHER nodes of this run) {fact}")
+    if not lines:
+        return ""
+    return (
+        "DETERMINISTIC FACTS (established by reproducible non-LLM checks; ground\n"
+        "truth — do not re-derive, contradict or restate them as your own\n"
+        "finding, and do not treat this list as complete: a check that did not\n"
+        "fire is silence, not approval. Unless a line says otherwise it is about\n"
+        "THIS node's own input/output):\n"
+        "---\n" + "\n".join(lines) + "\n---\n"
+    )
 
 
 async def score_node(
@@ -744,6 +858,7 @@ async def score_node(
     check_rules: list[CheckRule] | None = None,
     graph_type: str | None = None,
     is_deliverable_producer: bool = False,
+    peer_facts: list[str] | None = None,
     judge_sleep: Any = asyncio.sleep,
 ) -> NodeScore:
     """Score one run into a ``blame_engine.NodeScore`` (run_id as a string)."""
@@ -824,63 +939,9 @@ async def score_node(
     judge_component: float | None = None
     input_flawed: bool | None = None
     judge_note: str | None = None
+    judge_model: str | None = None
+    budget_exhausted = False
     flags: list[str] = []
-    prompt = render_prompt(
-        judge_prompt_template,
-        {
-            "AGENT_NAME": run.agent_name or "unknown",
-            "NODE_ROLE": node_role(
-                run.agent_name, is_deliverable_producer=is_deliverable_producer
-            ),
-            "NODE_INPUT": truncate_for_judge(input_text or ""),
-            "NODE_OUTPUT": truncate_for_judge(output_text),
-        },
-    )
-    async with semaphore:
-        verdict = await judge_json_with_retries(judge, prompt, sleep=judge_sleep)
-    if verdict is not None:
-        raw = verdict.get("task_score")
-        if isinstance(raw, (int, float)) and not isinstance(raw, bool):
-            judge_component = _clamp(float(raw))
-        flawed = verdict.get("input_flawed")
-        if isinstance(flawed, bool):
-            input_flawed = flawed
-        reasoning = verdict.get("reasoning")
-        if isinstance(reasoning, str):
-            judge_note = reasoning
-        raw_flags = verdict.get("flags")
-        if isinstance(raw_flags, list):
-            flags = [f for f in raw_flags if isinstance(f, str) and f.strip()][:8]
-
-    # Deterministic artifact-visibility check: what fraction of the work this
-    # payload claims is actually IN the payload. One classification, three
-    # outcomes — a judge verdict on a pointer is an assertion about an unopened
-    # file, and a judge verdict on an illustrated document is true of its text
-    # and silent about its pictures.
-    visibility = classify_artifact_visibility(output_text)
-    if visibility.state == ARTIFACT_OPAQUE and "unverifiable_artifact" not in flags:
-        flags.append("unverifiable_artifact")
-        opaque_note = render_opaque_artifact_note(list(visibility.opaque_refs))
-        judge_note = f"{judge_note} | {opaque_note}" if judge_note else opaque_note
-    elif visibility.state == ARTIFACT_PARTIAL:
-        # PARTIAL: the node's own text was graded, so no cap — capping every
-        # illustrated document at 0.60 would penalise the format, and inventing
-        # a penalty out of "we did not look" is the mirror of inventing a pass.
-        # The limit is instead RECORDED, twice: in the note (for humans) and as
-        # a flag (for anything that reads the score downstream), so a good
-        # number can never be read as "the photographs checked out too".
-        media_note = render_uninspected_media_caveat(list(visibility.uninspected_refs))
-        judge_note = f"{judge_note} | {media_note}" if judge_note else media_note
-        if FLAG_UNINSPECTED_MEDIA not in flags:
-            flags.append(FLAG_UNINSPECTED_MEDIA)
-
-    # Flags cap the judge component deterministically: a verdict that admits a
-    # shortcoming cannot keep a "good"-band number (score-reasoning mismatch).
-    if judge_component is not None:
-        for flag in flags:
-            cap = _JUDGE_FLAG_CAPS.get(flag)
-            if cap is not None:
-                judge_component = min(judge_component, cap)
 
     # Deterministic input-contract check: a silent rewrite of a carried-through
     # parameter (file_type, lang, format, ...) is a hard fault. Detected here
@@ -888,23 +949,6 @@ async def score_node(
     # declared params (migration 0011) stand in for the input side when the
     # payload is prose/code.
     violations = contract_violations(input_text, output_text, declared=run.contract_params)
-
-    components: dict[str, float | None] = {
-        "schema": schema_component,
-        "judge": judge_component,
-        "heuristics": heuristics_component,
-    }
-    score, unscored_reason = composite_score(components, weights, min_weight)
-    # CHANNEL DECOUPLING: the judged score is NEVER floored to a localisation
-    # sentinel. A deterministic fault (contract violation, fail-severity signal)
-    # is a SEPARATE evidence stream (contract_violations / deterministic_signals)
-    # that the blame engine reads as an independent candidacy channel — it must
-    # not be smuggled into the quality scalar. Flooring the score to 0.15/0.10
-    # multiplexed "how good is the output" with "a check failed here": it buried
-    # the judged number (a fluent verdict on genuinely broken work is the product,
-    # not noise) and made "score < threshold" a tautology the UI then re-sold as a
-    # measurement. The violation still travels below via `violations`; it just no
-    # longer overwrites the number.
 
     # Deterministic checks (docs/deterministic-signals.md). Every check emits
     # named signals; identity is stamped by the engine. Sources:
@@ -914,6 +958,10 @@ async def score_node(
     #   tool arg schemas — filtered to this run's agent/graph_type;
     # - built-ins: unit/temporal consistency, language vs the lang/locale
     #   contract param, security scans, tool-call behavioral patterns.
+    #
+    # They run BEFORE the judge because their results are prompt material: the
+    # judge was left to guess at what these checks already knew for certain
+    # about the very payload it is reading.
     rules = [
         r
         for r in (check_rules or [])
@@ -988,6 +1036,119 @@ async def score_node(
         + run_failed_signals(run.status, error_span_ids)
     )
 
+    # Deterministic artifact-visibility check: what fraction of the work this
+    # payload claims is actually IN the payload. One classification, three
+    # outcomes — a judge verdict on a pointer is an assertion about an unopened
+    # file, and a judge verdict on an illustrated document is true of its text
+    # and silent about its pictures.
+    visibility = classify_artifact_visibility(output_text)
+
+    # A node the trace declares deterministic made no LLM call, so there is no
+    # reasoning to grade: the judge is skipped and the score is carried by the
+    # channels that measure a machine (schema + heuristics).
+    declared_kind = getattr(run, "node_kind", None)
+    no_judge = (
+        isinstance(declared_kind, str)
+        and declared_kind.strip().lower() in _NO_JUDGE_NODE_KINDS
+    )
+    if not no_judge:
+        prompt = render_prompt(
+            judge_prompt_template,
+            {
+                "AGENT_NAME": run.agent_name or "unknown",
+                "NODE_ROLE": node_role(
+                    run.agent_name, is_deliverable_producer=is_deliverable_producer
+                ),
+                "DETERMINISTIC_FACTS": render_deterministic_facts(
+                    violations, deterministic_signals, visibility, peer_facts
+                ),
+                "NODE_INPUT": truncate_for_judge(input_text or ""),
+                "NODE_OUTPUT": truncate_for_judge(output_text),
+            },
+        )
+        def _note_unavailable(exc: PermanentJudgeError) -> None:
+            nonlocal budget_exhausted
+            budget_exhausted = isinstance(exc, JudgeSpendExhausted)
+
+        async with semaphore:
+            verdict = await judge_json_with_retries(
+                judge, prompt, sleep=judge_sleep, on_unavailable=_note_unavailable
+            )
+        if verdict is not None:
+            raw = verdict.get("task_score")
+            if isinstance(raw, (int, float)) and not isinstance(raw, bool):
+                judge_component = _clamp(float(raw))
+                judge_model = _judge_model_name(judge)
+            flawed = verdict.get("input_flawed")
+            if isinstance(flawed, bool):
+                input_flawed = flawed
+            reasoning = verdict.get("reasoning")
+            if isinstance(reasoning, str):
+                judge_note = reasoning
+            raw_flags = verdict.get("flags")
+            if isinstance(raw_flags, list):
+                flags = [f for f in raw_flags if isinstance(f, str) and f.strip()][:8]
+
+    # The visibility NOTES qualify a verdict ("verified on the text only"), so
+    # with no verdict there is nothing for them to qualify — the flags carry the
+    # fact instead and judge_note stays honestly empty.
+    if visibility.state == ARTIFACT_OPAQUE and "unverifiable_artifact" not in flags:
+        flags.append("unverifiable_artifact")
+        if not no_judge:
+            opaque_note = render_opaque_artifact_note(list(visibility.opaque_refs))
+            judge_note = f"{judge_note} | {opaque_note}" if judge_note else opaque_note
+    elif visibility.state == ARTIFACT_PARTIAL:
+        # PARTIAL: the node's own text was graded, so no cap — capping every
+        # illustrated document at 0.60 would penalise the format, and inventing
+        # a penalty out of "we did not look" is the mirror of inventing a pass.
+        # The limit is instead RECORDED, twice: in the note (for humans) and as
+        # a flag (for anything that reads the score downstream), so a good
+        # number can never be read as "the photographs checked out too".
+        if not no_judge:
+            media_note = render_uninspected_media_caveat(list(visibility.uninspected_refs))
+            judge_note = f"{judge_note} | {media_note}" if judge_note else media_note
+        if FLAG_UNINSPECTED_MEDIA not in flags:
+            flags.append(FLAG_UNINSPECTED_MEDIA)
+
+    # Flags cap the judge component deterministically: a verdict that admits a
+    # shortcoming cannot keep a "good"-band number (score-reasoning mismatch).
+    if judge_component is not None:
+        for flag in flags:
+            cap = _JUDGE_FLAG_CAPS.get(flag)
+            if cap is not None:
+                judge_component = min(judge_component, cap)
+
+    components: dict[str, float | None] = {
+        "schema": schema_component,
+        "judge": judge_component,
+        "heuristics": heuristics_component,
+    }
+    blend = composite_score(components, weights, min_weight)
+    score, unscored_reason = blend.score, blend.unscored_reason
+    # A skipped judge is not a failed one. With no registered output contract
+    # only heuristics remain, the min-weight floor refuses to score on that
+    # alone (correctly — one cheap channel is not a quality verdict), and
+    # "insufficient_components" would read as an accident. Naming the cause
+    # keeps the floor intact and the reason honest.
+    if no_judge and unscored_reason == "insufficient_components":
+        unscored_reason = "judge_skipped_deterministic_node"
+    # An exhausted budget and an unreachable judge produce the same absent
+    # number, but they are not the same event: one is a spending decision the
+    # operator made, the other is a fault to go fix. Collapsing them into
+    # insufficient_components hid which of the two happened.
+    elif budget_exhausted and unscored_reason == "insufficient_components":
+        unscored_reason = "judge_budget_exhausted"
+    # CHANNEL DECOUPLING: the judged score is NEVER floored to a localisation
+    # sentinel. A deterministic fault (contract violation, fail-severity signal)
+    # is a SEPARATE evidence stream (contract_violations / deterministic_signals)
+    # that the blame engine reads as an independent candidacy channel — it must
+    # not be smuggled into the quality scalar. Flooring the score to 0.15/0.10
+    # multiplexed "how good is the output" with "a check failed here": it buried
+    # the judged number (a fluent verdict on genuinely broken work is the product,
+    # not noise) and made "score < threshold" a tautology the UI then re-sold as a
+    # measurement. The violation still travels below via `violations`; it just no
+    # longer overwrites the number.
+
     # GENERALIZED deterministic-fail override: ANY fail-severity signal is a
     # hard, reproducible fact about this node's output — it caps the composite
     # below the blame threshold no matter how fluent the judge verdict was
@@ -1020,4 +1181,6 @@ async def score_node(
         flags=tuple(flags),
         contract_violations=tuple(violations),
         deterministic_signals=tuple(deterministic_signals),
+        effective_weights=blend.effective_weights,
+        judge_model=judge_model,
     )

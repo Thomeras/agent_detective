@@ -1,9 +1,17 @@
 """Algorithm 4: confidence formula (spec 3.6).
 
 raw = 0.5 * gap_term + 0.3 * severity_term + 0.2 * pred_term, then
-multiplicative penalties (multi-member SCC, multi-culprit), then the
-unknown-ancestor cap, clamped to [0, 1].
+multiplicative penalties (multi-member SCC, missing scoring channel,
+chain-shaped graph, tie between equally evidenced origins, multi-culprit),
+then the unknown-ancestor cap, clamped to [0, 1].
+
+Every penalty says the same thing in a different dimension: a claim may not
+outrun its evidence. What is missing — a channel that never reported, a shape
+with no branching to discriminate on, a tie the tie-break resolved by clock —
+lowers the number; it never raises it and never changes which node is named.
 """
+
+import math
 
 from .cutpoint import Candidate
 from .types import BlameConfig
@@ -61,10 +69,39 @@ REPORT_TYPE_CAP: dict[str, float] = {
     "terminal_defect_unlocalized": 0.6,
 }
 
+# A cut_point localised on FEWER channels than the scorer weighed stays a
+# cut_point. Every entry above is a verdict that names no individual origin
+# (composition / external / verification / terminal-unlocalized) or names
+# several (multi_culprit); a thin-channel cut_point still names one, backed by a
+# measured drop, so renaming it to any of them would assert something the
+# evidence does not — that no node broke, or that the fault came from outside,
+# or that a verifier failed. This table's design already says where thin
+# evidence goes: into the NUMBER, not into the type. So the honesty is carried
+# by ``single_channel_penalty`` in the formula below, and by the
+# ``single_channel`` note that states which channel never reported.
+
 
 def report_type_cap(report_type: str) -> float:
     """Honest ceiling for a report type's headline confidence (1.0 = uncapped)."""
     return REPORT_TYPE_CAP.get(report_type, 1.0)
+
+
+# A cut_point is a POSITIVE claim: the fault originated at this named node. When
+# the origin's score came from a single channel, that claim rests on one
+# instrument with nothing to corroborate it — the same evidence class as
+# JUDGED_DEGRADATION_OBSERVATION, and held to the same ceiling. It stays above
+# the "could not localise" verdicts (0.6 and below) because a measured drop does
+# point somewhere; it can no longer reach the certainty of a cut_point that two
+# independent channels agree on. The multiplier alone was not enough: it scales
+# with the evidence, so a strong-looking single channel still arrived near 1.0.
+SINGLE_CHANNEL_CUT_POINT_CAP = 0.7
+
+
+def diversity_cap(report_type: str, *, single_channel: bool) -> float:
+    """Ceiling a positive localisation may reach on one channel's evidence."""
+    if single_channel and report_type == "cut_point":
+        return SINGLE_CHANNEL_CUT_POINT_CAP
+    return 1.0
 
 
 # Backwards-compatible alias: `_DETERMINISTIC_OBSERVATION` was the old private
@@ -72,8 +109,46 @@ def report_type_cap(report_type: str) -> float:
 _DETERMINISTIC_OBSERVATION = DETERMINISTIC_ATTRIBUTION
 
 
+def channels_incomplete(
+    reported: tuple[str, ...] | None, offered: tuple[str, ...] | None
+) -> bool:
+    """True when a score rests on FEWER channels than the scorer weighed.
+
+    The renormalization is what makes this backwards by default: a channel that
+    never reported hands its weight to the survivors (schema absent ⇒ the
+    judge's 0.40 becomes 0.727 of the blend), so a missing measurement made the
+    remaining one speak LOUDER. Unknown coverage — a legacy report, an unscored
+    node — is not a missing channel and earns no penalty.
+    """
+    if reported is None or offered is None:
+        return False
+    return len(reported) < len(offered)
+
+
+def chain_penalty(depth: int, config: BlameConfig) -> float:
+    """How much a chain's shape discounts attribution, scaled by its length.
+
+    A flat penalty would treat a 3-step pipeline like an 18-step one, but they
+    are not equally silent: three steps still narrow the origin to one interior
+    node, eighteen narrow it to seventeen. The discount therefore ramps with the
+    interior length and saturates at ``chain_full_penalty_depth``. The ramp is
+    sqrt because the discriminating power falls off fastest at the start — the
+    step from 1 candidate to 4 costs far more certainty than 13 to 16 does.
+    """
+    interior = depth - 2  # the head and the tail are not in question
+    full = max(1, config.chain_full_penalty_depth - 2)
+    if interior <= 0:
+        return 1.0
+    ramp = min(1.0, math.sqrt(interior / full))
+    return 1.0 - (1.0 - config.chain_confidence_penalty) * ramp
+
+
 def compute_confidence(
-    candidate: Candidate, config: BlameConfig, *, multi_culprit: bool = False
+    candidate: Candidate,
+    config: BlameConfig,
+    *,
+    multi_culprit: bool = False,
+    chain_depth: int = 0,
 ) -> float:
     drop = candidate.drop if candidate.drop is not None else 0.0
     gap_term = _clamp(drop / 0.5)
@@ -96,6 +171,19 @@ def compute_confidence(
     confidence = raw
     if candidate.iterations > 1:
         confidence *= config.scc_confidence_penalty
+    if channels_incomplete(candidate.score_channels, candidate.score_channels_all):
+        confidence *= config.single_channel_penalty
+    # The graph's shape is silent about WHERE, so attribution may not borrow
+    # authority from it. Observation is untouched — "is this output defective"
+    # is answered by the node's own score, whatever the graph looks like.
+    if chain_depth:
+        confidence *= chain_penalty(chain_depth, config)
+    # k origins with identical evidence are k equally supported answers, and the
+    # tie-break names one of them by the clock. Splitting the attribution is what
+    # keeps the named node from carrying certainty the tie denies it; the set
+    # itself is reported as competing hypotheses.
+    if len(candidate.tied_members) > 1:
+        confidence /= len(candidate.tied_members)
     if multi_culprit:
         confidence *= config.multi_culprit_penalty
     if candidate.unknown_upstream:

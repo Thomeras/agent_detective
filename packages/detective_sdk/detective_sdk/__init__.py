@@ -26,6 +26,11 @@ an OTLP export when the run ends::
             s.output = documents
             s.cost(usd=0.004, tokens_in=1200, tokens_out=340, model="gpt-4o")
 
+``r.step(name, node_kind="deterministic")`` declares a step that runs code
+rather than reasoning: role is otherwise inferred from the agent NAME, which
+cannot carry that, so a ``plan_node`` making zero model calls gets judged on the
+prose of a plan it never wrote.
+
 ``branch``/``join`` and ``retry`` cover the two shapes span nesting cannot
 express — a fan-IN (one parent id per span, so a joiner has no edge from the
 work it merged) and a loop (attempts of one agent get no edge between them).
@@ -35,7 +40,15 @@ Off unless ``AGENT_DETECTIVE_ENDPOINT`` or ``AGENT_DETECTIVE_TRACE_FILE`` is set
 
 from .artifacts import artifact_meta, artifact_meta_block, detect_kind
 from .control import TOOL_SCHEMA_HASH_ATTRIBUTE, should_halt
-from .tracing import ATTEMPT_SEPARATOR, MAX_PAYLOAD_CHARS, Retry, Run, Span, run
+from .tracing import (
+    ATTEMPT_SEPARATOR,
+    MAX_PAYLOAD_CHARS,
+    NODE_KIND_ATTRIBUTE,
+    Retry,
+    Run,
+    Span,
+    run,
+)
 from .versioning import content_hash, git_version, tool_schema_hash
 
 __version__ = "0.3.0"
@@ -55,4 +68,5 @@ __all__ = [
     "Retry",
     "MAX_PAYLOAD_CHARS",
     "ATTEMPT_SEPARATOR",
+    "NODE_KIND_ATTRIBUTE",
 ]

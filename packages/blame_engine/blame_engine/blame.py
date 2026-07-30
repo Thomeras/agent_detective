@@ -29,19 +29,24 @@ from .confidence import (
     CORROBORATED_FLAG,
     REPORT_TYPE_CAP as _CONFIDENCE_CAP,
     _DETERMINISTIC_OBSERVATION,
+    channels_incomplete,
     compute_confidence,
     compute_observation_confidence,
+    diversity_cap,
     report_type_cap,
 )
 from .cost import downstream_cost
-from .cutpoint import Candidate, _analyze
+from .cutpoint import Candidate, _analyze, channel_fields
 from .finding import Finding
 from .loops import _detect_anomalies
 from .narrative import (
+    HYPOTHESIS_SCORE_TIE,
+    HYPOTHESIS_UNRESOLVED,
     CandidacyRecord,
     NoteRecord,
     render_attribution_basis,
     render_candidacy,
+    render_hypothesis_basis,
     render_notes,
     render_score_override_reason,
     render_terminal_caveat,
@@ -65,9 +70,11 @@ _CONTENT_FLAGS = frozenset(
 def _drill_into_loop(cond, inp, super_id, exit_node, preferred=None):
     """When the culprit super-node is a loop (multi-member SCC), the blame belongs
     to the MEMBER where quality actually broke — not the exit node that merely
-    flows downstream. Returns (culprit_run_id, members, real_drop) where real_drop
-    is the member's drop from its own raw (in-graph) predecessors, so it reflects
-    the true break (e.g. act 0.93 -> render 0.27) rather than the loop's exit drop.
+    flows downstream. Returns (culprit_run_id, members, real_drop, tied) where
+    real_drop is the member's drop from its own raw (in-graph) predecessors, so it
+    reflects the true break (e.g. act 0.93 -> render 0.27) rather than the loop's
+    exit drop, and ``tied`` names the members that scored EXACTLY what the culprit
+    scored — an equal set the chronological order, not the evidence, resolved.
 
     ``preferred`` is the member the intra-SCC localizer qualified
     (``Candidate.scc_member``). It wins over "worst-scoring", because the worst
@@ -82,11 +89,17 @@ def _drill_into_loop(cond, inp, super_id, exit_node, preferred=None):
         if inp.scores.get(m) is not None and inp.scores[m].score is not None
     ]
     if len(members) <= 1 or not scored:
-        return exit_node, members, None
+        return exit_node, members, None, ()
+    tied: tuple[str, ...] = ()
     if preferred is not None and any(m == preferred for m, _ in scored):
         culprit = preferred
     else:
-        culprit = min(scored, key=lambda ms: ms[1])[0]
+        # Unchanged selection (`min` returns the FIRST minimum, and members are in
+        # chronological order) — the tie set is recorded, never re-ordered.
+        worst = min(s for _, s in scored)
+        culprit = next(m for m, s in scored if s == worst)
+        equal = tuple(m for m, s in scored if s == worst)
+        tied = equal if len(equal) > 1 else ()
     pred_scores = [
         inp.scores[p].score
         for p in cond.graph.predecessors(culprit)
@@ -95,7 +108,7 @@ def _drill_into_loop(cond, inp, super_id, exit_node, preferred=None):
     real_drop = None
     if pred_scores:
         real_drop = max(0.0, max(pred_scores) - inp.scores[culprit].score)
-    return culprit, members, real_drop
+    return culprit, members, real_drop, tied
 
 
 def _node_score(inp: BlameInput, run_id: str) -> float | None:
@@ -273,8 +286,15 @@ def find_blame(
     analysis = _analyze(cond, inp)
     candidates = list(analysis.candidates)
     anomalies = _detect_anomalies(cond, inp)
-    # Advisory topology classification (presentational; never drives verdicts).
+    # Advisory topology classification (presentational; never picks culprits).
     topology = classify_topology(inp.nodes, inp.edges)
+    # The one structural fact attribution may read: on an unbranched line every
+    # interior node is an articulation point, so naming one of them is a
+    # statement about ORDER, not about structure. It discounts the attribution
+    # formula below; everything else about `topology` stays presentational.
+    # Carried as the DEPTH, not a flag: how much the shape withholds scales with
+    # how many interior nodes it refuses to distinguish. 0 = not a chain.
+    chain_shaped = int(topology.get("depth") or 0) if topology.get("chain") else 0
 
     # Raw nodes in deterministic topological order (super-node topo order, then
     # chronological within each SCC). Everything keyed per-node downstream —
@@ -380,6 +400,10 @@ def find_blame(
     observation_confidence: float | None = None
     attribution_confidence: float | None = None
     attribution_breakdown: list[dict] = []
+    # Origins whose evidence is identical to the named culprit's — a tie the
+    # deterministic order resolved. Reported as a candidate set (hypotheses)
+    # rather than silently collapsed into one name.
+    origin_tie: tuple[str, ...] = ()
     fabrication_origin: str | None = None  # set by the fabrication-cascade row
     loop_drops: dict[str, float] = {}  # real drop for culprits drilled inside a loop
     loop_members: list[str] = []       # members of the loop the culprit sits in
@@ -498,7 +522,7 @@ def find_blame(
         named the loop member that broke, alongside a second origin it named the
         loop's exit — a node that can sit comfortably above the threshold.
         """
-        drilled, members, real_drop = _drill_into_loop(
+        drilled, members, real_drop, _tied = _drill_into_loop(
             cond, inp, candidate.super_id, candidate.run_id, candidate.scc_member
         )
         # Drill only in the CONTENT channel: a deterministic origin's evidence is
@@ -540,8 +564,8 @@ def find_blame(
         return candidate.run_id
 
     def _conf_candidate(candidate, culprit):
-        """Confidence inputs for a drilled culprit: the member's own score and
-        in-cycle drop, never the exit's."""
+        """Confidence inputs for a drilled culprit: the member's own score, its
+        in-cycle drop and ITS channel coverage, never the exit's."""
         if culprit == candidate.run_id:
             return candidate
         _s = _node_score(inp, culprit)
@@ -552,6 +576,7 @@ def find_blame(
             score=_s if _s is not None else candidate.score,
             drop=_d,
             base=(_s + _d) if (_s is not None and _d is not None) else candidate.base,
+            **channel_fields(inp, culprit),
         )
 
     def _stamp(ds: list) -> list:
@@ -595,9 +620,10 @@ def find_blame(
             is_source=True,
             iterations=cond.super_nodes[sid].iterations,
             end_time=inp.node_end_times.get(run_id),
+            **channel_fields(inp, run_id),
         )
         culprits = [run_id]
-        confidence = compute_confidence(candidate, cfg)
+        confidence = compute_confidence(candidate, cfg, chain_depth=chain_shaped)
         defects = emit_external(
             idx,
             run_id,
@@ -625,7 +651,11 @@ def find_blame(
         loop_sid = cond.node_to_super[anomaly.member_run_ids[0]]
         loop_candidate = candidate_sids.get(loop_sid)
         # No candidate: the deterministic limit breach itself is the evidence.
-        confidence = compute_confidence(loop_candidate, cfg) if loop_candidate else 1.0
+        confidence = (
+            compute_confidence(loop_candidate, cfg, chain_depth=chain_shaped)
+            if loop_candidate
+            else 1.0
+        )
         defects = emit_loop(
             idx,
             culprits[0],
@@ -669,7 +699,10 @@ def find_blame(
                 confidence
                 + sum(
                     compute_confidence(
-                        _conf_candidate(c, cul), cfg, multi_culprit=True
+                        _conf_candidate(c, cul),
+                        cfg,
+                        multi_culprit=True,
+                        chain_depth=chain_shaped,
                     )
                     for c, cul in zip(other_candidates, other_culprits)
                 )
@@ -732,6 +765,7 @@ def find_blame(
                     score=_dr_score if _dr_score is not None else candidate.score,
                     base=_dr_base,
                     drop=_dr_drop,
+                    **channel_fields(inp, culprit),
                 )
                 loop_members = members_all
                 ensure_content_drop_finding(
@@ -740,7 +774,8 @@ def find_blame(
                     loop_members=members_all,
                 )
             culprits = [culprit]
-            _raw_attr = compute_confidence(candidate, cfg)
+            origin_tie = candidate.tied_members
+            _raw_attr = compute_confidence(candidate, cfg, chain_depth=chain_shaped)
             attribution_confidence = _verdict_attribution(
                 inp, culprit, candidate, _raw_attr, notes
             )
@@ -797,7 +832,7 @@ def find_blame(
             # content defect is reported as observed-but-unlocalized.
             culprit = candidate.run_id
             culprits = [culprit]
-            _raw_attr = compute_confidence(candidate, cfg)
+            _raw_attr = compute_confidence(candidate, cfg, chain_depth=chain_shaped)
             attribution_confidence = _verdict_attribution(
                 inp, culprit, candidate, _raw_attr, notes
             )
@@ -828,10 +863,14 @@ def find_blame(
                 )
             )
         else:
-            culprit, members, real_drop = _drill_into_loop(
+            culprit, members, real_drop, _drill_tie = _drill_into_loop(
                 cond, inp, candidate.super_id, candidate.run_id, candidate.scc_member
             )
             culprits = [culprit]
+            # Whichever localizer chose the member also decides whose tie it is:
+            # the intra-SCC one records its own qualifying set, the drill records
+            # the members that scored exactly the same.
+            origin_tie = candidate.tied_members or _drill_tie
             conf_candidate = candidate
             if len(members) > 1 and real_drop is not None:
                 loop_members = members
@@ -851,6 +890,7 @@ def find_blame(
                     # evidenced break.
                     base=_member_score + real_drop,
                     base_assumed=False,
+                    **channel_fields(inp, culprit),
                 )
                 conf_candidate = member_cand
                 loop_drops[culprit] = real_drop
@@ -898,6 +938,7 @@ def find_blame(
                     candidate,
                     run_id=culprit,
                     score=_c_score if _c_score is not None else candidate.score,
+                    **channel_fields(inp, culprit),
                 )
                 notes.append(
                     NoteRecord(
@@ -972,7 +1013,10 @@ def find_blame(
             # doubt. An assumed-baseline origin cannot claim near-certain
             # attribution — it is the origin partly because it is the first node
             # we could see (structural cap, stated in the notes).
-            _raw_attr = compute_confidence(conf_candidate, cfg)
+            # The drill's tie belongs to the node whose confidence we compute, so
+            # the split lands in the formula with every other evidence discount.
+            conf_candidate = replace(conf_candidate, tied_members=origin_tie)
+            _raw_attr = compute_confidence(conf_candidate, cfg, chain_depth=chain_shaped)
             attribution_confidence = _verdict_attribution(
                 inp, culprit, conf_candidate, _raw_attr, notes
             )
@@ -1009,7 +1053,9 @@ def find_blame(
         # cannot localize differently just because a second fault exists.
         culprits = [_resolve_culprit(c) for c in candidates]
         confidence = sum(
-            compute_confidence(_conf_candidate(c, cul), cfg, multi_culprit=True)
+            compute_confidence(
+                _conf_candidate(c, cul), cfg, multi_culprit=True, chain_depth=chain_shaped
+            )
             for c, cul in zip(candidates, culprits)
         ) / len(candidates)
         defects = emit_multi(
@@ -1591,8 +1637,117 @@ def find_blame(
     # "100% sure" on a guess).
     confidence = min(confidence, report_type_cap(report_type))
 
+    _cf = channel_fields(inp, culprits[0]) if culprits else None
+    _single_channel = _cf is not None and channels_incomplete(
+        _cf["score_channels"], _cf["score_channels_all"]
+    )
+    # Naming ONE origin needs more than one instrument agreeing. Without that,
+    # the verdict type stays honest (a measured drop did happen here) but its
+    # headline is held below what corroborated localisation can claim.
+    confidence = min(
+        confidence, diversity_cap(report_type, single_channel=_single_channel)
+    )
+
+    # WHY the attribution is lower than the raw evidence would suggest. A
+    # discount whose basis is not stated is exactly the unexplained number this
+    # engine exists not to print, so each one that fired says so.
+    if culprits:
+        if _single_channel and _cf is not None:
+            notes.append(
+                NoteRecord(
+                    "single_channel",
+                    {
+                        "agent": inp.agent_names.get(culprits[0], culprits[0]),
+                        "reported": list(_cf["score_channels"]),
+                        "missing": sorted(
+                            set(_cf["score_channels_all"]) - set(_cf["score_channels"])
+                        ),
+                        "penalty": cfg.single_channel_penalty,
+                        "cap": diversity_cap(report_type, single_channel=True),
+                    },
+                )
+            )
+        if chain_shaped:
+            notes.append(
+                NoteRecord(
+                    "chain_topology",
+                    {
+                        "depth": topology["depth"],
+                        "penalty": cfg.chain_confidence_penalty,
+                    },
+                )
+            )
+
+    # A tie stated as a tie. The named culprit and the tie-break ORDER are
+    # unchanged; what changes is that the other equally evidenced origins stop
+    # being invisible. Each holds exactly the attribution the split left it, and
+    # what none of them accounts for is the explicit unresolved remainder — the
+    # same shape (weights summing to 1.0) the worker's competing-origin
+    # breakdown uses for disagreeing evidence streams.
+    hypotheses: list[dict] = []
+    _tie_score = score_map.get(culprits[0]) if culprits else None
+    if (
+        len(origin_tie) > 1
+        and attribution_confidence is not None
+        and _tie_score is not None
+    ):
+        _share = round(attribution_confidence, 4)
+        _unresolved = round(1.0 - _share * len(origin_tie), 4)
+        # An observed-origination override (a contract diff saw the parameter
+        # arrive intact and leave rewritten) does not rest on the tie-break at
+        # all — there is no tie to split out of it, and no honest remainder.
+        if _unresolved >= 0.0:
+            hypotheses = [
+                {
+                    "origin": r,
+                    "agent": inp.agent_names.get(r, "unknown"),
+                    "basis_code": HYPOTHESIS_SCORE_TIE,
+                    "basis": render_hypothesis_basis(HYPOTHESIS_SCORE_TIE),
+                    "weight": _share,
+                }
+                for r in origin_tie
+            ] + [
+                {
+                    "origin": None,
+                    "agent": None,
+                    "basis_code": HYPOTHESIS_UNRESOLVED,
+                    "basis": render_hypothesis_basis(HYPOTHESIS_UNRESOLVED),
+                    "weight": _unresolved,
+                }
+            ]
+            notes.append(
+                NoteRecord(
+                    "origin_tie",
+                    {
+                        "count": len(origin_tie),
+                        "agents": [inp.agent_names.get(r, r) for r in origin_tie],
+                        "named": inp.agent_names.get(culprits[0], culprits[0]),
+                        "score": _tie_score,
+                    },
+                )
+            )
+
     path = propagation_path(inp, cond, culprits[0]) if culprits else []
     cost = downstream_cost(inp, culprits)
+    # What that total actually covers. ``downstream_cost`` sums the KNOWN costs
+    # over the culprits and their descendants and returns a partial sum as a
+    # floor — honest, but a bare scalar prints as the price of the run. Counted
+    # over the same affected set (never the whole graph), so "6 of 28" is
+    # readable as the lower bound it is. Empty when nothing affected was priced:
+    # there is no total to qualify, and cost is None.
+    affected_runs: set[str] = set()
+    for _c in culprits:
+        if _c in cond.graph:
+            affected_runs.add(_c)
+            affected_runs.update(nx.descendants(cond.graph, _c))
+    priced_runs = sum(
+        1 for n in affected_runs if inp.node_costs.get(n) is not None
+    )
+    cost_coverage = (
+        {"priced": priced_runs, "total": len(affected_runs)} if priced_runs else {}
+    )
+    if cost_coverage and priced_runs < len(affected_runs):
+        notes.append(NoteRecord("cost_coverage", cost_coverage))
 
     # Unscored ANCESTORS that could genuinely hide the origin — excluding
     # structural roots, whose unscored-ness is by design (they hold no content
@@ -1955,6 +2110,8 @@ def find_blame(
         contract_violations=contract_breaches,
         deterministic_signals=deterministic_signals,
         topology=topology,
+        hypotheses=hypotheses,
+        cost_coverage=cost_coverage,
         schema=2,
         findings=schema2_findings,
         defects=schema2_defects,

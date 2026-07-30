@@ -34,7 +34,8 @@ def graph_summary(row: Mapping[str, Any]) -> dict[str, Any]:
         row,
         [
             "graph_id", "name", "graph_type", "status", "started_at", "ended_at",
-            "total_cost_usd", "run_count", "late_spans_count", "late_spans_last_at",
+            "total_cost_usd", "run_count", "priced_run_count",
+            "late_spans_count", "late_spans_last_at",
         ],
     ) | {"id": str(row["graph_id"])}
 
@@ -54,6 +55,10 @@ def run_node(row: Mapping[str, Any]) -> dict[str, Any]:
             "status",
             "quality_score",
             "score_components",
+            # The weights actually used and the model behind the judge
+            # component: a score that cannot name its instrument is not evidence.
+            "score_weights",
+            "judge_model",
             "unscored_reason",
             "input_flawed",
             "cost_usd",
@@ -86,7 +91,15 @@ def run_edge(row: Mapping[str, Any]) -> dict[str, Any]:
 
 
 def report_summary(row: Mapping[str, Any]) -> dict[str, Any]:
-    return json_row(row, ["report_type", "culprit_run_ids", "confidence", "downstream_cost_usd"])
+    # cost_coverage travels WITH the cost: the inbox sums these, and a total
+    # over 6 of 28 priced runs is a lower bound, never the price of the run.
+    return json_row(
+        row,
+        [
+            "report_type", "culprit_run_ids", "confidence", "downstream_cost_usd",
+            "cost_coverage", "judge_model",
+        ],
+    )
 
 
 def report_detail(row: Mapping[str, Any]) -> dict[str, Any]:
@@ -103,8 +116,11 @@ def report_detail(row: Mapping[str, Any]) -> dict[str, Any]:
             "propagation_path",
             "confidence",
             "downstream_cost_usd",
+            "cost_coverage",
             "unscored_run_ids",
             "evidence",
+            "judge_prompt_hash",
+            "judge_model",
             "created_at",
         ],
     )

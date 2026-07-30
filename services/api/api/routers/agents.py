@@ -28,13 +28,19 @@ async def leaderboard(
             "prompt_hash",
             "total_cost_usd",
             "run_count",
+            # SUM(cost_usd) skips NULLs, so the total needs its denominator to
+            # read as a lower bound rather than a price.
+            "priced_run_count",
             "failure_rate",
             "avg_quality_score",
         ]
     else:
         # Default behavior unchanged without the param.
         rows = await repo.leaderboard()
-        fields = ["agent_name", "total_cost_usd", "run_count", "failure_rate", "avg_quality_score"]
+        fields = [
+            "agent_name", "total_cost_usd", "run_count", "priced_run_count",
+            "failure_rate", "avg_quality_score",
+        ]
     return {"agents": [json_row(row, fields) for row in rows]}
 
 

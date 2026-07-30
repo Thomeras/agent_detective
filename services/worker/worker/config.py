@@ -17,12 +17,19 @@ class Settings(BaseSettings):
 
     model_config = SettingsConfigDict(extra="ignore")
 
-    @field_validator("cost_budget_default_usd", "judge_seed", mode="before")
+    @field_validator(
+        "cost_budget_default_usd",
+        "judge_seed",
+        "judge_max_spend_usd",
+        "judge_price_prompt_usd_per_1k",
+        "judge_price_completion_usd_per_1k",
+        mode="before",
+    )
     @classmethod
     def _empty_str_is_none(cls, value: object) -> object:
-        # COST_BUDGET_DEFAULT_USD / JUDGE_SEED are intentionally unset in
-        # compose/.env, which arrives as an empty string; treat that as None
-        # ("no budget" / "no seed").
+        # COST_BUDGET_DEFAULT_USD / JUDGE_SEED and the judge spend knobs are
+        # intentionally unset in compose/.env, which arrives as an empty string;
+        # treat that as None ("no budget" / "no seed" / "no cap" / "no price").
         if isinstance(value, str) and value.strip() == "":
             return None
         return value
@@ -56,6 +63,18 @@ class Settings(BaseSettings):
     # independent origin only the judge would have found) for cost, and that is
     # an operator's call, not a default.
     judge_gate: bool = False
+
+    # Judge spend. None = uncapped, which is the pre-existing behavior and must
+    # stay the default. When a cap is set and reached, the judge client stops
+    # calling and the affected nodes come back unjudged (the existing unscored
+    # path) — a partial analysis that says so beats a crashed one.
+    judge_max_spend_usd: float | None = None
+    # Per-1k-token prices for the configured model. Unset means the cost of a
+    # call is UNKNOWN (null, never $0) unless the endpoint prices it itself in
+    # `usage.cost` (OpenRouter does); with no price and no usage.cost a spend
+    # cap cannot bind, and the judge client says so once, loudly.
+    judge_price_prompt_usd_per_1k: float | None = None
+    judge_price_completion_usd_per_1k: float | None = None
 
     # Scoring weights and the renormalization floor (spec 4.3 step 2).
     score_w_schema: float = 0.35
@@ -113,3 +132,49 @@ class Settings(BaseSettings):
     @property
     def payload_inline_max_bytes(self) -> int:
         return self.payload_inline_max_kb * 1024
+
+    @property
+    def judge_is_mock(self) -> bool:
+        """True when verdicts come from the bundled mock LLM, not a real model.
+
+        Which judge answered decides whether a verdict means anything, so it
+        must be readable from the process instead of inferred from a
+        `docker exec env`. Recognised by the compose default (JUDGE_MODEL=mock)
+        and by the bundled mock service's own URL.
+        """
+        model = (self.judge_model or "").strip().lower()
+        base_url = (self.judge_base_url or "").strip().lower()
+        return model in _MOCK_JUDGE_MODELS or any(m in base_url for m in _MOCK_JUDGE_HOSTS)
+
+    def judge_effective_config(self) -> dict[str, object]:
+        """Non-secret judge identity + spend knobs, mirroring ingest's /config.
+
+        JUDGE_API_KEY never leaves the process: only whether one is set.
+        """
+        return {
+            "judge_model": self.judge_model,
+            "judge_base_url": self.judge_base_url,
+            "judge_is_mock": self.judge_is_mock,
+            "judge_api_key_set": bool((self.judge_api_key or "").strip()),
+            "judge_concurrency": self.judge_concurrency,
+            "judge_gate": self.judge_gate,
+            "judge_seed": self.judge_seed,
+            "judge_max_spend_usd": self.judge_max_spend_usd,
+            "judge_price_prompt_usd_per_1k": self.judge_price_prompt_usd_per_1k,
+            "judge_price_completion_usd_per_1k": self.judge_price_completion_usd_per_1k,
+        }
+
+    def describe_judge(self) -> str:
+        """One log-line summary of who is judging and under what cap."""
+        cap = "uncapped" if self.judge_max_spend_usd is None else f"${self.judge_max_spend_usd:g}"
+        kind = "MOCK (verdicts are canned)" if self.judge_is_mock else "real model"
+        return (
+            f"judge: model={self.judge_model} base_url={self.judge_base_url} "
+            f"kind={kind} api_key_set={bool((self.judge_api_key or '').strip())} "
+            f"max_spend={cap}"
+        )
+
+
+# The bundled demo judge, by model name (compose default) and by service host.
+_MOCK_JUDGE_MODELS = frozenset({"mock", "mock-llm"})
+_MOCK_JUDGE_HOSTS = ("mock-llm", "mock_llm")

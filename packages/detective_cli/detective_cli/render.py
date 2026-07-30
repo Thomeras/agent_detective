@@ -230,6 +230,28 @@ class _GraphView:
         parts = ", ".join(f"{name} {value:.2f}" for name, value in present.items())
         return f"partial deterministic measurement: {parts}"
 
+    def _channels_note(self, run_id: str) -> str:
+        """How many channels a SCORED node's number actually rests on.
+
+        A missing channel does not abstain, it hands its weight to the channels
+        that did report (schema absent -> judge 0.40 becomes 0.727), so a
+        single-channel score reads exactly like a three-channel one. Named here
+        so the blend cannot pass for more independent evidence than it is.
+        """
+        row = self.analysis.node_scores_by_str.get(run_id)
+        components = (row.score_components if row is not None else None) or {}
+        if not components:
+            return ""
+        present = [k for k, v in components.items() if v is not None]
+        if len(present) >= len(components):
+            return ""
+        note = f"{len(present)} of {len(components)} channels"
+        weights = getattr(row, "score_weights", None) or {}
+        if weights:
+            carried = ", ".join(f"{k} {w:.2f}" for k, w in sorted(weights.items()))
+            note += f" (effective weight: {carried})"
+        return note
+
     def node_rows(self) -> list[tuple[str, str, str]]:
         """(name, score, annotation) per run, in the engine's topological order."""
         culprits = {str(c) for c in self.culprits}
@@ -254,7 +276,11 @@ class _GraphView:
                 notes.append(f"drop {drop:.2f}")
             if state == "not_analyzed":
                 notes.append("not analyzed")
-            elif state != "scored":
+            elif state == "scored":
+                channels = self._channels_note(run_id)
+                if channels:
+                    notes.append(channels)
+            else:
                 notes.append(f"unscored ({state})")
                 partial = self._components_note(run_id)
                 if partial:
@@ -428,7 +454,16 @@ def render_terminal(run: AnalysisRun, source: str, *, color: bool = True) -> str
         cost = view.report.get("downstream_cost_usd")
         if isinstance(cost, (int, float)) and cost > 0:
             add("")
-            add(paint(f"   downstream cost of the fault: ${cost:.4f}", "dim"))
+            # Coverage rides with the number: a total over 6 of 28 priced runs
+            # is a lower bound, and printed bare it reads as the price of the run.
+            coverage = view.report.get("cost_coverage") or {}
+            priced, total = coverage.get("priced"), coverage.get("total")
+            suffix = (
+                f" ({priced}/{total} runs priced, lower bound)"
+                if isinstance(priced, int) and isinstance(total, int) and priced < total
+                else ""
+            )
+            add(paint(f"   downstream cost of the fault: ${cost:.4f}{suffix}", "dim"))
 
     add("")
     incidents = run.incidents

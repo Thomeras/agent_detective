@@ -6,6 +6,7 @@ quality of the reviewed artifact itself; judge whether this verifier reached the
 Its INPUT is the artifact under review. Its OUTPUT is its verdict (a pass/fail
 decision, possibly with notes).
 
+<<DETERMINISTIC_FACTS>>
 INPUT (artifact the verifier reviewed):
 ---
 <<NODE_INPUT>>

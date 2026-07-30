@@ -103,6 +103,7 @@ async def batch_from_spans(
                 contract_params=candidate.contract_params,
                 attempt=candidate.attempt,
                 attempt_of=candidate.attempt_of,
+                node_kind=candidate.node_kind,
                 trace_id=candidate.trace_id,
                 status=candidate.status,
                 input_inline=input_payload.inline,

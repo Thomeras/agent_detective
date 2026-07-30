@@ -9,7 +9,10 @@ from blame_engine import BlameConfig, Candidate, NodeScore, compute_confidence, 
 from blame_engine.confidence import (
     DETERMINISTIC_ATTRIBUTION,
     JUDGED_DEGRADATION_OBSERVATION,
+    SINGLE_CHANNEL_CUT_POINT_CAP,
+    chain_penalty,
     compute_observation_confidence,
+    diversity_cap,
 )
 
 CFG = BlameConfig()
@@ -189,3 +192,50 @@ def test_fail_signal_without_the_marker_keeps_inferred_attribution(mk):
     )
     report = find_blame(inp)
     assert report.evidence.attribution_confidence < 0.95
+
+
+# --- Chain shape and channel diversity (P5 / P1b) ---------------------------
+
+
+def test_chain_penalty_scales_with_the_length_it_cannot_discriminate():
+    # A 3-step line still narrows the origin to one interior node; an 18-step
+    # one narrows it to seventeen, which is not narrowing. A flat discount
+    # would have charged both the same.
+    short = chain_penalty(3, CFG)
+    long = chain_penalty(18, CFG)
+    assert short > long
+    assert long == pytest.approx(CFG.chain_confidence_penalty)
+
+
+def test_chain_penalty_saturates_and_never_exceeds_the_configured_floor():
+    assert chain_penalty(30, CFG) == pytest.approx(CFG.chain_confidence_penalty)
+    assert chain_penalty(200, CFG) == pytest.approx(CFG.chain_confidence_penalty)
+
+
+def test_chain_penalty_absent_when_there_is_no_interior_node_to_confuse():
+    # Head and tail are never in question, so a 2-node line withholds nothing.
+    assert chain_penalty(2, CFG) == 1.0
+    assert chain_penalty(0, CFG) == 1.0
+
+
+def test_single_channel_cut_point_is_capped_below_corroborated_localisation():
+    # Naming ONE origin on one instrument's word cannot reach the certainty of
+    # a cut_point two independent channels agree on.
+    assert diversity_cap("cut_point", single_channel=True) == SINGLE_CHANNEL_CUT_POINT_CAP
+    assert diversity_cap("cut_point", single_channel=False) == 1.0
+
+
+def test_diversity_cap_only_binds_verdicts_that_name_an_origin():
+    # A fallback verdict names no single node, so channel count is not what
+    # limits it — its own report-type cap already does.
+    assert diversity_cap("composition_failure", single_channel=True) == 1.0
+
+
+def test_incomplete_channels_discount_attribution_but_absence_of_data_does_not():
+    reported = _candidate(drop=0.5)
+    thin = replace(reported, score_channels=("judge",), score_channels_all=("schema", "judge"))
+    assert compute_confidence(thin, CFG) < compute_confidence(reported, CFG)
+    # Legacy candidate: nothing recorded about channels -> no penalty invented.
+    assert compute_confidence(reported, CFG) == compute_confidence(
+        replace(reported, score_channels=None, score_channels_all=None), CFG
+    )

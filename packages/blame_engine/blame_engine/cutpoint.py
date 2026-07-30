@@ -78,6 +78,21 @@ class Candidate:
     # member broke" — blame drills to THIS member rather than to the merely
     # worst-scoring one, which may be its victim.
     scc_member: str | None = None
+    # Which scoring channels actually produced ``score`` (the keys of
+    # ``NodeScore.effective_weights``), against the full set the scorer weighed
+    # (the keys of ``NodeScore.components``). A channel that never reported hands
+    # its weight to the ones that did — schema absent turns the judge's 0.40 into
+    # 0.727 of the blend — so an absence silently INCREASED the authority of the
+    # survivors. Fewer channels is less evidence; confidence.py discounts it.
+    # Both None when nothing was blended (unscored node, legacy report): unknown
+    # coverage is not a missing channel and invents no penalty.
+    score_channels: tuple[str, ...] | None = None
+    score_channels_all: tuple[str, ...] | None = None
+    # Origins whose evidence is IDENTICAL to this one's, when the winner was
+    # picked out of an equal set by the deterministic tie-break rather than by
+    # anything the evidence prefers. Empty when nothing was tied. The tie-break
+    # ORDER is unchanged — this only stops the tie from being resolved silently.
+    tied_members: tuple[str, ...] = ()
 
 
 @dataclass(frozen=True)
@@ -104,6 +119,22 @@ class CutAnalysis:
 def _input_flawed(inp: BlameInput, run_id: str) -> bool:
     ns = inp.scores.get(run_id)
     return ns is not None and ns.input_flawed is True
+
+
+def channel_fields(inp: BlameInput, run_id: str) -> dict:
+    """A node's score-channel provenance, as ``Candidate`` kwargs.
+
+    Threaded like score/base/drop so every construction site carries it and no
+    consumer has to reach back into the score map. Absent effective_weights
+    stays absent — an unmeasured blend must not read as a complete one.
+    """
+    ns = inp.scores.get(run_id)
+    if ns is None or ns.effective_weights is None:
+        return {"score_channels": None, "score_channels_all": None}
+    return {
+        "score_channels": tuple(sorted(ns.effective_weights)),
+        "score_channels_all": tuple(sorted(ns.components)),
+    }
 
 
 def _degradation_chains(cond: Condensation, inp: BlameInput) -> list[DegradationChain]:
@@ -318,6 +349,7 @@ def _analyze(cond: Condensation, inp: BlameInput) -> CutAnalysis:
                     if cond.super_nodes[p].score is None
                 )
             ),
+            **channel_fields(inp, sn.exit_node),
         )
         if observed_drop:
             drop_origins.append(cand)
@@ -367,6 +399,7 @@ def _analyze(cond: Condensation, inp: BlameInput) -> CutAnalysis:
                     end_time=inp.node_end_times.get(sn.exit_node),
                     observed_drop=False,
                     cumulative_path=ch.run_ids,
+                    **channel_fields(inp, sn.exit_node),
                 )
             )
     if not origins:
@@ -440,6 +473,11 @@ def _scc_internal_origins(
         if len(sn.members) < 2:
             continue
         best: tuple[float, str, bool, bool] | None = None  # score, member, observed, recovered
+        # Members that qualified with the SAME score as `best`. The winner is the
+        # chronologically first of them (strict `<` below, members are in
+        # chronological order); recording the rest is what stops six equally
+        # evidenced members from being reported as one localised origin.
+        tied: list[str] = []
         for m in sn.members:
             ns = inp.scores.get(m)
             if ns is None or ns.score is None:
@@ -487,6 +525,9 @@ def _scc_internal_origins(
                 observed = False
             if best is None or s < best[0]:
                 best = (s, m, observed, member_recovered)
+                tied = [m]
+            elif s == best[0]:
+                tied.append(m)
         if best is None:
             continue
         score, member, observed, member_recovered = best
@@ -509,6 +550,8 @@ def _scc_internal_origins(
                 base_assumed=False,
                 via="content",
                 scc_member=member,
+                tied_members=tuple(tied) if len(tied) > 1 else (),
+                **channel_fields(inp, sn.exit_node),
             )
         )
     return out
@@ -642,6 +685,7 @@ def _deterministic_origins(
                 recovered=recovered,
                 base_assumed=False,
                 via="deterministic",
+                **channel_fields(inp, run_id),
             )
         )
     if out or not secondary:
@@ -666,6 +710,7 @@ def _deterministic_origins(
             recovered=False,
             base_assumed=False,
             via="deterministic",
+            **channel_fields(inp, run_id),
         )
         for sid, run_id in secondary[:1]   # the earliest in topological order
     ]

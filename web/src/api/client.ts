@@ -4,6 +4,9 @@
 import type {
   AnalyzeResponse,
   BreakersResponse,
+  ContractBody,
+  ContractSuggestion,
+  ContractsResponse,
   FeedbackRequest,
   FeedbackResponse,
   GraphDetail,
@@ -12,6 +15,7 @@ import type {
   IncidentListResponse,
   IncidentStatus,
   LeaderboardResponse,
+  OutputContract,
   PolicyDecisionsResponse,
   RunPayloads,
   VersionDiffResponse,
@@ -99,5 +103,19 @@ export const api = {
   },
   breakers(): Promise<BreakersResponse> {
     return request(`/control/breakers`);
+  },
+  listContracts(): Promise<ContractsResponse> {
+    return request(`/contracts`);
+  },
+  suggestContract(agentName: string, minSamples?: number): Promise<ContractSuggestion> {
+    const min = minSamples ? `&min_samples=${minSamples}` : "";
+    return request(`/contracts/suggest?agent_name=${encodeURIComponent(agentName)}${min}`);
+  },
+  registerContract(body: ContractBody): Promise<OutputContract> {
+    return request(`/contracts`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body),
+    });
   },
 };

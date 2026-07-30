@@ -22,12 +22,22 @@ import json
 import logging
 import os
 import sys
+import urllib.parse
 from pathlib import Path
 
 from . import __version__
 from .analyze import AnalysisRun, analyze, local_settings
 from .bundle import TraceFormatError, bundles_from_exports, load_trace
 from .capture import Capture, serve
+from .contracts import (
+    ApiError,
+    contract_body,
+    read_source,
+    render_list,
+    render_registered,
+    render_suggestion,
+    request,
+)
 from .doctor import (
     check_quiescence,
     diagnose,
@@ -181,6 +191,63 @@ def build_parser() -> argparse.ArgumentParser:
         default="auto",
         help="colourise terminal output (default: auto — off when piped or NO_COLOR)",
     )
+
+    contracts_cmd = sub.add_parser(
+        "contracts",
+        help="register the output contracts the schema scoring channel needs",
+        description=(
+            "Output contracts are the deterministic schema channel: with none "
+            "registered that component is null on every node and the judge's "
+            "weight silently renormalizes to cover it. These commands talk to a "
+            "deployed API (DETECTIVE_API_URL, default http://localhost:8000)."
+        ),
+    )
+    contracts_sub = contracts_cmd.add_subparsers(dest="contracts_command", required=True)
+
+    contracts_list = contracts_sub.add_parser("list", help="show the registered contracts")
+    contracts_register = contracts_sub.add_parser(
+        "register",
+        help="create or replace a contract from a JSON file (or stdin)",
+        description=(
+            "Accepts either a bare contract ({agent_name, agent_version_pattern, "
+            "json_schema}) or the envelope `contracts suggest --json` prints, so a "
+            "reviewed suggestion is posted back unedited. A schema the scoring "
+            "engine cannot enforce is rejected, not stored."
+        ),
+    )
+    contracts_register.add_argument(
+        "--file", default="-", help="JSON file to register (default: - for stdin)"
+    )
+    contracts_suggest = contracts_sub.add_parser(
+        "suggest",
+        help="derive a candidate schema from this agent's stored outputs",
+        description=(
+            "Reads payloads Detective already stored and proposes only what they "
+            "literally show: a key is required when every usable sample had it, "
+            "types are the types observed, nothing is invented. Exits 1 when the "
+            "samples support no contract worth registering."
+        ),
+    )
+    contracts_suggest.add_argument("--agent-name", required=True, help="agent to derive from")
+    contracts_suggest.add_argument(
+        "--min-samples",
+        type=int,
+        default=5,
+        help="usable payloads required before a shape counts as a contract (default: 5)",
+    )
+    contracts_suggest.add_argument(
+        "--limit", type=int, default=100, help="most recent runs to examine (default: 100)"
+    )
+    for contracts_parser in (contracts_list, contracts_register, contracts_suggest):
+        contracts_parser.add_argument(
+            "--json", action="store_true", help="emit the API response as JSON"
+        )
+        contracts_parser.add_argument(
+            "--color",
+            choices=("auto", "always", "never"),
+            default="auto",
+            help="colourise terminal output (default: auto — off when piped or NO_COLOR)",
+        )
     return parser
 
 
@@ -360,6 +427,42 @@ def cmd_doctor(args: argparse.Namespace) -> int:
     return EXIT_CLEAN
 
 
+def cmd_contracts(args: argparse.Namespace) -> int:
+    """Register/inspect output contracts against a deployed API.
+
+    `suggest` exits 1 when it proposes nothing, so `suggest --json > c.json &&
+    register --file c.json` cannot register a refusal.
+    """
+    force = {"always": True, "never": False, "auto": None}[args.color]
+    color = color_enabled(sys.stdout, force=force)
+    try:
+        if args.contracts_command == "list":
+            payload = request("GET", "/contracts")
+            render = render_list
+        elif args.contracts_command == "register":
+            body = contract_body(read_source(args.file))
+            payload = request("POST", "/contracts", body)
+            render = render_registered
+        else:
+            query = (
+                f"?agent_name={urllib.parse.quote(args.agent_name)}"
+                f"&min_samples={args.min_samples}&limit={args.limit}"
+            )
+            payload = request("GET", f"/contracts/suggest{query}")
+            render = render_suggestion
+    except (ApiError, OSError, ValueError) as exc:
+        print(f"detective: {exc}", file=sys.stderr)
+        return EXIT_ERROR
+
+    if args.json:
+        print(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        print(render(payload, color=color))
+    if args.contracts_command == "suggest" and payload.get("contract") is None:
+        return EXIT_INCIDENT
+    return EXIT_CLEAN
+
+
 def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if args.command == "analyze":
@@ -368,6 +471,8 @@ def main(argv: list[str] | None = None) -> int:
         return cmd_capture(args)
     if args.command == "doctor":
         return cmd_doctor(args)
+    if args.command == "contracts":
+        return cmd_contracts(args)
     return EXIT_ERROR
 
 

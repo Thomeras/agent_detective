@@ -12,6 +12,7 @@
 import type { Defect, DefectCaveat, Finding } from "../verdict/types";
 import { defectDescriptor, originPhrase } from "../verdict/descriptor";
 import { SPOKEN_KEYS, summarizeFinding } from "../verdict/findingSummary";
+import { judgeLabel } from "../format";
 import { Badge, Card, Chip, Disclosure, Meter } from "../ui/primitives";
 
 // Human labels for the structured caveat fields (§2.4). Typed kinds first, with
@@ -49,9 +50,11 @@ function CaveatChips({ caveats }: { caveats?: DefectCaveat[] }) {
 function FindingRow({
   finding,
   labelFor,
+  judgeModel,
 }: {
   finding: Finding;
   labelFor?: (runId: string) => string;
+  judgeModel?: string | null;
 }) {
   const summary = summarizeFinding(finding, labelFor);
   const subject =
@@ -107,6 +110,14 @@ function FindingRow({
             kind: <span className="mono">{finding.kind}</span>
           </>
         )}
+        {/* An assessed finding names its instrument; a deterministic one has no
+            judge to name. */}
+        {finding.channel === "judged" && (
+          <>
+            {" · judge: "}
+            <span className="mono">{judgeLabel(judgeModel)}</span>
+          </>
+        )}
       </div>
 
       {rest.length > 0 && (
@@ -140,12 +151,16 @@ export default function DefectCard({
   labelFor,
   selected,
   onSelect,
+  judgeModel,
 }: {
   defect: Defect;
   findings: Finding[];
   labelFor: (runId: string) => string;
   selected: boolean;
   onSelect: () => void;
+  // Which model produced the judged numbers on this report; absent on reports
+  // written before the judge model was recorded.
+  judgeModel?: string | null;
 }) {
   const desc = defectDescriptor(defect.kind, defect.origin);
   const where = originPhrase(defect.origin, labelFor);
@@ -183,9 +198,19 @@ export default function DefectCard({
         title={
           <span className="defect-title">
             {desc.label}
-            <Badge channel={defect.channel} title={`${defect.channel} channel`}>
+            <Badge
+              channel={defect.channel}
+              title={
+                defect.channel === "deterministic"
+                  ? "deterministic channel"
+                  : `judged channel — ${judgeLabel(judgeModel)}`
+              }
+            >
               {defect.channel === "deterministic" ? "deterministic" : "judged"}
             </Badge>
+            {defect.channel === "judged" && (
+              <span className="dim small mono">{judgeLabel(judgeModel)}</span>
+            )}
           </span>
         }
         actions={<Badge tone={desc.tone}>{originBadgeText(defect)}</Badge>}
@@ -231,6 +256,7 @@ export default function DefectCard({
                         key={`s-${x.finding.kind}-${i}`}
                         finding={x.finding}
                         labelFor={labelFor}
+                        judgeModel={judgeModel}
                       />
                     ))}
                   </div>
@@ -247,6 +273,7 @@ export default function DefectCard({
                         key={`r-${x.finding.kind}-${i}`}
                         finding={x.finding}
                         labelFor={labelFor}
+                        judgeModel={judgeModel}
                       />
                     ))}
                   </div>
@@ -261,6 +288,7 @@ export default function DefectCard({
                         key={`c-${x.finding.kind}-${i}`}
                         finding={x.finding}
                         labelFor={labelFor}
+                        judgeModel={judgeModel}
                       />
                     ))}
                   </div>

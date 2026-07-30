@@ -114,7 +114,10 @@ async def test_leaderboard_without_param_has_no_version_fields(client, repo, run
     # Default behavior unchanged without group_by.
     repo.runs = [run_factory(uuid.uuid4(), agent_name="scraper-agent")]
     agent = (await client.get("/agents/leaderboard")).json()["agents"][0]
-    assert set(agent) == {"agent_name", "total_cost_usd", "run_count", "failure_rate", "avg_quality_score"}
+    assert set(agent) == {
+        "agent_name", "total_cost_usd", "run_count", "priced_run_count",
+        "failure_rate", "avg_quality_score",
+    }
 
 
 async def test_leaderboard_rejects_unknown_group_by(client):
