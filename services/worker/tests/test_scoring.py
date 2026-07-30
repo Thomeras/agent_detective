@@ -911,12 +911,17 @@ def test_judge_prompt_role_rubric_is_locked():
     """The role-aware rubric disappeared from judge.md three times because no
     test pinned it. This test IS the pin: the prompt must carry the NODE_ROLE
     placeholder (the role is resolved in code, never inferred by the LLM), the
-    role-first instruction, and the planner worked example."""
-    prompt = load_prompt("judge.md")
+    role-first instruction, and the planner worked examples — prose outline AND
+    structured routing decision."""
+    prompt = " ".join(load_prompt("judge.md").split())
     assert "<<NODE_ROLE>>" in prompt
     assert "ITS OWN ROLE" in prompt
     assert "category error" in prompt
     assert "Role-blind" in prompt and "false origins" in prompt
+    # A plan may be structured data; "only returns the ICO and sources" about a
+    # PLANNER is the category error the second worked example forbids.
+    assert "structured routing decision IS the plan" in prompt
+    assert "only returns the ICO and sources" in prompt
 
 
 def test_judge_prompt_forbids_reading_the_handoff_as_a_spec():
@@ -944,8 +949,27 @@ def test_node_role_is_resolved_deterministically():
     assert node_role("render", is_deliverable_producer=True).startswith(
         "DELIVERABLE PRODUCER"
     )
+    assert node_role("collect:press").startswith("RETRIEVER / COLLECTOR")
+    assert node_role("fetch_ares").startswith("RETRIEVER / COLLECTOR")
     assert node_role("act").startswith("INTERMEDIATE PRODUCER")
     assert node_role(None).startswith("INTERMEDIATE PRODUCER")
+
+
+def test_node_role_precedence_holds_on_overlapping_names():
+    """First match wins: VERIFIER > PLANNER > DELIVERABLE PRODUCER > RETRIEVER.
+    A node that ships the artifact is judged on the artifact even when it
+    fetched the material itself; ``triage`` keeps its routing rubric; a name
+    scored on its yield (``harvest``) stays INTERMEDIATE."""
+    from worker.scoring import node_role
+
+    assert node_role("triage").startswith("PLANNER")
+    assert node_role(
+        "collect", is_deliverable_producer=True
+    ).startswith("DELIVERABLE PRODUCER")
+    assert node_role("harvest").startswith("INTERMEDIATE PRODUCER")
+    # The measured intermediates of graph 7fa6f73d must not slide to RETRIEVER.
+    for name in ("extract", "reconcile", "card", "timeline"):
+        assert node_role(name).startswith("INTERMEDIATE PRODUCER"), name
 
 
 def test_intermediate_role_does_not_point_the_judge_at_its_input():
@@ -981,6 +1005,28 @@ def test_score_node_states_the_role_in_the_judge_prompt():
     assert captured, "judge was never called"
     assert "PLANNER — its correct output is a plan" in captured[0]
     assert "<<NODE_ROLE>>" not in captured[0]
+
+
+def test_score_node_states_retriever_role_for_collector_nodes():
+    """A collect:* node must reach the judge as RETRIEVER / COLLECTOR — judged
+    on the query and the faithfulness of the report, never the yield."""
+    captured: list[str] = []
+
+    class CapturingJudge:
+        async def complete_json(self, prompt, *, system=None):
+            captured.append(prompt)
+            return {"task_score": 0.9, "input_flawed": False, "reasoning": "ok"}
+
+    asyncio.run(
+        score_node(
+            make_run(15, "collect:press"), "the input", "a few records", [],
+            None, CapturingJudge(), asyncio.Semaphore(2), WEIGHTS, 0.5,
+            load_prompt("judge.md"),
+        )
+    )
+    assert captured, "judge was never called"
+    assert "RETRIEVER / COLLECTOR" in captured[0]
+    assert "never the size of the yield" in captured[0]
 
 
 # --- empty output vs missing payload --------------------------------------

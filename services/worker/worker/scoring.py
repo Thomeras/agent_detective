@@ -26,7 +26,7 @@ from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from blame_engine import NodeScore, is_planner, is_verifier
+from blame_engine import NodeScore, is_planner, is_retriever, is_verifier
 
 from .behavioral import (
     duplicate_side_effect_signals,
@@ -78,11 +78,19 @@ _WORD_RE = re.compile(r"\S+")
 def node_role(agent_name: str | None, *, is_deliverable_producer: bool = False) -> str:
     """Deterministic role classification, stated to the judge as ground truth.
 
+    Precedence, first match wins: VERIFIER → PLANNER → DELIVERABLE PRODUCER →
+    RETRIEVER → INTERMEDIATE.
+
     VERIFIER is tested FIRST. When a name carries both hints the verifier word is
     the job and the planner word only says what is being checked — a
     ``quality_controller`` verifies, a ``plan_reviewer`` reviews. Judging either
     by the planner rubric ("its correct output is a plan") is the role-blind
     category error the rubric split exists to prevent.
+
+    PLANNER beats RETRIEVER so ``triage`` keeps its routing rubric; DELIVERABLE
+    PRODUCER beats RETRIEVER because a node that ships the artifact is judged on
+    the artifact even when it fetched the material itself. A name with no hint
+    falls through to INTERMEDIATE — a wrong role is worse than none.
     """
     if is_verifier(agent_name):
         return "VERIFIER — its correct output is a verdict on another node's work"
@@ -95,6 +103,13 @@ def node_role(agent_name: str | None, *, is_deliverable_producer: bool = False) 
         return (
             "DELIVERABLE PRODUCER — its output IS the artifact shipped to the "
             "user; deliverable-level requirements apply in full"
+        )
+    if is_retriever(agent_name):
+        return (
+            "RETRIEVER / COLLECTOR — its correct output is a faithful report "
+            "of what the queried source returned, INCLUDING NOTHING; judge the "
+            "query it made and the faithfulness of the report, never the size "
+            "of the yield"
         )
     # "judge it against what its input asked THIS step to produce" USED to stand
     # here, and it was the bug: in a pipeline the input is mostly the previous

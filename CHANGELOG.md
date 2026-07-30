@@ -31,6 +31,18 @@ Distributions are versioned independently; a release lists the ones that moved.
   incident upsert on `(graph_id, incident_key)`) keeps the repeat safe.
 
 ### Changed
+- **New judge role: RETRIEVER / COLLECTOR.** `blame_engine.roles` gained
+  `RETRIEVER_PREFIXES` + `is_retriever` (prefix-token matching, same discipline
+  as the planner hints), and `node_role()` resolves it with explicit precedence
+  VERIFIER → PLANNER → DELIVERABLE PRODUCER → RETRIEVER → INTERMEDIATE. A
+  retriever's correct output is a faithful report of what the source returned —
+  including nothing — so collectors with partial results are judged on the
+  query and the fidelity of the report, never the yield. `harvest` and
+  `search`/`lookup` stay out of the stem set on purpose (scored-on-yield and
+  tool-name collisions respectively); a name with no hint still falls through
+  to INTERMEDIATE. The judge rubric now also states that a plan may be
+  structured data — a routing object like `{ico, sources}` IS the plan — with
+  a worked example mirroring the prose-outline one.
 - **A run no analysis ever covered now reads `not_analyzed`, distinct from an
   analysed-but-unscored run.** Both used to surface as `quality_score=null` +
   `unscored_reason=null`; the API graph detail and the CLI report now derive

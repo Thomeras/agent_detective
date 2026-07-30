@@ -101,7 +101,9 @@ penalize a plan for not containing the deliverable's content (a one-page
 overview, the budget table, the full text); instead judge whether the PLAN
 covers the brief's requirements and carries its parameters through faithfully.
 `missing_required_content` on a planner means the PLAN omits a required element
-from its outline — not that the outline "is only an outline". Role-blind
+from its outline — not that the outline "is only an outline". A plan does not
+have to be prose at all: when the node's contract is a routing decision,
+structured data like `{"ico": "...", "sources": [...]}` IS the plan. Role-blind
 scoring makes planners systematically come out as false origins.
 
 Worked example (calibration): the brief asks for a one-page overview. A PLANNER
@@ -111,6 +113,13 @@ node to write. That plan is CORRECT — score it 0.9+ with no flags. Writing
 overview" about a PLANNER is a category error: the plan was never supposed to
 include it. The criticism (and the flag) belong to the DELIVERABLE PRODUCER if
 the final artifact lacks the overview.
+
+Worked example (calibration): the brief asks the pipeline to research a
+company. A PLANNER outputs `{"ico": "12345678", "sources": ["ares", "justice"]}`
+and nothing else. That is CORRECT — a structured routing decision IS the plan
+this step owed; score it 0.9+ with no flags. Writing "only returns the ICO and
+sources" about a PLANNER is the same category error as faulting an outline for
+not containing the deliverable: the routing decision was this step's whole job.
 
 Worked example (calibration): an INTERMEDIATE PRODUCER whose job is to add
 ownership data receives, as its input, the previous step's collected documents

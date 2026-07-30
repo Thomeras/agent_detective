@@ -9,7 +9,7 @@ failures of the old ``any(hint in name)`` substring test.
 
 import pytest
 
-from blame_engine.roles import is_planner, is_verifier
+from blame_engine.roles import is_planner, is_retriever, is_verifier
 
 
 @pytest.mark.parametrize(
@@ -95,3 +95,34 @@ def test_verifier_wins_over_planner_when_a_name_carries_both() -> None:
     ``node_role`` tests verifier first for exactly this reason."""
     for name in ("quality_controller", "plan_reviewer", "review_coordinator"):
         assert is_verifier(name), name
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # the collector convention measured on the 7fa6f73d research graph
+        "collect:press", "collect:czechinvest", "collect:discover_web",
+        "collector", "fetch_ares", "fetcher", "retriever", "retrieve_registry",
+        "gatherer", "gather_sources",
+    ],
+)
+def test_retriever_names(name) -> None:
+    assert is_retriever(name)
+
+
+@pytest.mark.parametrize(
+    "name",
+    [
+        # kept OUT deliberately: the measured harvester was scored on the
+        # addresses it returned — the yield was the requirement, so the
+        # retriever role would shield it from legitimate criticism
+        "harvest",
+        # tool names as often as agent roles; a wrong role is worse than none
+        "search", "web_lookup",
+        # other roles and plain producers
+        "triage", "plan", "extract", "reconcile", "research", "writer",
+        None, "",
+    ],
+)
+def test_non_retriever_names(name) -> None:
+    assert not is_retriever(name)

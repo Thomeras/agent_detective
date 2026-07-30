@@ -79,10 +79,12 @@ from .narrative import (
 )
 from .roles import (
     PLANNER_PREFIXES,
+    RETRIEVER_PREFIXES,
     VERIFIER_PHRASES,
     VERIFIER_SUBSTRINGS,
     VERIFIER_TOKENS,
     is_planner,
+    is_retriever,
     is_verifier,
 )
 from .types import (
@@ -181,8 +183,10 @@ __all__ = [
     # Node-role heuristics (single home; the worker imports these)
     "is_verifier",
     "is_planner",
+    "is_retriever",
     "VERIFIER_TOKENS",
     "VERIFIER_SUBSTRINGS",
     "VERIFIER_PHRASES",
     "PLANNER_PREFIXES",
+    "RETRIEVER_PREFIXES",
 ]

@@ -43,8 +43,10 @@ __all__ = [
     "VERIFIER_SUBSTRINGS",
     "VERIFIER_PHRASES",
     "PLANNER_PREFIXES",
+    "RETRIEVER_PREFIXES",
     "is_verifier",
     "is_planner",
+    "is_retriever",
     "tokens",
 ]
 
@@ -111,6 +113,29 @@ PLANNER_PREFIXES: tuple[str, ...] = (
     "manag", "delegat", "schedul", "triage", "director", "controll",
 )
 
+# Retriever/collector stems: the node's correct output is a faithful report of
+# what the queried source returned — including nothing. Matched as token
+# PREFIXES, same discipline as PLANNER_PREFIXES.
+#
+# ``collect`` — the collector convention seen in the wild (``collect:press``).
+# ``fetch``/``retriev``/``gather`` — the plain English words for "go ask a
+# source and bring back what it said", with no common non-retrieval reading.
+#
+# Left out on purpose:
+# - ``triage`` is already a PLANNER and planner wins on precedence — a triage
+#   node decides where work goes, it does not report a source's answer.
+# - ``harvest``: the one harvester we measured was scored on the ADDRESSES it
+#   returned — the yield was the requirement there, so the retriever role
+#   ("never judge the yield") would shield it from legitimate criticism.
+# - ``search``/``lookup``: they name TOOLS as often as agents, so an agent
+#   carrying one is as likely a tool wrapper as a retrieval step; a wrong role
+#   is worse than none, and INTERMEDIATE is the safe fallback.
+# - ``crawl``/``scrap``/``discover``: rare as agent names, and ``discover``
+#   covers analysis phases as much as fetching.
+RETRIEVER_PREFIXES: tuple[str, ...] = (
+    "collect", "fetch", "retriev", "gather",
+)
+
 _SPLIT_RE = re.compile(r"[^0-9a-zA-Z]+")
 _CAMEL_RE = re.compile(r"(?<=[a-z0-9])(?=[A-Z])")
 
@@ -142,3 +167,8 @@ def is_verifier(name: str | None) -> bool:
 def is_planner(name: str | None) -> bool:
     """True when the agent name identifies a planner/orchestrator node."""
     return any(t.startswith(p) for t in tokens(name) for p in PLANNER_PREFIXES)
+
+
+def is_retriever(name: str | None) -> bool:
+    """True when the agent name identifies a retriever/collector node."""
+    return any(t.startswith(p) for t in tokens(name) for p in RETRIEVER_PREFIXES)
