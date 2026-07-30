@@ -319,7 +319,9 @@ With no judge configured, nodes report **unscored** rather than passing, and
 the report says plainly that the judged channel was off. `--no-judge` forces
 that mode even when the env vars are set. The judge is **role-aware**:
 producer nodes are judged relative to their input; verifier nodes on whether
-their PASS/FAIL verdict was correct.
+their PASS/FAIL verdict was correct. Exactly which nodes can get a score at
+all without a judge, and what every `unscored_reason` means:
+[§4.4](#44-when-a-node-gets-a-score--and-when-it-cannot).
 
 ### 2.3 Reading the report
 
@@ -400,9 +402,9 @@ use:
   scoring (flagged graphs always do).
 - `A2A_DETECTION=true` (compose default for ingest) enables cross-trace
   agent-to-agent edges; peer/mesh architectures require it.
-- One logical execution across multiple traces/processes? Correlate with the
-  `x-execution-graph-id` attribute — membership only, direction still comes
-  from structure ([instrumentation.md](instrumentation.md#the-correlation-header-x-execution-graph-id)).
+- One logical execution across multiple traces/processes? Share the graph
+  identity and build the edges deliberately — full walkthrough:
+  [instrumentation.md](instrumentation.md#multi-stage-and-multi-process-pipelines).
 
 ---
 
@@ -597,7 +599,75 @@ effective values at startup and serves the non-secret subset on
 Incident severity (worst first): `latent_defect` > `degraded_quality` >
 `terminal_failure` > `cost_overrun`.
 
-### 4.4 Packages and distributions
+### 4.4 When a node gets a score — and when it cannot
+
+The rules below are the code, written down: `composite_score` and
+`score_node` in `services/worker/worker/scoring.py`, the weights in
+`services/worker/worker/config.py`.
+
+**The arithmetic.** A node's quality score is a weighted mean over the
+components that are *present*, with these weights (all env-overridable):
+
+| Component | Weight | Present when |
+|---|---|---|
+| judge | 0.40 (`SCORE_W_JUDGE`) | a judge is configured and answered |
+| schema | 0.35 (`SCORE_W_SCHEMA`) | an output contract is **registered** for this agent |
+| heuristics | 0.15 (`SCORE_W_HEURISTICS`) | a heuristic check actually fired — a clean pass is silence, never 1.0 |
+
+With the judge present, the node is scored whenever anything measurable
+exists. Without it, the present weights must sum to at least
+`SCORE_MIN_WEIGHT` (default **0.5**), or the node is unscored with
+`insufficient_components`. The only way over the floor judge-less is schema +
+heuristics: **0.35 + 0.15 = 0.50** — and since the heuristics component is
+absent unless it found something to subtract, in practice a node gets a score
+without a judge only when it has a registered contract **and** the heuristics
+channel observed a problem. No contract → at most 0.15 → always
+`insufficient_components`. That is the designed behaviour, not a broken
+pipeline: `detective doctor` says up front how many nodes of a judge-less
+trace will land there, and `SCORE_MIN_WEIGHT` is an operator knob if you
+deliberately want a lower floor — not a default we ship.
+
+**The root wrapper always comes out `payload_missing`.** The root carries the
+original request as its input and has no output of its own — there is nothing
+to score, and that is recorded as *unscored*, never as a failure. The same
+holds for orchestrator wrapper spans generally; a **non-root** node in this
+state additionally raises an `instrumentation_warning` on the report, so the
+blind spot stays visible without being charged to the agent.
+
+**`not_analyzed` ≠ `unscored`.** An unscored node went through analysis and
+no quality scalar could be produced — the reason says why. `not_analyzed`
+means no analysis ever covered the run: the graph was never analyzed, or the
+run arrived after it (late spans — see
+[instrumentation.md](instrumentation.md#multi-stage-and-multi-process-pipelines)).
+It is derived at the read boundary (API, CLI report): the engine always
+writes a reason when it analyzes, so `quality_score NULL` +
+`unscored_reason NULL` can only mean "never analyzed".
+
+| `unscored_reason` | Meaning |
+|---|---|
+| `not_analyzed` | analysis never covered this run (never ran, or run arrived late) |
+| `payload_missing` | no output payload was recorded — the wrapper/orchestrator shape |
+| `empty_output` | output was recorded **empty** while usage reports emitted tokens — the agent spent its budget and returned nothing; also a fail-severity signal |
+| `zero_result_set` | output is well-formed but carries zero records; rides the deterministic channel as a warn signal |
+| `insufficient_components` | present component weights did not reach `SCORE_MIN_WEIGHT` — the judge-less default above |
+
+A judge endpoint failure is not a crash and not a separate state: the judge
+component simply comes back absent, so the node lands wherever the remaining
+weights put it — usually `insufficient_components`.
+
+**What deterministic-only mode gives — and what it does not.** With no judge
+(`--no-judge`, or no `JUDGE_*` set) the deterministic channel still runs in
+full: contract-breach checks, artifact integrity, every named signal (retry
+storms, loop fingerprints, sensitive-data scans, …), flags, and the terminal
+verdict — and the report shows each unscored node's measured components
+labelled *partial deterministic measurement* instead of a blank. What it does
+**not** give: per-node quality scalars for most nodes (see the arithmetic),
+so score-drop localization has nothing to walk and blame rests on the
+deterministic channel alone, with confidence capped accordingly.
+`quality_score` stays `NULL` — no number is fabricated from the 0.15
+heuristics weight and sold as a score.
+
+### 4.5 Packages and distributions
 
 | Distribution | Import | What | License |
 |---|---|---|---|

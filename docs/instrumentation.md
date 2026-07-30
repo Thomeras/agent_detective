@@ -339,6 +339,91 @@ Two practical gotchas when wiring a real framework, learned the hard way:
   whatever you set; if you only have token counts, compute cost = tokens × price
   in the exporter and attach it (again, absent → unknown, never a default).
 
+## Multi-stage and multi-process pipelines
+
+One logical execution often lives in several processes or traces: a triage
+service emits its own trace, the worker it dispatched to emits another. This
+section is about getting those pieces into **one graph with the right edges**.
+
+### Sharing graph identity across processes
+
+By default every `run()` generates its own trace id, so two processes land in
+two graphs. Pass the identity in from outside — the public parameters of
+`run()`, never `run._trace_id`:
+
+| Parameter | Effect |
+|---|---|
+| `trace_id=` | both processes emit spans under the **same trace id** — the strongest correlation, everything below works with no header at all |
+| `parent_span_id=` | the downstream root span's parent — builds a structural edge across the process boundary |
+| `graph_id=` | sets the `x-execution-graph-id` attribute on the root span — groups separate traces into one graph (see [the correlation header](#the-correlation-header-x-execution-graph-id) below) |
+
+Hand the identity over through your own channel (a job payload, a queue
+message); the SDK exposes exactly the two values you need to pass:
+
+```python
+# upstream process
+with run("triage", task=request) as r:
+    ...
+    dispatch(job, trace_id=r.trace_id, parent=r.root_span_id)
+
+# downstream process
+with run("worker", task=job.task,
+         trace_id=job.trace_id, parent_span_id=job.parent) as r:
+    ...
+```
+
+### Two ways to build a cross-process edge
+
+- **SPAWN via a propagated parent (preferred).** Passing `trace_id=` +
+  `parent_span_id=` parents the downstream root span under the upstream one,
+  and the mapper emits the SPAWN edge from structure alone — no name
+  resolution, no ambiguity.
+- **TOOL_DELEGATION resolved by name.** A `TOOL` span carrying
+  `gen_ai.tool.target_agent = "worker"` yields an edge target → caller. The
+  target run is resolved **by agent name**, and it does not have to share the
+  caller's POST: at finalization ingest re-maps the full stored span set and
+  resolves delegations deferred from earlier batches against all runs of the
+  graph. Name resolution is inherently ambiguous, though — with two runs of
+  the same agent name in one graph, the edge lands on the first match (same
+  trace preferred, then earliest start, then run id). Prefer SPAWN whenever
+  you control both ends.
+
+### Limitations, written down
+
+- **The correlation header gives membership, not direction.** A shared
+  `x-execution-graph-id` puts both runs in one graph but yields no edge; edge
+  direction always comes from structure. Full statement:
+  [Limitation: membership only, not direction](#limitation-membership-only-not-direction).
+- **A delegation names a role, not a run.** Two same-named targets = an edge
+  to the first in resolution order. If you need a specific instance,
+  propagate the parent span id instead.
+- **The graph has a deadline.** Edges and identity are recomputed at
+  finalization; whatever arrives after it is late — see below.
+
+### The quiescence window — and what "late" means
+
+Ingest keeps a graph open until its root run ends **or** no new spans arrive
+for `GRAPH_QUIESCENCE_SECONDS` (default **30 s**; `FINALIZER_CHECK_SECONDS`
+sets the scan cadence). At finalization the full stored span set is re-mapped
+— that is when deferred delegations resolve and cross-batch edges appear —
+and the graph is announced for analysis exactly once.
+
+Verify the effective value instead of assuming the default: the ingest logs
+it at startup (`effective config: graph_quiescence_seconds=…`) and serves the
+non-secret subset on `GET /config`; `detective doctor` reads it from there
+and says *unknown* when no ingest answers — it never assumes the default. For
+pipelines whose stages start minutes apart, raise
+`GRAPH_QUIESCENCE_SECONDS`, or the later stages land in a graph that was
+already analyzed.
+
+**Spans arriving after finalization are not silently dropped.** The graph row
+records them (`late_spans_count`, `late_spans_last_at`), the ingest logs
+them, and runs that arrive this way stay `not_analyzed`. Set
+`REANALYZE_LATE_SPANS=true` to go further: the graph is re-mapped and
+re-announced, triggering a fresh analysis over the now-complete span set. The
+flag is off by default — a re-analysis can change a verdict consumers may
+already have read.
+
 ## The correlation header: `x-execution-graph-id`
 
 By default Agent Detective groups a run into an execution graph by its trace id

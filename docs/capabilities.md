@@ -82,8 +82,10 @@ misreference), each caught by the deterministic counter-channel.
 
 ## Honest limits
 What the trace did not capture at run time, no analysis can manufacture
-(`trace-requirements.md`). The corpus is still ONE harness, ONE linear
-topology, ONE injection — the graph-first thesis (fan-out, retry loops, A2A)
-awaits its validating trace. Backlog: orphan-findings counter, the
-text-vs-own-score half of the assessment emitter, inline-prose deletion, B2
-screens.
+(`trace-requirements.md`). Without a judge, most nodes get no quality score
+unless a registered output contract crosses the weight floor — the exact
+arithmetic and every `unscored_reason`: `usage.md` §4.4. The corpus is still
+ONE harness, ONE linear topology, ONE injection — the graph-first thesis
+(fan-out, retry loops, A2A) awaits its validating trace. Backlog:
+orphan-findings counter, the text-vs-own-score half of the assessment
+emitter, inline-prose deletion, B2 screens.
