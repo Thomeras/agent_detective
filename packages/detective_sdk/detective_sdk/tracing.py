@@ -525,9 +525,7 @@ class Retry:
         # have to re-derive them by splitting a string.
         span._attrs["agent_detective.attempt"] = str(number)
         span._attrs["agent_detective.attempt_of"] = str(agent)
-        if self._run.enabled:
-            self._run._spans.append(span)
-        self._run._open.append(span)
+        self._run._track(span)
         self._attempts.append(span)
         return span
 
@@ -680,23 +678,24 @@ class Run:
         the handoff really did carry that value, and without it every node looks
         like it started from nothing, leaving blame nothing to compare.
         """
-        parent = self._last_step.span_id if self._last_step is not None else self._root_id
-        if input is None and self._last_step is not None:
-            input = self._last_step.output
-        if input is None and self._last_step is None:
-            input = self._task
-        span = Span(self, name, parent, input=input)
-        self._track(span)
-        self._last_step = span
+        with self._lock:
+            last = self._last_step
+            parent = last.span_id if last is not None else self._root_id
+            if input is None:
+                input = last.output if last is not None else self._task
+            span = Span(self, name, parent, input=input)
+            self._track(span)
+            self._last_step = span
         return span
 
     def span(self, name: str, *, input: Any = None) -> Span:
         """A NESTED step: its parent is the innermost span still open."""
-        parent = self._open[-1].span_id if self._open else self._root_id
-        if input is None:
-            input = self._open[-1]._input if self._open else self._task
-        span = Span(self, name, parent, input=input)
-        self._track(span)
+        with self._lock:
+            parent = self._open[-1].span_id if self._open else self._root_id
+            if input is None:
+                input = self._open[-1]._input if self._open else self._task
+            span = Span(self, name, parent, input=input)
+            self._track(span)
         return span
 
     def _fanout_point(self) -> Optional[Span]:
@@ -711,7 +710,7 @@ class Run:
             for span in reversed(self._open):
                 if not span._parallel:
                     return span
-        return self._last_step
+            return self._last_step
 
     def branch(self, name: str, *, input: Any = None, of: Span | None = None) -> Span:
         """One arm of a FAN-OUT: parallel with its siblings, not chained to them.
@@ -732,22 +731,23 @@ class Run:
         to fan out from a specific step, e.g. a second fan-out nested inside an
         arm that is still running.
         """
-        point = of if of is not None else self._fanout_point()
-        parent = point.span_id if point is not None else self._root_id
-        if input is None and point is not None:
-            # ONLY what the dispatcher actually produced. When it is still open
-            # and has produced nothing yet, the arm's input stays unknown —
-            # substituting the dispatcher's OWN input would claim a handoff that
-            # did not happen, and a contract check reading it would find the
-            # original parameters intact on work that never received them. This
-            # is the refusal `Retry.attempt` already makes; `branch` inherited
-            # the opposite habit from `span` and it was wrong in both.
-            input = point.output
-        if input is None and point is None:
-            input = self._task
-        span = Span(self, name, parent, input=input)
-        span._parallel = True
-        self._track(span)
+        with self._lock:
+            point = of if of is not None else self._fanout_point()
+            parent = point.span_id if point is not None else self._root_id
+            if input is None and point is not None:
+                # ONLY what the dispatcher actually produced. When it is still open
+                # and has produced nothing yet, the arm's input stays unknown —
+                # substituting the dispatcher's OWN input would claim a handoff that
+                # did not happen, and a contract check reading it would find the
+                # original parameters intact on work that never received them. This
+                # is the refusal `Retry.attempt` already makes; `branch` inherited
+                # the opposite habit from `span` and it was wrong in both.
+                input = point.output
+            if input is None and point is None:
+                input = self._task
+            span = Span(self, name, parent, input=input)
+            span._parallel = True
+            self._track(span)
         return span
 
     def join(self, name: str, sources: "Iterable[Span | str]", *, input: Any = None) -> Span:
@@ -760,23 +760,27 @@ class Run:
 
         ``input`` defaults to ``{agent name: that agent's output}`` — the joiner
         really did receive those values, and without them the merge step looks
-        like it invented its result. Sources the SDK never saw an output for (a
-        bare agent name, or a span whose ``output`` was never set) are LEFT OUT
-        of that default rather than entered as null: null reads as "produced
-        nothing", which is a different claim from "not recorded here". Pass
-        ``input=`` when you have the real merged input.
+        like it invented its result. A bare agent name resolves to the spans of
+        that name already recorded in this run, so an event-driven fan-in (the
+        integrator holds callbacks, not :class:`Span` objects) merges exactly
+        what the ``with``-style one does. Sources the SDK never saw an output
+        for (an unknown name, or a span whose ``output`` was never set) are
+        LEFT OUT of that default rather than entered as null: null reads as
+        "produced nothing", which is a different claim from "not recorded here".
+        Pass ``input=`` when you have the real merged input.
         """
         collected = list(sources)
-        point = self._fanout_point()
-        parent = point.span_id if point is not None else self._root_id
-        if input is None:
-            input = self._join_input(collected)
-        span = Span(self, name, parent, input=input)
-        self._track(span)
-        span.reads_from(*collected, tool="collect")
-        # The pipeline resumes here: a following `step` continues from the merge,
-        # not from the step that fanned out.
-        self._last_step = span
+        with self._lock:
+            point = self._fanout_point()
+            parent = point.span_id if point is not None else self._root_id
+            if input is None:
+                input = self._join_input(collected)
+            span = Span(self, name, parent, input=input)
+            self._track(span)
+            span.reads_from(*collected, tool="collect")
+            # The pipeline resumes here: a following `step` continues from the
+            # merge, not from the step that fanned out.
+            self._last_step = span
         return span
 
     def _join_input(self, sources: "list[Span | str]") -> Any:
@@ -788,11 +792,28 @@ class Run:
         text, presented as the complete merge input. A judge then scored the
         merge against a third of what it merged, and blame walking back from a
         bad merge had two thirds of the evidence deleted.
+
+        A bare name stands for every span this run recorded under it, so the
+        same-named-arm grouping applies whether the sources arrived as objects
+        or as names.
         """
         grouped: dict[str, list[Any]] = {}
-        for source in sources:
-            if isinstance(source, Span) and source.output is not None:
-                grouped.setdefault(source.name, []).append(source.output)
+        with self._lock:
+            for source in sources:
+                if isinstance(source, Span):
+                    if source.output is not None:
+                        grouped.setdefault(source.name, []).append(source.output)
+                    continue
+                name = str(source or "").strip()
+                if not name:
+                    continue
+                for span in self._spans:
+                    if (
+                        isinstance(span, Span)
+                        and span.name == name
+                        and span.output is not None
+                    ):
+                        grouped.setdefault(name, []).append(span.output)
         merged = {
             name: outputs[0] if len(outputs) == 1 else outputs
             for name, outputs in grouped.items()
@@ -833,24 +854,26 @@ class Run:
         otherwise — the SDK will not assume the last attempt's output was
         accepted, and an unset output is recorded as unscored, not as empty.
         """
-        if of is not None:
-            point = of
-        elif parallel:
-            point = self._fanout_point()
-        else:
-            point = self._open[-1] if self._open else self._last_step
-        parent = point.span_id if point is not None else self._root_id
-        if input is None:
-            input = point.output if point is not None else self._task
-        span = Span(self, name, parent, input=input)
-        span._parallel = parallel
-        self._track(span)
-        if not parallel:
-            # The loop is one stage of the enclosing pipeline: what follows it
-            # chains off the controller, never off an attempt. An ARM is not a
-            # stage — like `branch`, it must not become the chain head, or the
-            # step after the join would continue from whichever arm ran last.
-            self._last_step = span
+        with self._lock:
+            if of is not None:
+                point = of
+            elif parallel:
+                point = self._fanout_point()
+            else:
+                point = self._open[-1] if self._open else self._last_step
+            parent = point.span_id if point is not None else self._root_id
+            if input is None:
+                input = point.output if point is not None else self._task
+            span = Span(self, name, parent, input=input)
+            span._parallel = parallel
+            self._track(span)
+            if not parallel:
+                # The loop is one stage of the enclosing pipeline: what follows
+                # it chains off the controller, never off an attempt. An ARM is
+                # not a stage — like `branch`, it must not become the chain head,
+                # or the step after the join would continue from whichever arm
+                # ran last.
+                self._last_step = span
         return Retry(self, span)
 
     def _delegate(
@@ -905,12 +928,13 @@ class Run:
         Returns ``None`` for a step that was never opened (a stray "finished"
         callback), rather than inventing a zero-length span.
         """
-        for span in reversed(self._open):
-            if span.name == name:
-                if failed:
-                    span.fail()
-                span.end(output)
-                return span
+        with self._lock:
+            for span in reversed(self._open):
+                if span.name == name:
+                    if failed:
+                        span.fail()
+                    span.end(output)
+                    return span
         return None
 
     def _close(self, span: Span) -> None:
