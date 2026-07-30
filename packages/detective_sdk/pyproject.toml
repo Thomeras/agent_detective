@@ -21,6 +21,11 @@ Homepage = "https://github.com/Thomeras/agent_detective"
 # extra just makes the requirement explicit. The module itself imports OTel
 # lazily and its transforms are testable without it.
 otel = ["opentelemetry-sdk>=1.20"]
+# For `detective_sdk.langgraph`, which hooks node runs through LangGraph's
+# callback seam. langgraph pulls in langchain-core, the only import the
+# adapter needs; the module imports it lazily and raises at construction
+# without it.
+langgraph = ["langgraph>=0.2"]
 
 [dependency-groups]
 dev = [
