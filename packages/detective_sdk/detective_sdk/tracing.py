@@ -634,7 +634,9 @@ class Run:
         self._trace_id = _trace_id_of(trace_id)
         self._root_id = _hex(8)
         self._parent_span_id = _span_id(parent_span_id)
-        self._graph_id = str(graph_id or "").strip() or None
+        self._attrs: dict[str, str] = {}
+        if graph_id is not None and str(graph_id).strip():
+            self.attr("x-execution-graph-id", graph_id)
         self._start_ns = time.time_ns()
         self._spans: list[Span] = []
         self._open: list[Span] = []          # nesting stack, for `span`
@@ -656,6 +658,11 @@ class Run:
     def root_span_id(self) -> str:
         """Span id of the run root; pass as ``parent_span_id`` to a downstream run."""
         return self._root_id
+
+    def attr(self, key: str, value: Any) -> "Run":
+        """Attribute on the run's root span; last write wins, overrides the fixed set."""
+        self._attrs[str(key)] = _encode(value)
+        return self
 
     def _track(self, span: "Span") -> None:
         """Record a span and push it on the open stack."""
@@ -975,9 +982,16 @@ class Run:
             _attr("input.value", _encode(self._task)),
             _attr("output.value", ""),
         ]
-        if self._graph_id is not None:
-            # Correlation header key the mapper groups execution graphs by.
-            attrs.append(_attr("x-execution-graph-id", self._graph_id))
+        if self._attrs:
+            by_key = {entry["key"]: entry for entry in attrs}
+            for key, value in self._attrs.items():
+                entry = by_key.get(key)
+                if entry is None:
+                    entry = _attr(key, value)
+                    attrs.append(entry)
+                    by_key[key] = entry
+                else:
+                    entry["value"]["stringValue"] = value
         root = {
             "traceId": self._trace_id,
             "spanId": self._root_id,

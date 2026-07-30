@@ -756,3 +756,25 @@ class TestParallelRetryArms:
         loop.close({"draft": 1})
         g = _graph(r)
         assert g.predecessors("revise") == {"plan"}
+
+
+class TestCorrelationAcrossRuns:
+    def test_shared_correlation_groups_two_processes_into_one_graph(self, tmp_path) -> None:
+        # Two processes, one logical execution: the mapper files both runs
+        # under the written graph id, never under either trace id.
+        a = _enabled(tmp_path, "ingest")
+        a.attr("x-execution-graph-id", "exec-graph-7")
+        with a.step("s") as s:
+            s.output = "1"
+        b = _enabled(tmp_path, "score")
+        b.attr("x-execution-graph-id", "exec-graph-7")
+        with b.step("s") as s:
+            s.output = "2"
+        spans = _mapper.flatten_export_request(a.build_payload())
+        spans += _mapper.flatten_export_request(b.build_payload())
+        result = _mapper.map_spans(spans)
+        roots = {
+            c.agent_name: c.graph_id for c in result.runs
+            if c.agent_name in {"ingest", "score"}
+        }
+        assert roots == {"ingest": "exec-graph-7", "score": "exec-graph-7"}

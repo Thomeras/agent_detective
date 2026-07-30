@@ -408,3 +408,49 @@ class TestGraphIdentity:
         r = _enabled(tmp_path, trace_id=self.TRACE_ID)
         assert r.trace_id == self.TRACE_ID
         assert len(r.root_span_id) == 16
+
+
+class TestRunAttr:
+    def test_attr_lands_on_the_root_span_only(self, tmp_path):
+        r = _enabled(tmp_path)
+        r.attr("x-request-id", "req-1")
+        with r.step("s") as s:
+            s.output = "1"
+        spans = _spans(r)
+        assert spans["run"]["attrs"]["x-request-id"] == "req-1"
+        assert "x-request-id" not in spans["s"]["attrs"]
+
+    def test_attr_encodes_values_like_everywhere_else(self, tmp_path):
+        # Same _encode path as the fixed attrs: non-strings become JSON text,
+        # so an exotic value cannot break the export.
+        r = _enabled(tmp_path)
+        r.attr("labels", {"env": "prod", "n": 1})
+        assert _spans(r)["run"]["attrs"]["labels"] == '{"env": "prod", "n": 1}'
+
+    def test_attr_overrides_the_fixed_set_without_duplicating(self, tmp_path):
+        # An override must REPLACE the fixed entry — two entries with one key
+        # is an invalid OTLP attributes field.
+        r = _enabled(tmp_path, task="original")
+        r.attr("input.value", "overridden")
+        with r.step("s") as s:
+            s.output = "1"
+        root = _spans(r)["run"]
+        keys = [a["key"] for a in root["attributes"]]
+        assert len(keys) == len(set(keys))
+        assert root["attrs"]["input.value"] == "overridden"
+
+    def test_attr_last_write_wins(self, tmp_path):
+        r = _enabled(tmp_path)
+        r.attr("k", "first")
+        r.attr("k", "second")
+        assert _spans(r)["run"]["attrs"]["k"] == "second"
+
+    def test_graph_id_param_is_just_an_attr_write(self, tmp_path):
+        # FIX-3B: the FIX-3A param rides the public attr path, so a later
+        # attr write overrides it — same last-write-wins semantics.
+        r = _enabled(tmp_path, graph_id="from-param")
+        r.attr("x-execution-graph-id", "from-attr")
+        root = _spans(r)["run"]
+        keys = [a["key"] for a in root["attributes"]]
+        assert keys.count("x-execution-graph-id") == 1
+        assert root["attrs"]["x-execution-graph-id"] == "from-attr"
