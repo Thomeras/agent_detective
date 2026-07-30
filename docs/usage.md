@@ -564,7 +564,10 @@ Shared options (`analyze` and `capture`):
 **Full stack:** all knobs have working defaults in `docker-compose.yml`
 (`${VAR:-default}`); `.env.example` documents them. The ones that matter
 first: `AUDIT_HMAC_KEY`, `TIER2_SAMPLE_PCT`, `A2A_DETECTION`,
-`GRAPH_QUIESCENCE_SECONDS`, `PAYLOAD_INLINE_MAX_KB`.
+`GRAPH_QUIESCENCE_SECONDS`, `PAYLOAD_INLINE_MAX_KB`. The ingest logs its
+effective values at startup and serves the non-secret subset on
+`GET /config`; `detective doctor` reads the effective quiescence from there
+(or says it is unknown when no ingest answers — it never assumes the default).
 
 ### 4.3 Verdicts and report types
 

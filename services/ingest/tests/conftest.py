@@ -290,6 +290,12 @@ class Harness:
         ) as client:
             return await client.get("/health")
 
+    async def config(self, method: str = "GET") -> httpx.Response:
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=self.app), base_url="http://test"
+        ) as client:
+            return await client.request(method, "/config")
+
 
 @pytest.fixture()
 def harness() -> Harness:

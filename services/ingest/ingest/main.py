@@ -8,6 +8,7 @@ FastAPI app with:
   into Postgres (graphs/runs/edges, idempotent under redelivery), and
   input/output payloads are routed inline or to MinIO by size.
 - ``GET /health`` — Postgres + ClickHouse + Redis connectivity.
+- ``GET /config`` — read-only whitelist of the effective non-secret settings.
 - a background finalizer task that flips quiesced / root-ended graphs to
   ``finalized`` and announces them on the ``ad.graphs.completed`` stream.
 
@@ -75,6 +76,17 @@ def create_app(settings: Settings, deps: Dependencies) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        # The values that change runtime behavior, one line, so the effective
+        # config is visible without docker exec.
+        logger.info(
+            "effective config: graph_quiescence_seconds=%s finalizer_check_seconds=%s "
+            "a2a_detection=%s reanalyze_late_spans=%s payload_inline_max_kb=%s",
+            settings.graph_quiescence_seconds,
+            settings.finalizer_check_seconds,
+            settings.a2a_detection,
+            settings.reanalyze_late_spans,
+            settings.payload_inline_max_kb,
+        )
         try:
             await deps.store.ensure_bucket(settings.minio_bucket)
         except Exception:
@@ -159,6 +171,20 @@ def create_app(settings: Settings, deps: Dependencies) -> FastAPI:
         return JSONResponse(
             {"status": "ok" if ok else "degraded", **checks},
             status_code=200 if ok else 503,
+        )
+
+    @app.get("/config")
+    async def config() -> JSONResponse:
+        # Read-only whitelist of behavior-changing, non-secret settings; never
+        # dump Settings — database_url and the MinIO keys stay in the process.
+        return JSONResponse(
+            {
+                "graph_quiescence_seconds": settings.graph_quiescence_seconds,
+                "finalizer_check_seconds": settings.finalizer_check_seconds,
+                "a2a_detection": settings.a2a_detection,
+                "reanalyze_late_spans": settings.reanalyze_late_spans,
+                "payload_inline_max_kb": settings.payload_inline_max_kb,
+            }
         )
 
     return app

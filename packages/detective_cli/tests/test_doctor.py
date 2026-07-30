@@ -13,8 +13,10 @@ import json
 
 from detective_cli.cli import EXIT_CLEAN, EXIT_ERROR, main
 from detective_cli.doctor import (
+    check_quiescence,
     classify_payload,
     diagnose,
+    fetch_ingest_config,
     payload_judgeable,
     render_doctor_json,
     render_doctor_terminal,
@@ -530,6 +532,47 @@ class TestCommand:
         _, out, _ = run_cli(["doctor", str(path), "--color", "never"], capsys)
         for word in ("PASSED", "FAILED", "incident", "culprit", "confidence"):
             assert word not in out
+
+
+class TestQuiescence:
+    """The effective window is read from the ingest, never guessed."""
+
+    def test_a_known_window_is_reported_with_what_it_means(self):
+        result = check_quiescence(120.0)
+
+        assert result.level == "ok"
+        assert "120" in result.detail
+        assert "finalized" in result.detail
+
+    def test_an_unknown_window_is_admitted_not_defaulted(self):
+        # "30s is the default" is a fact about config.py, not about the
+        # deployment in front of the reader — an unknown stays unknown.
+        result = check_quiescence(None)
+
+        assert result.level == "warn"
+        assert "unknown" in result.detail
+
+    def test_an_unreachable_ingest_yields_no_config(self):
+        assert fetch_ingest_config("http://localhost:1", timeout=0.5) is None
+
+    def test_doctor_reports_the_ingests_effective_quiescence(
+        self, trace_file, capsys, monkeypatch
+    ):
+        monkeypatch.setenv("INGEST_URL", "http://ingest.test")
+        monkeypatch.setattr(
+            "detective_cli.cli.fetch_ingest_config",
+            lambda url: {"graph_quiescence_seconds": 120.0},
+        )
+        path = trace_file(linear_pipeline())
+        _, out, _ = run_cli(["doctor", str(path), "--color", "never"], capsys)
+        assert "graph_quiescence_seconds=120" in out
+
+    def test_an_empty_ingest_url_skips_the_check(self, trace_file, capsys, monkeypatch):
+        # Same opt-out convention as demo/run.sh: empty means no ingest.
+        monkeypatch.setenv("INGEST_URL", "")
+        path = trace_file(linear_pipeline())
+        _, out, _ = run_cli(["doctor", str(path), "--color", "never"], capsys)
+        assert "quiescence" not in out
 
 
 class TestRendering:

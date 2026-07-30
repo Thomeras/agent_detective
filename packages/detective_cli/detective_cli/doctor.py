@@ -42,6 +42,7 @@ previous version certified "cost 5/5" on a six-run trace.
 from __future__ import annotations
 
 import json
+import urllib.request
 from collections import Counter
 from dataclasses import dataclass, field
 from typing import Any, Literal
@@ -326,6 +327,60 @@ def _payload_shape(payload: str | None) -> str:
         return "{" + ", ".join(str(k) for k in keys[:4]) + "}"
     text = " ".join((payload or "").split())
     return f'"{text[:40]}…"' if len(text) > 40 else f'"{text}"'
+
+
+# ---------------------------------------------------------------------------
+# Ingest effective config — read, never guessed
+# ---------------------------------------------------------------------------
+
+
+def fetch_ingest_config(base_url: str, timeout: float = 2.0) -> dict[str, Any] | None:
+    """The effective config a running ingest reports on ``GET /config``.
+
+    ``None`` on any failure — connection refused, an older ingest without the
+    endpoint, a non-JSON body. The caller reports the value as unknown rather
+    than falling back to the default constant: a guessed window is worse than
+    an admitted unknown one.
+    """
+    try:
+        with urllib.request.urlopen(f"{base_url.rstrip('/')}/config", timeout=timeout) as resp:
+            data = json.loads(resp.read())
+    except (OSError, ValueError):
+        return None
+    return data if isinstance(data, dict) else None
+
+
+def check_quiescence(seconds: float | None) -> Check:
+    """What the effective quiescence window means for a multi-stage run."""
+    if seconds is None:
+        return Check(
+            id="quiescence",
+            title="graph quiescence",
+            level="warn",
+            detail=(
+                "the ingest's effective graph_quiescence_seconds is unknown — no "
+                "running ingest answered GET /config"
+            ),
+            consequence=(
+                "a pipeline stage whose spans arrive more than the window after the "
+                "previous span finds its graph already finalized, and you cannot see "
+                "the window this deployment actually runs with"
+            ),
+            fix=(
+                "start the ingest (or upgrade it to a build serving GET /config) and "
+                "point INGEST_URL at it; until then do not assume the 30s default"
+            ),
+        )
+    return Check(
+        id="quiescence",
+        title="graph quiescence",
+        level="ok",
+        detail=(
+            f"ingest reports graph_quiescence_seconds={seconds:g} — a stage arriving "
+            f"more than {seconds:g}s after the previous span finds the graph already "
+            "finalized"
+        ),
+    )
 
 
 # ---------------------------------------------------------------------------

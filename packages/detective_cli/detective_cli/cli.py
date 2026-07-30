@@ -20,6 +20,7 @@ from __future__ import annotations
 import argparse
 import json
 import logging
+import os
 import sys
 from pathlib import Path
 
@@ -27,7 +28,14 @@ from . import __version__
 from .analyze import AnalysisRun, analyze, local_settings
 from .bundle import TraceFormatError, bundles_from_exports, load_trace
 from .capture import Capture, serve
-from .doctor import diagnose, render_doctor_json, render_doctor_terminal, unreadable_diagnosis
+from .doctor import (
+    check_quiescence,
+    diagnose,
+    fetch_ingest_config,
+    render_doctor_json,
+    render_doctor_terminal,
+    unreadable_diagnosis,
+)
 from .judge import select_judge
 from .render import (
     color_enabled,
@@ -330,6 +338,15 @@ def cmd_doctor(args: argparse.Namespace) -> int:
             judge_detail=judge.description,
             settings=settings,
         )
+
+    # The effective quiescence window is read from the running ingest, never
+    # assumed; an empty INGEST_URL opts out (same convention as demo/run.sh).
+    ingest_url = os.environ.get("INGEST_URL", "http://localhost:8001")
+    if ingest_url:
+        config = fetch_ingest_config(ingest_url)
+        raw = (config or {}).get("graph_quiescence_seconds")
+        seconds = float(raw) if isinstance(raw, (int, float)) else None
+        diagnosis.checks.append(check_quiescence(seconds))
 
     if args.json:
         print(json.dumps(render_doctor_json(diagnosis), indent=2, ensure_ascii=False))
