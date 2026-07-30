@@ -8,12 +8,92 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
-## [0.4.0] — Unreleased
+## [0.4.0] — 2026-07-30
 
-`otel-mapper` (0.2.0 → 0.3.0), `detective-sdk` (0.2.0 → 0.3.0), ingest service
-(self-host stack).
+`blame-engine` (0.3.0 → 0.4.0), `agent-detective` (0.3.0 → 0.4.0),
+`agent-detective-worker` (0.3.0 → 0.4.0), `detective-sdk` (0.2.0 → 0.3.0),
+`otel-mapper` (0.2.0 → 0.3.0), API and ingest services (self-host stack).
+
+Verdicts change on unchanged traces. Three things move numbers you have seen
+before: chain-shaped graphs discount attribution confidence, a cut_point
+localised on a single scoring channel is capped at 0.7, and a well-formed empty
+result is no longer scored as a defect. The exit-code contract (`0` / `1` / `2`)
+is unchanged.
+
+**Upgrade note.** Migrations 0014 and 0015 are additive and nullable, so a
+0.3.0 deployment runs against the 0.4.0 schema unchanged; rollback is a
+redeploy, not a down-migration. `agent-detective-worker` and `agent-detective`
+require `blame-engine>=0.4.0` — the worker writes fields the engine reads, and
+an unbounded partial upgrade would silently keep the old behaviour.
 
 ### Added
+- **Every score records what measured it.** `judge_model` is stored on the run
+  whose judge component it produced and on both verdict tables beside the
+  existing `judge_prompt_hash`; `/calibration` slices by the pair. Until now
+  the model existed only in worker config and the outgoing HTTP request, so
+  0.4 from a cheap model and 0.4 from a frontier one were the same row and
+  `/calibration`, `/agents/leaderboard` and version-diff compared across
+  incommensurable measurements with no way to tell (migration 0014).
+- **Output contracts have a write path.** `GET`/`POST /contracts` and
+  `GET /contracts/suggest`, plus `detective contracts {list,register,suggest}`.
+  The table had no writer at all — 0 rows after `docker compose up`, readers
+  only — so the schema scoring channel was unreachable without hand-written
+  SQL, and the judge's weight silently covered the hole on every install.
+  `suggest` derives a schema from the agent's own stored payloads: a key is
+  required only when *every* usable sample carries it, types are the types
+  observed, and nothing (enum, format, range, nested constraint) is invented.
+  When the samples do not agree it returns a refusal with a reason rather than
+  a permissive schema — one that passes everything would manufacture a
+  0.35-weight channel out of payloads that never agreed on anything.
+- **`agent_detective.node_kind`** — an optional span attribute declaring a step
+  as `deterministic` or `tool`, carried SDK → mapper → ingest → worker
+  (migration 0015). Such a node skips the judge entirely instead of being
+  graded on an agent rubric it never ran under; role was inferred from the
+  agent NAME alone, so a `plan_node` making zero LLM calls was handed the
+  PLANNER rubric. The LangGraph adapter accepts explicit
+  `node_kinds={"plan_node": "deterministic"}`; its auto-detection is opt-in
+  (`detect_deterministic=True`) because "no LangChain callback fired" is not
+  the same claim as "no model call happened".
+- **`JUDGE_MAX_SPEND_USD`** with per-analysis judge spend accounting and
+  logging. At the cap the worker stops calling and the remaining nodes come
+  back unjudged through the existing unscored path — a partial analysis that
+  says so beats a crashed one. Cost comes from the response's own usage when
+  the endpoint reports it, else from an optional price table, else stays
+  `null`: an unknown cost is never `$0`.
+- **`POST /v1/traces` on the API port**, forwarding to ingest
+  (`INGEST_BASE_URL`). Ingest listens on 8001 and the API on 8000, so a client
+  told "the API is on 8000" — which it is — posted traces into a 404 with
+  nothing to explain why.
+- **Thread-safe event-driven step API** in the SDK (start/finish by name, join,
+  fan-in), and a **LangGraph adapter** mapping nodes, `Send` fan-out and fan-in
+  onto `step` / `branch` / `join`. Both existed as boilerplate every second
+  integrator had to write.
+- **LLM token usage captured from LangChain callbacks** onto the owning node.
+  Tokens sum only when every call reported them, the model is recorded only
+  when unambiguous, and USD only from an integrator-supplied price table
+  covering every call — unknown stays absent, never 0.
+- **`detective_sdk.run(trace_id=..., graph_id=...)`** so multi-stage pipelines
+  share one execution graph without touching private attributes, and public
+  **`Run.attr()`** symmetric to `Span.attr` for root-span attributes.
+- **`GET /config` on ingest** and the effective configuration logged at
+  startup: the quiescence window was discoverable only via `docker exec env`.
+  `detective doctor` reads it and admits the value is unknown when no ingest
+  answers, instead of assuming the default.
+- `MappingResult.unresolved_delegations` — a TOOL_DELEGATION whose target
+  agent name matched no run in the mapping call is recorded (owner run key,
+  target name, trace id, span id) instead of vanishing. Additive field with
+  a default; the `runs` / `edges` output is unchanged.
+- `detective_sdk.run(parent_span_id=...)` parents the run root on a span from
+  another process, so a pipeline layer handed work across process boundaries
+  produces a structural SPAWN edge at re-map time instead of relying on
+  name-resolved TOOL_DELEGATION alone. `Run.trace_id` / `Run.root_span_id`
+  expose the identity to hand over. Invalid ids degrade to a root without a
+  parent; `detective_sdk.otel.collect` / `root_span` accept the same option.
+- `REANALYZE_LATE_SPANS` ingest flag (default off): a finalized graph that
+  gained new runs goes through the full finalization path again — re-map over
+  the complete span set, refinalize, exactly one new announcement on
+  `ad.graphs.completed`. Worker-side dedup (`dedup_key=graph_id`,
+  incident upsert on `(graph_id, incident_key)`) keeps the repeat safe.
 - `MappingResult.unresolved_delegations` — a TOOL_DELEGATION whose target
   agent name matched no run in the mapping call is recorded (owner run key,
   target name, trace id, span id) instead of vanishing. Additive field with
@@ -31,6 +111,58 @@ Distributions are versioned independently; a release lists the ones that moved.
   incident upsert on `(graph_id, incident_key)`) keeps the repeat safe.
 
 ### Changed
+- **A score reports the weights it was actually blended from.**
+  `composite_score` returns `CompositeScore(score, unscored_reason,
+  effective_weights)` — the arithmetic is unchanged, what changes is that the
+  renormalization is no longer silent. A channel that never reported handed its
+  weight to the ones that did (schema absent ⇒ the judge's 0.40 becomes 0.727
+  of the blend) while the report still read "weighted mean over three
+  independent components". The effective weights are stored on the run
+  (migration 0014), served by the API, and shown by the CLI as
+  `1 of 3 channels (effective weight: …)`. **Breaking** for direct callers of
+  `composite_score`, which used to return a 2-tuple.
+- **A missing channel now lowers confidence instead of promoting the survivor.**
+  Attribution is discounted when the origin's score rests on fewer channels
+  than were weighed, and a `cut_point` localised on a single channel is capped
+  at 0.7 — naming one origin on one instrument's word cannot reach the
+  certainty of a localisation two independent channels agree on. The verdict
+  *type* is unchanged: a measured drop still happened there, and every weaker
+  report type asserts something the evidence does not say.
+- **Attribution confidence accounts for graph shape.** On a chain-shaped graph
+  every interior node is an articulation point, so "this node is the cut point"
+  rests on ordering rather than structure. The discount scales with the number
+  of nodes the shape cannot distinguish (×0.95 at depth 3, ×0.80 at depth 18
+  and beyond) rather than being flat, because three steps still narrow the
+  origin to one interior node and eighteen narrow it to seventeen. Observation
+  confidence is untouched — whether an output is defective does not depend on
+  the graph's shape.
+- **A tie between equally evidenced origins is reported as a tie.** Several
+  nodes on the same score used to be resolved into one name by the tie-break
+  order; the competing origins now appear in `Evidence.hypotheses` with an
+  explicit unresolved remainder. The named culprit and the ordering are
+  unchanged — what changes is that the alternatives stop being invisible.
+- **Costs travel with their coverage.** `Evidence.cost_coverage`
+  (`{"priced": n, "total": m}`) on the report and `priced_run_count` on graph
+  and agent aggregates. A total summed over 6 of 28 priced runs is a lower
+  bound; printed bare it read as the price of the run, and the incident inbox
+  summed such totals treating an unpriced run as a free one.
+- **The judge is told what the deterministic channel already knows.** The
+  per-node prompt carries a delimited `DETERMINISTIC FACTS` block — contract
+  parameters the node rewrote, artifact visibility, every fired check — plus
+  how many sibling nodes of the same run also returned a well-formed empty
+  result. The judge was guessing at facts the same function had already
+  established, and a lone collector that found nothing looks negligent until
+  you know four siblings found nothing either. The scoring rubric also asks for
+  two decimal places and forbids falling back on the round anchors, because
+  when many steps land on the same number the ranking between them is lost.
+- **The worker states which judge it is using at startup** — model, base URL,
+  and whether the verdicts are canned mock answers or a real model.
+- New `unscored_reason` values: `zero_result_set`,
+  `judge_skipped_deterministic_node` (the trace declared the node
+  deterministic, so the judge was deliberately not run) and
+  `judge_budget_exhausted` (the spend cap bound). The last two are deliberate
+  outcomes, not faults; an exhausted budget used to be indistinguishable from
+  an unreachable judge.
 - **New judge role: RETRIEVER / COLLECTOR.** `blame_engine.roles` gained
   `RETRIEVER_PREFIXES` + `is_retriever` (prefix-token matching, same discipline
   as the planner hints), and `node_role()` resolves it with explicit precedence
@@ -54,6 +186,24 @@ Distributions are versioned independently; a release lists the ones that moved.
   `judge_error`). Blame-engine inputs are unchanged.
 
 ### Fixed
+- **A well-formed output carrying no records is unscored, not a defect.** Such
+  a node was handed to the judge, which rates emptiness as worthless; eight of
+  them on one graph deflated the median enough to fabricate a `multi_culprit`
+  verdict out of an observed absence. A `zero_result_set` gate now runs before
+  the judge — skipped for failed runs and errored tool digests, where the
+  emptiness may be the failure's own footprint — and the observation rides the
+  deterministic channel as a warn signal. The engine treats the new reason like
+  `empty_output`: observed, not a blind spot, so it neither blocks
+  classification nor caps confidence as an unknown ancestor.
+- **A run no analysis ever covered reads `not_analyzed`.** `quality_score=NULL`
+  + `unscored_reason=NULL` meant both "never analysed" and "analysed, no
+  score". The engine never writes that pair, so the read boundary derives it;
+  the CLI report leads its Pipeline listing with a per-state node count.
+- **An offline run says why nothing was scored.** Without a judge every node
+  ended `insufficient_components` with nothing stating the rule, so a
+  deliberate design read as a malfunction. `detective doctor` now names the
+  score floor before the analysis runs, and unscored nodes that carry real
+  measurements show them labelled as a partial deterministic measurement.
 - **Findings export no longer pairs a judge sentence with the composite
   score.** The judge-findings section of the exported Markdown brief showed
   `score_map`'s blended `quality_score` (schema + judge + heuristics) next to
