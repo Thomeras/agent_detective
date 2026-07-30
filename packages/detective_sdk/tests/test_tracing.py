@@ -350,3 +350,61 @@ class TestExternalParent:
             with r.step("s") as s:
                 s.output = "1"
             assert _spans(r)["run"]["parentSpanId"] == ""
+
+
+class TestGraphIdentity:
+    TRACE_ID = "abcdef0123456789abcdef0123456789"
+
+    def test_supplied_trace_id_is_the_exported_one(self, tmp_path):
+        # The whole point: a second pipeline stage continues the SAME trace,
+        # so the re-map sees one run, not two strangers.
+        r = _enabled(tmp_path, trace_id=self.TRACE_ID)
+        with r.step("s") as s:
+            s.output = "1"
+        assert _spans(r)["run"]["traceId"] == self.TRACE_ID
+
+    def test_trace_id_normalizes_to_lowercase(self, tmp_path):
+        r = _enabled(tmp_path, trace_id=self.TRACE_ID.upper())
+        with r.step("s") as s:
+            s.output = "1"
+        assert _spans(r)["run"]["traceId"] == self.TRACE_ID
+
+    def test_invalid_trace_id_falls_back_to_a_fresh_one(self, tmp_path):
+        # Instrumentation must never take the host process down; a bad id is
+        # replaced, never raised.
+        for bad in (None, "", "xyz", self.TRACE_ID + "ff", "g" * 32):
+            r = _enabled(tmp_path, trace_id=bad)
+            with r.step("s") as s:
+                s.output = "1"
+            exported = _spans(r)["run"]["traceId"]
+            assert len(exported) == 32
+            assert all(c in "0123456789abcdef" for c in exported)
+
+    def test_graph_id_rides_the_root_as_the_correlation_attribute(self, tmp_path):
+        # The mapper groups execution graphs by exactly this key.
+        r = _enabled(tmp_path, graph_id="exec-graph-42")
+        with r.step("s") as s:
+            s.output = "1"
+        spans = _spans(r)
+        assert spans["run"]["attrs"]["x-execution-graph-id"] == "exec-graph-42"
+        assert "x-execution-graph-id" not in spans["s"]["attrs"]
+
+    def test_no_graph_id_means_byte_identical_payload_shape(self, tmp_path):
+        # Backward compat: without the new params nothing about the payload
+        # may change — same keys, same order.
+        r = _enabled(tmp_path, task="t")
+        with r.step("s") as s:
+            s.output = "1"
+        keys = [a["key"] for a in _spans(r)["run"]["attributes"]]
+        assert keys == [
+            "openinference.span.kind",
+            "gen_ai.agent.name",
+            "input.value",
+            "output.value",
+        ]
+
+    def test_public_properties_cover_the_handoff(self, tmp_path):
+        # Passing identity to the next process must not need private attrs.
+        r = _enabled(tmp_path, trace_id=self.TRACE_ID)
+        assert r.trace_id == self.TRACE_ID
+        assert len(r.root_span_id) == 16

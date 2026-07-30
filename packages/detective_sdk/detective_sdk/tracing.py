@@ -127,6 +127,14 @@ def _span_id(value: Any) -> str:
     return ""
 
 
+def _trace_id_of(value: Any) -> str:
+    """Normalise an externally supplied trace id; anything off becomes a fresh one."""
+    candidate = str(value or "").strip().lower()
+    if len(candidate) == 32 and all(c in "0123456789abcdef" for c in candidate):
+        return candidate
+    return _hex(16)
+
+
 def _encode(value: Any, limit: int = MAX_PAYLOAD_CHARS) -> str:
     """Any Python value -> the string that goes into an OTLP attribute."""
     if value is None:
@@ -611,6 +619,8 @@ class Run:
         endpoint: str | None = None,
         trace_file: str | None = None,
         parent_span_id: str | None = None,
+        trace_id: str | None = None,
+        graph_id: str | None = None,
     ) -> None:
         self.name = name
         self._task = task
@@ -621,9 +631,10 @@ class Run:
         self._trace_file = (trace_file or "").strip() or None
         self.enabled = bool(self._endpoint or self._trace_file)
 
-        self._trace_id = _hex(16)
+        self._trace_id = _trace_id_of(trace_id)
         self._root_id = _hex(8)
         self._parent_span_id = _span_id(parent_span_id)
+        self._graph_id = str(graph_id or "").strip() or None
         self._start_ns = time.time_ns()
         self._spans: list[Span] = []
         self._open: list[Span] = []          # nesting stack, for `span`
@@ -958,6 +969,15 @@ class Run:
         """The OTLP ``ExportTraceServiceRequest`` (JSON encoding)."""
         self._check_delegations()
         end_ns = time.time_ns()
+        attrs = [
+            _attr("openinference.span.kind", "AGENT"),
+            _attr("gen_ai.agent.name", self.name),
+            _attr("input.value", _encode(self._task)),
+            _attr("output.value", ""),
+        ]
+        if self._graph_id is not None:
+            # Correlation header key the mapper groups execution graphs by.
+            attrs.append(_attr("x-execution-graph-id", self._graph_id))
         root = {
             "traceId": self._trace_id,
             "spanId": self._root_id,
@@ -966,12 +986,7 @@ class Run:
             "kind": 1,
             "startTimeUnixNano": str(self._start_ns),
             "endTimeUnixNano": str(end_ns),
-            "attributes": [
-                _attr("openinference.span.kind", "AGENT"),
-                _attr("gen_ai.agent.name", self.name),
-                _attr("input.value", _encode(self._task)),
-                _attr("output.value", ""),
-            ],
+            "attributes": attrs,
             "status": {"code": 1},
         }
         names = self._final_names()
@@ -1053,6 +1068,8 @@ def run(
     endpoint: str | None = None,
     trace_file: str | None = None,
     parent_span_id: str | None = None,
+    trace_id: str | None = None,
+    graph_id: str | None = None,
 ) -> Run:
     """Start a run. Use as a context manager; the trace exports on exit."""
     return Run(
@@ -1062,6 +1079,8 @@ def run(
         endpoint=endpoint,
         trace_file=trace_file,
         parent_span_id=parent_span_id,
+        trace_id=trace_id,
+        graph_id=graph_id,
     )
 
 
