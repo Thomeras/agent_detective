@@ -42,6 +42,16 @@ Distributions are versioned independently; a release lists the ones that moved.
   `judge_error`). Blame-engine inputs are unchanged.
 
 ### Fixed
+- **Findings export no longer pairs a judge sentence with the composite
+  score.** The judge-findings section of the exported Markdown brief showed
+  `score_map`'s blended `quality_score` (schema + judge + heuristics) next to
+  the judge's own note, making the judge look self-contradictory. Each note
+  now carries the judge's own `score_components.judge`; when it differs from
+  the composite both numbers print with the claimed → effective vocabulary,
+  and when the judge component is missing (unscored node, judge never ran)
+  the export says so instead of borrowing the composite. The verdict block
+  labels its score as composite, and unscored nodes in the Node quality table
+  print their `unscored_reason` rather than a number.
 - **A delegation split across POSTs of one trace now produces its edge.** The
   ingest finalization re-map retries the delegations it still could not
   resolve against the graph's stored runs, so the TOOL_DELEGATION edge is

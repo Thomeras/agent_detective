@@ -63,7 +63,7 @@ export function buildFindingsMarkdown(
     if (origins.length) {
       const parts = origins.map((id) => {
         const drop = drops[id] != null ? `, dropped ${drops[id].toFixed(2)}` : "";
-        return `\`${nameOf(id)}\` (score ${fmtScore(scoreMap[id])}${drop})`;
+        return `\`${nameOf(id)}\` (composite score ${fmtScore(scoreMap[id])}${drop})`;
       });
       L.push(`- **Origin — where quality broke:** ${parts.join(", ")}`);
     }
@@ -97,7 +97,8 @@ export function buildFindingsMarkdown(
 
   // --- Per-node quality ---
   L.push(`## Node quality`);
-  L.push(`| Agent | Score | Drop | Status | Tokens in/out | Cost |`);
+  L.push(`_Score is the blended composite (schema + judge + heuristics), not any single component._`);
+  L.push(`| Agent | Composite score | Drop | Status | Tokens in/out | Cost |`);
   L.push(`|---|---|---|---|---|---|`);
   const rows = [...graph.nodes].sort(
     (a, b) => (a.data.quality_score ?? 2) - (b.data.quality_score ?? 2),
@@ -107,19 +108,42 @@ export function buildFindingsMarkdown(
     const drop = drops[d.id] != null ? `-${drops[d.id].toFixed(2)}` : "";
     const cost = d.cost_usd != null ? "$" + d.cost_usd.toFixed(4) : "";
     const tok = `${d.tokens_in ?? "-"}/${d.tokens_out ?? "-"}`;
+    // An unscored node prints its reason, never a number it does not have.
+    const score =
+      d.quality_score == null && d.unscored_reason
+        ? `unscored (${d.unscored_reason})`
+        : fmtScore(d.quality_score);
     L.push(
-      `| \`${d.agent_name ?? "-"}\` | ${fmtScore(d.quality_score)} | ${drop} | ${d.status} | ${tok} | ${cost} |`,
+      `| \`${d.agent_name ?? "-"}\` | ${score} | ${drop} | ${d.status} | ${tok} | ${cost} |`,
     );
   }
   L.push("");
 
   // --- Judge criticism per node (what to fix) ---
+  // A judge sentence is paired with the judge's own component, never the
+  // composite. When the two differ, both show with the claimed/effective
+  // vocabulary of BlameReportPanel; when the judge component is missing
+  // (unscored node, judge never ran) the export says so instead of borrowing
+  // the composite.
+  const judgeScoreOf = (id: string): string => {
+    const d = dataById.get(id);
+    const judge = d?.score_components?.judge;
+    if (judge == null) {
+      const why = d?.unscored_reason ? ` — node unscored (${d.unscored_reason})` : "";
+      return `judge score not recorded${why}`;
+    }
+    const composite = scoreMap[id] ?? d?.quality_score;
+    if (composite != null && fmtScore(composite) !== fmtScore(judge)) {
+      return `claimed ${judge.toFixed(2)} → effective composite ${composite.toFixed(2)}`;
+    }
+    return `${judge.toFixed(2)}`;
+  };
   const notes = ev?.judge_notes ?? {};
   const noteEntries = Object.entries(notes);
   if (noteEntries.length) {
     L.push(`## Judge findings (what is wrong)`);
     for (const [id, note] of noteEntries) {
-      L.push(`- **${nameOf(id)}** (${fmtScore(scoreMap[id])}): ${note}`);
+      L.push(`- **${nameOf(id)}** (${judgeScoreOf(id)}): ${note}`);
     }
     L.push("");
   }
