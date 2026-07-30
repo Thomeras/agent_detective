@@ -38,7 +38,7 @@ from .control import TOOL_SCHEMA_HASH_ATTRIBUTE, should_halt
 from .tracing import ATTEMPT_SEPARATOR, MAX_PAYLOAD_CHARS, Retry, Run, Span, run
 from .versioning import content_hash, git_version, tool_schema_hash
 
-__version__ = "0.2.0"
+__version__ = "0.3.0"
 
 __all__ = [
     "detect_kind",

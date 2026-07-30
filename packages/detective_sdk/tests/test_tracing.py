@@ -328,3 +328,25 @@ class TestTruncation:
             s.output = "x" * (MAX_PAYLOAD_CHARS + 5_000)
         value = _spans(r)["render"]["attrs"]["output.value"]
         assert "truncated 5000 chars" in value
+
+
+class TestExternalParent:
+    def test_external_parent_span_id_rides_the_root(self, tmp_path):
+        # A root parented on another process's span is what lets the re-map
+        # build the structural SPAWN edge across processes.
+        r = _enabled(tmp_path, "worker", task="x", parent_span_id="ABCDEF0123456789")
+        with r.step("s") as s:
+            s.output = "1"
+        root = _spans(r)["worker"]
+        assert root["parentSpanId"] == "abcdef0123456789"
+        assert root["traceId"] == r.trace_id
+        assert root["spanId"] == r.root_span_id
+
+    def test_invalid_parent_span_id_means_no_parent(self, tmp_path):
+        # Export is best-effort: a nonsense id must not take the run down, and
+        # a root must not claim a parent that never existed.
+        for bad in (None, "", "xyz", "0123456789abcdefg", "0123456789abcdez"):
+            r = _enabled(tmp_path, parent_span_id=bad)
+            with r.step("s") as s:
+                s.output = "1"
+            assert _spans(r)["run"]["parentSpanId"] == ""

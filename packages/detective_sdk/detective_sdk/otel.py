@@ -41,7 +41,7 @@ import logging
 from dataclasses import dataclass, field, replace
 from typing import Any, Callable, Iterable, Optional, Sequence
 
-from .tracing import _encode, _hex, deliver
+from .tracing import _encode, _hex, _span_id, deliver
 
 logger = logging.getLogger(__name__)
 
@@ -170,7 +170,13 @@ def chain_agents(records: Sequence[SpanRecord]) -> list[SpanRecord]:
     ]
 
 
-def root_span(records: Sequence[SpanRecord], *, name: str, task: Any) -> Optional[SpanRecord]:
+def root_span(
+    records: Sequence[SpanRecord],
+    *,
+    name: str,
+    task: Any,
+    parent_span_id: str | None = None,
+) -> Optional[SpanRecord]:
     """Synthesise the run root that carries the ORIGINAL request.
 
     The terminal judge cites this as provenance; without it there is nothing to
@@ -190,7 +196,7 @@ def root_span(records: Sequence[SpanRecord], *, name: str, task: Any) -> Optiona
         name=name,
         start_ns=min(r.start_ns for r in agents),
         end_ns=max(r.end_ns for r in agents),
-        parent_id="",
+        parent_id=_span_id(parent_span_id),
         attributes={
             AGENT_KIND_ATTRIBUTE: "AGENT",
             AGENT_NAME_ATTRIBUTE: name,
@@ -268,6 +274,7 @@ class TraceCollector:
         service: str | None = None,
         root: str = "run",
         task: Any = None,
+        parent_span_id: str | None = None,
     ) -> None:
         self._endpoint = endpoint
         self._trace_file = trace_file
@@ -276,6 +283,7 @@ class TraceCollector:
         self._service = service
         self._root = root
         self._task = task
+        self._parent_span_id = parent_span_id
         self._records: list[SpanRecord] = []
         self._exported = False
 
@@ -301,7 +309,12 @@ class TraceCollector:
         if self._chain:
             records = chain_agents(records)
         if self._task is not None:
-            root = root_span(records, name=self._root, task=self._task)
+            root = root_span(
+                records,
+                name=self._root,
+                task=self._task,
+                parent_span_id=self._parent_span_id,
+            )
             if root is not None:
                 # The first agent span hangs off the synthesised root; the rest
                 # already chain behind it.
@@ -349,6 +362,7 @@ def collect(
     service: str | None = None,
     root: str = "run",
     task: Any = None,
+    parent_span_id: str | None = None,
     provider: Any = None,
     at_exit: bool = True,
 ) -> TraceCollector:
@@ -372,6 +386,7 @@ def collect(
         service=service,
         root=root,
         task=task,
+        parent_span_id=parent_span_id,
     )
     if provider is None:
         from opentelemetry import trace as _trace

@@ -273,3 +273,16 @@ class TestCollector:
         names = {s["name"] for s in
                  self._written(tmp_path)["resourceSpans"][0]["scopeSpans"][0]["spans"]}
         assert names == {"a"}
+
+    def test_root_hangs_off_the_external_parent(self, tmp_path):
+        # Same cross-process handoff as the hand-built run: without it the
+        # bridge stays incompatible with the SDK it mirrors.
+        collector = self._collector(tmp_path, promote=["research_task"], root="crew",
+                                    task="Build a snake game",
+                                    parent_span_id="0123456789abcdef")
+        collector.export([FakeSpan("research_task", 0x20, parent_id=0x10, start=10, end=20)])
+        collector.flush()
+
+        emitted = self._written(tmp_path)["resourceSpans"][0]["scopeSpans"][0]["spans"]
+        by_name = {s["name"]: s for s in emitted}
+        assert by_name["crew"]["parentSpanId"] == "0123456789abcdef"

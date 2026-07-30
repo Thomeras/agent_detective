@@ -10,13 +10,20 @@ Distributions are versioned independently; a release lists the ones that moved.
 
 ## [0.4.0] — Unreleased
 
-`otel-mapper` (0.2.0 → 0.3.0), ingest service (self-host stack).
+`otel-mapper` (0.2.0 → 0.3.0), `detective-sdk` (0.2.0 → 0.3.0), ingest service
+(self-host stack).
 
 ### Added
 - `MappingResult.unresolved_delegations` — a TOOL_DELEGATION whose target
   agent name matched no run in the mapping call is recorded (owner run key,
   target name, trace id, span id) instead of vanishing. Additive field with
   a default; the `runs` / `edges` output is unchanged.
+- `detective_sdk.run(parent_span_id=...)` parents the run root on a span from
+  another process, so a pipeline layer handed work across process boundaries
+  produces a structural SPAWN edge at re-map time instead of relying on
+  name-resolved TOOL_DELEGATION alone. `Run.trace_id` / `Run.root_span_id`
+  expose the identity to hand over. Invalid ids degrade to a root without a
+  parent; `detective_sdk.otel.collect` / `root_span` accept the same option.
 
 ### Fixed
 - **A delegation split across POSTs of one trace now produces its edge.** The

@@ -119,6 +119,14 @@ def _hex(nbytes: int) -> str:
     return uuid.uuid4().hex[: nbytes * 2]
 
 
+def _span_id(value: Any) -> str:
+    """Normalise an externally supplied span id; anything off becomes no parent."""
+    candidate = str(value or "").strip().lower()
+    if len(candidate) == 16 and all(c in "0123456789abcdef" for c in candidate):
+        return candidate
+    return ""
+
+
 def _encode(value: Any, limit: int = MAX_PAYLOAD_CHARS) -> str:
     """Any Python value -> the string that goes into an OTLP attribute."""
     if value is None:
@@ -602,6 +610,7 @@ class Run:
         service: str | None = None,
         endpoint: str | None = None,
         trace_file: str | None = None,
+        parent_span_id: str | None = None,
     ) -> None:
         self.name = name
         self._task = task
@@ -614,6 +623,7 @@ class Run:
 
         self._trace_id = _hex(16)
         self._root_id = _hex(8)
+        self._parent_span_id = _span_id(parent_span_id)
         self._start_ns = time.time_ns()
         self._spans: list[Span] = []
         self._open: list[Span] = []          # nesting stack, for `span`
@@ -625,6 +635,16 @@ class Run:
         # appended span from the stack — a lost parent, silently, in the one
         # shape this SDK exists to get right.
         self._lock = threading.RLock()
+
+    @property
+    def trace_id(self) -> str:
+        """This run's trace id, for handing to the next process in the pipeline."""
+        return self._trace_id
+
+    @property
+    def root_span_id(self) -> str:
+        """Span id of the run root; pass as ``parent_span_id`` to a downstream run."""
+        return self._root_id
 
     def _track(self, span: "Span") -> None:
         """Record a span and push it on the open stack."""
@@ -941,7 +961,7 @@ class Run:
         root = {
             "traceId": self._trace_id,
             "spanId": self._root_id,
-            "parentSpanId": "",
+            "parentSpanId": self._parent_span_id,
             "name": self.name,
             "kind": 1,
             "startTimeUnixNano": str(self._start_ns),
@@ -1032,9 +1052,17 @@ def run(
     service: str | None = None,
     endpoint: str | None = None,
     trace_file: str | None = None,
+    parent_span_id: str | None = None,
 ) -> Run:
     """Start a run. Use as a context manager; the trace exports on exit."""
-    return Run(name, task=task, service=service, endpoint=endpoint, trace_file=trace_file)
+    return Run(
+        name,
+        task=task,
+        service=service,
+        endpoint=endpoint,
+        trace_file=trace_file,
+        parent_span_id=parent_span_id,
+    )
 
 
 __all__ = [
