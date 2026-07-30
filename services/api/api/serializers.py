@@ -62,6 +62,9 @@ def run_node(row: Mapping[str, Any]) -> dict[str, Any]:
             "output_summary",
         ],
     )
+    if data["quality_score"] is None and data["unscored_reason"] is None:
+        # The engine never writes NULL+NULL, so this run was never analyzed.
+        data["unscored_reason"] = "not_analyzed"
     data["id"] = str(row["run_id"])
     return {"data": data}
 

@@ -25,6 +25,17 @@ Distributions are versioned independently; a release lists the ones that moved.
   expose the identity to hand over. Invalid ids degrade to a root without a
   parent; `detective_sdk.otel.collect` / `root_span` accept the same option.
 
+### Changed
+- **A run no analysis ever covered now reads `not_analyzed`, distinct from an
+  analysed-but-unscored run.** Both used to surface as `quality_score=null` +
+  `unscored_reason=null`; the API graph detail and the CLI report now derive
+  `not_analyzed` from that pair at the read boundary (the engine never writes
+  it), and the CLI report leads the Pipeline listing with a per-state node
+  count (`node states: 3 scored · 2 not_analyzed · …`). Runs the analysis did
+  score keep their original `unscored_reason`
+  (`payload_missing` / `empty_output` / `insufficient_components` /
+  `judge_error`). Blame-engine inputs are unchanged.
+
 ### Fixed
 - **A delegation split across POSTs of one trace now produces its edge.** The
   ingest finalization re-map retries the delegations it still could not

@@ -83,3 +83,23 @@ async def test_graph_detail_cytoscape_shape(client, ids):
 async def test_graph_detail_404(client):
     response = await client.get(f"/graphs/{uuid.uuid4()}")
     assert response.status_code == 404
+
+
+async def test_graph_detail_marks_never_analyzed_run(client, repo, run_factory, ids):
+    # NULL score + NULL reason can only mean no analysis ever covered the run.
+    repo.runs = [
+        run_factory(ids.RUN_A, quality_score=None, score_components=None, unscored_reason=None),
+    ]
+    response = await client.get(f"/graphs/{ids.GRAPH_ID}")
+    node = response.json()["nodes"][0]["data"]
+    assert node["quality_score"] is None
+    assert node["unscored_reason"] == "not_analyzed"
+
+
+async def test_graph_detail_keeps_engine_unscored_reason(client, repo, run_factory, ids):
+    repo.runs = [
+        run_factory(ids.RUN_A, quality_score=None, score_components=None, unscored_reason="payload_missing"),
+    ]
+    response = await client.get(f"/graphs/{ids.GRAPH_ID}")
+    node = response.json()["nodes"][0]["data"]
+    assert node["unscored_reason"] == "payload_missing"

@@ -60,6 +60,21 @@ def unmeasured_run() -> AnalysisRun:
     return make_run(no_judge=True)
 
 
+@pytest.fixture
+def unanalyzed_run() -> AnalysisRun:
+    # tier1-only: scoring never ran, so the runs carry no score rows at all.
+    bundles = bundles_from_exports([linear_pipeline()])
+    settings = local_settings()
+    choice = judging(StubJudge())
+    graphs = asyncio.run(analyze_bundles(bundles, settings, judge=choice, tier1_only=True))
+    return AnalysisRun(
+        graphs=graphs,
+        judge=choice.description,
+        judge_enabled=choice.enabled,
+        settings=settings,
+    )
+
+
 class TestTerminal:
     def test_a_failure_names_the_verdict_and_the_culprit(self, failing_run):
         text = render_terminal(failing_run, "trace.json", color=False)
@@ -89,6 +104,16 @@ class TestTerminal:
         text = render_terminal(unmeasured_run, "trace.json", color=False)
         assert "unscored (insufficient_components)" in text
         assert "0.00" not in text
+
+    def test_never_analyzed_nodes_are_named_not_analyzed(self, unanalyzed_run):
+        text = render_terminal(unanalyzed_run, "trace.json", color=False)
+        pipeline = text.split("Pipeline", 1)[1]
+        assert "not analyzed" in pipeline
+        assert "unscored" not in pipeline
+
+    def test_node_states_breakdown_counts_each_state(self, unanalyzed_run):
+        text = render_terminal(unanalyzed_run, "trace.json", color=False)
+        assert "node states: 3 not_analyzed" in text
 
     def test_the_origin_node_is_marked_in_the_pipeline_listing(self, failing_run):
         text = render_terminal(failing_run, "trace.json", color=False)
@@ -188,6 +213,10 @@ class TestMarkdown:
 
     def test_the_header_counts_unverified_graphs(self, unmeasured_run):
         assert "**Unverified:** 1" in render_markdown(unmeasured_run, "trace.json")
+
+    def test_the_node_state_breakdown_is_listed(self, unanalyzed_run):
+        md = render_markdown(unanalyzed_run, "trace.json")
+        assert "Node states: 3 not_analyzed" in md
 
 
 class TestJson:

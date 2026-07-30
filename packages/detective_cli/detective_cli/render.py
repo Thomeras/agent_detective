@@ -183,15 +183,37 @@ class _GraphView:
             if defect.get(field)
         ]
 
-    def node_rows(self) -> list[tuple[str, str, str]]:
-        """(name, score, annotation) per run, in the engine's topological order."""
-        score_map: dict[str, Any] = self.evidence.get("score_map") or {}
+    def _run_order(self) -> list[str]:
         order: list[str] = list(self.evidence.get("topo_order") or [])
         if not order:
             # No report (tier1-only, or nothing escalated): fall back to the
             # bundle's own run order, which the mapper already made deterministic.
             order = [str(run.run_id) for run in self.analysis.bundle.runs]
+        return order
 
+    def _score_and_state(self, run_id: str) -> tuple[Any, str]:
+        """(score, state) — state is "scored", "not_analyzed", or an unscored reason."""
+        score_map: dict[str, Any] = self.evidence.get("score_map") or {}
+        score = score_map.get(run_id)
+        row = self.analysis.node_scores_by_str.get(run_id)
+        if score is None and row is not None:
+            score = row.quality_score
+        if score is not None:
+            return score, "scored"
+        reason = row.unscored_reason if row is not None else None
+        # NULL score + NULL reason means no analysis ever covered this run.
+        return None, reason or "not_analyzed"
+
+    def node_state_counts(self) -> dict[str, int]:
+        """Node count per scoring state, for the at-a-glance breakdown."""
+        counts: dict[str, int] = {}
+        for run_id in self._run_order():
+            _score, state = self._score_and_state(run_id)
+            counts[state] = counts.get(state, 0) + 1
+        return counts
+
+    def node_rows(self) -> list[tuple[str, str, str]]:
+        """(name, score, annotation) per run, in the engine's topological order."""
         culprits = {str(c) for c in self.culprits}
         manifestations = {str(m) for m in (self.evidence.get("manifestation_run_ids") or [])}
         verifiers = {str(v) for v in (self.evidence.get("verifier_run_ids") or [])}
@@ -199,10 +221,8 @@ class _GraphView:
         node_flags: dict[str, list[str]] = self.evidence.get("node_flags") or {}
 
         rows: list[tuple[str, str, str]] = []
-        for run_id in order:
-            score = score_map.get(run_id)
-            if score is None and run_id in self.analysis.node_scores_by_str:
-                score = self.analysis.node_scores_by_str[run_id].quality_score
+        for run_id in self._run_order():
+            score, state = self._score_and_state(run_id)
 
             notes: list[str] = []
             if run_id in culprits:
@@ -214,10 +234,10 @@ class _GraphView:
             drop = drops.get(run_id)
             if isinstance(drop, (int, float)):
                 notes.append(f"drop {drop:.2f}")
-            if score is None:
-                row = self.analysis.node_scores_by_str.get(run_id)
-                reason = row.unscored_reason if row is not None else None
-                notes.append(f"unscored ({reason})" if reason else "unscored")
+            if state == "not_analyzed":
+                notes.append("not analyzed")
+            elif state != "scored":
+                notes.append(f"unscored ({state})")
             notes.extend(node_flags.get(run_id, []))
             rows.append((self.label(run_id), _score(score), ", ".join(notes)))
         return rows
@@ -352,6 +372,8 @@ def render_terminal(run: AnalysisRun, source: str, *, color: bool = True) -> str
         if rows:
             add("")
             add(paint("   Pipeline", "bold"))
+            states = " · ".join(f"{n} {state}" for state, n in view.node_state_counts().items())
+            add(paint(f"   node states: {states}", "dim"))
             width = max(len(name) for name, _, _ in rows)
             for name, score, note in rows:
                 line = f"     {name.ljust(width)}  {score.rjust(5)}"
@@ -482,6 +504,9 @@ def render_markdown(run: AnalysisRun, source: str) -> str:
         rows = view.node_rows()
         if rows:
             lines.append("### Pipeline")
+            lines.append("")
+            states = ", ".join(f"{n} {state}" for state, n in view.node_state_counts().items())
+            lines.append(f"Node states: {states}")
             lines.append("")
             lines.append("| node | score | notes |")
             lines.append("| --- | --- | --- |")
