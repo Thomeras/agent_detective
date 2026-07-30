@@ -23,6 +23,8 @@ execution_graphs = sa.Table(
     sa.Column("finalized_at", sa.DateTime(timezone=True)),
     sa.Column("total_cost_usd", sa.Numeric()),
     sa.Column("run_count", sa.Integer()),
+    sa.Column("late_spans_count", sa.Integer()),
+    sa.Column("late_spans_last_at", sa.DateTime(timezone=True)),
     sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
 )
 

@@ -125,7 +125,18 @@ def create_app(settings: Settings, deps: Dependencies) -> FastAPI:
             )
         span_rows, batch = await build_batch(payload, settings, deps.store)
         await deps.span_sink.insert_spans(span_rows)
-        await deps.repo.upsert_batch(batch)
+        late = await deps.repo.upsert_batch(batch)
+        # One warning per graph per POST, not per span.
+        for graph_id in sorted(late, key=str):
+            logger.warning(
+                "graph %s already finalized; batch added %d new run(s) after finalization",
+                graph_id,
+                late[graph_id],
+            )
+        if settings.reanalyze_late_spans:
+            # Only graphs that actually gained runs: redelivery must not
+            # queue a second analysis of unchanged data.
+            finalizer.notify_late_spans(gid for gid, n in late.items() if n > 0)
         finalizer.touch(batch.graph_ids)
         # An empty object is a valid OTLP ExportTraceServiceResponse.
         return JSONResponse({})

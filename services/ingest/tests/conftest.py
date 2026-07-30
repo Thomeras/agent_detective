@@ -12,7 +12,7 @@ OTLP fixtures are reused from packages/otel_mapper/testdata (not duplicated).
 from __future__ import annotations
 
 import json
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
 from uuid import UUID
@@ -61,7 +61,14 @@ class FakeRepo:
         self._edge_keys: set[tuple[Any, ...]] = set()
         self.fail_ping = False
 
-    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> dict[UUID, int]:
+        late: dict[UUID, int] = {}
+        if not refresh_runs:
+            late = {
+                gid: 0
+                for gid in batch.graph_ids
+                if self.graphs.get(gid, {}).get("status") == "finalized"
+            }
         for graph in batch.graphs:
             existing = self.graphs.get(graph.graph_id)
             if existing is None:
@@ -74,6 +81,8 @@ class FakeRepo:
                     "finalized_at": None,
                     "run_count": 0,
                     "total_cost_usd": None,
+                    "late_spans_count": None,
+                    "late_spans_last_at": None,
                     "created_at": graph.started_at,
                 }
             else:
@@ -86,6 +95,8 @@ class FakeRepo:
             if refresh_runs:
                 self.runs[run.run_id] = run  # ON CONFLICT DO UPDATE (re-map)
             else:
+                if run.run_id not in self.runs and run.graph_id in late:
+                    late[run.graph_id] += 1
                 self.runs.setdefault(run.run_id, run)  # ON CONFLICT DO NOTHING
         for edge in batch.edges:
             key = (edge.graph_id, edge.from_run_id, edge.to_run_id, edge.type)
@@ -94,6 +105,15 @@ class FakeRepo:
                 self.edges.append(edge)
         for graph_id in batch.graph_ids:
             self.graphs[graph_id]["run_count"] = self._run_count(graph_id)
+        for graph_id, new_runs in late.items():
+            if new_runs == 0:
+                continue
+            graph = self.graphs[graph_id]
+            graph["late_spans_count"] = (graph["late_spans_count"] or 0) + new_runs
+            graph["late_spans_last_at"] = _max_none(
+                graph["late_spans_last_at"], datetime.now(timezone.utc)
+            )
+        return late
 
     def _run_count(self, graph_id: UUID) -> int:
         return sum(1 for r in self.runs.values() if r.graph_id == graph_id)
@@ -146,6 +166,19 @@ class FakeRepo:
         if graph is None or graph["status"] != "active":
             return None
         graph["status"] = "finalized"
+        graph["finalized_at"] = finalized_at
+        graph["run_count"] = self._run_count(graph_id)
+        graph["total_cost_usd"] = sum(
+            r.cost_usd or 0.0 for r in self.runs.values() if r.graph_id == graph_id
+        )
+        return FinalizeResult(
+            graph_id=graph_id, finalized_at=finalized_at, run_count=graph["run_count"]
+        )
+
+    async def refinalize_graph(self, graph_id: UUID, finalized_at: datetime) -> FinalizeResult | None:
+        graph = self.graphs.get(graph_id)
+        if graph is None or graph["status"] != "finalized":
+            return None
         graph["finalized_at"] = finalized_at
         graph["run_count"] = self._run_count(graph_id)
         graph["total_cost_usd"] = sum(

@@ -32,7 +32,10 @@ def json_row(row: Mapping[str, Any], fields: list[str]) -> dict[str, Any]:
 def graph_summary(row: Mapping[str, Any]) -> dict[str, Any]:
     return json_row(
         row,
-        ["graph_id", "name", "graph_type", "status", "started_at", "ended_at", "total_cost_usd", "run_count"],
+        [
+            "graph_id", "name", "graph_type", "status", "started_at", "ended_at",
+            "total_cost_usd", "run_count", "late_spans_count", "late_spans_last_at",
+        ],
     ) | {"id": str(row["graph_id"])}
 
 

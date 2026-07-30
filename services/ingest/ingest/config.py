@@ -29,6 +29,9 @@ class Settings(BaseSettings):
     graph_quiescence_seconds: float = 30.0
     # How often the background finalizer task scans active graphs.
     finalizer_check_seconds: float = 5.0
+    # Re-map + re-announce a finalized graph that gained new runs after
+    # finalization. Off by default: late spans are only recorded and logged.
+    reanalyze_late_spans: bool = False
 
     # Payloads at or below this size stay inline in Postgres; larger ones go
     # to the object store with only a bounded prefix kept inline.

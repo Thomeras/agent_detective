@@ -53,6 +53,8 @@ execution_graphs = Table(
     Column("finalized_at", DateTime(timezone=True)),
     Column("total_cost_usd", Numeric),
     Column("run_count", Integer),
+    Column("late_spans_count", Integer),
+    Column("late_spans_last_at", DateTime(timezone=True)),
     Column("created_at", DateTime(timezone=True), nullable=False, server_default=func.now()),
 )
 
@@ -104,13 +106,18 @@ edges = Table(
 class Repo(Protocol):
     """Persistence seam; faked by an in-memory implementation in tests."""
 
-    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> dict[UUID, int]:
         """Idempotent write of one mapped batch.
 
         With ``refresh_runs`` the batch is authoritative for run DATA: run rows
         are updated in place instead of first-write-wins. Only the finalization
         re-map sets it — that batch is mapped from the graph's full span set,
         so it is at least as informed as any per-request row.
+
+        Returns ``graph_id -> new run count`` for every FINALIZED graph the
+        batch touched (detected inside the upsert transaction, so it cannot
+        race the finalizer). Only genuinely new runs count, so redelivery of
+        the same spans neither inflates the tally nor re-triggers re-analysis.
         """
         ...
 
@@ -133,6 +140,15 @@ class Repo(Protocol):
         """
         ...
 
+    async def refinalize_graph(self, graph_id: UUID, finalized_at: datetime) -> FinalizeResult | None:
+        """Refresh a finalized graph after late spans were re-mapped in.
+
+        Status stays ``finalized``; only ``finalized_at`` and the derived
+        aggregates move. Returns None when the graph is not finalized, so the
+        controlled second announcement cannot fire for an active graph.
+        """
+        ...
+
     async def ping(self) -> None: ...
 
     async def close(self) -> None: ...
@@ -142,8 +158,20 @@ class PgRepo:
     def __init__(self, engine: "object") -> None:
         self._engine = engine
 
-    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> None:
+    async def upsert_batch(self, batch: IngestBatch, *, refresh_runs: bool = False) -> dict[UUID, int]:
         async with self._engine.begin() as conn:
+            late: dict[UUID, int] = {}
+            if batch.graph_ids and not refresh_runs:
+                # Detect inside the upsert transaction: a post-commit read
+                # races the finalizer and could miss the finalized state.
+                # The re-map itself (refresh_runs) never counts as late.
+                rows = await conn.execute(
+                    select(execution_graphs.c.graph_id).where(
+                        execution_graphs.c.graph_id.in_(batch.graph_ids),
+                        execution_graphs.c.status == "finalized",
+                    )
+                )
+                late = {row.graph_id: 0 for row in rows}
             for graph in batch.graphs:
                 stmt = pg_insert(execution_graphs).values(
                     graph_id=graph.graph_id,
@@ -231,7 +259,11 @@ class PgRepo:
                     )
                 else:
                     stmt = stmt.on_conflict_do_nothing()
-                await conn.execute(stmt)
+                result = await conn.execute(stmt)
+                # rowcount 1 = genuinely inserted; redelivery conflicts and
+                # reports 0, so the late tally cannot double-count.
+                if run.graph_id in late and result.rowcount > 0:
+                    late[run.graph_id] += 1
 
             for edge in batch.edges:
                 stmt = (
@@ -260,6 +292,24 @@ class PgRepo:
                     .where(execution_graphs.c.graph_id == graph_id)
                     .values(run_count=count)
                 )
+
+            # Permanent trace of late arrivals; GREATEST ignores NULLs.
+            for graph_id, new_runs in late.items():
+                if new_runs == 0:
+                    continue
+                await conn.execute(
+                    update(execution_graphs)
+                    .where(execution_graphs.c.graph_id == graph_id)
+                    .values(
+                        late_spans_count=func.coalesce(
+                            execution_graphs.c.late_spans_count, 0
+                        ) + new_runs,
+                        late_spans_last_at=func.greatest(
+                            execution_graphs.c.late_spans_last_at, func.now()
+                        ),
+                    )
+                )
+        return late
 
     async def trace_ids_for_graph(self, graph_id: UUID) -> list[str]:
         stmt = (
@@ -341,6 +391,14 @@ class PgRepo:
         ]
 
     async def finalize_graph(self, graph_id: UUID, finalized_at: datetime) -> FinalizeResult | None:
+        return await self._finalize_update(graph_id, finalized_at, from_status="active")
+
+    async def refinalize_graph(self, graph_id: UUID, finalized_at: datetime) -> FinalizeResult | None:
+        return await self._finalize_update(graph_id, finalized_at, from_status="finalized")
+
+    async def _finalize_update(
+        self, graph_id: UUID, finalized_at: datetime, *, from_status: str
+    ) -> FinalizeResult | None:
         count = (
             select(func.count(agent_runs.c.run_id))
             .where(agent_runs.c.graph_id == execution_graphs.c.graph_id)
@@ -355,20 +413,22 @@ class PgRepo:
             .where(agent_runs.c.graph_id == execution_graphs.c.graph_id)
             .scalar_subquery()
         )
+        values: dict[str, object] = {
+            "finalized_at": finalized_at,
+            "run_count": count,
+            "total_cost_usd": total_cost,
+        }
+        if from_status == "active":
+            values["status"] = "finalized"
         stmt = (
             update(execution_graphs)
             .where(
                 execution_graphs.c.graph_id == graph_id,
                 # The status guard makes a double finalize a no-op: the second
                 # call matches no row and returns None.
-                execution_graphs.c.status == "active",
+                execution_graphs.c.status == from_status,
             )
-            .values(
-                status="finalized",
-                finalized_at=finalized_at,
-                run_count=count,
-                total_cost_usd=total_cost,
-            )
+            .values(**values)
             .returning(execution_graphs.c.run_count)
         )
         async with self._engine.begin() as conn:

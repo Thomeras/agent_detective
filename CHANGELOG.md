@@ -24,6 +24,11 @@ Distributions are versioned independently; a release lists the ones that moved.
   name-resolved TOOL_DELEGATION alone. `Run.trace_id` / `Run.root_span_id`
   expose the identity to hand over. Invalid ids degrade to a root without a
   parent; `detective_sdk.otel.collect` / `root_span` accept the same option.
+- `REANALYZE_LATE_SPANS` ingest flag (default off): a finalized graph that
+  gained new runs goes through the full finalization path again — re-map over
+  the complete span set, refinalize, exactly one new announcement on
+  `ad.graphs.completed`. Worker-side dedup (`dedup_key=graph_id`,
+  incident upsert on `(graph_id, incident_key)`) keeps the repeat safe.
 
 ### Changed
 - **A run no analysis ever covered now reads `not_analyzed`, distinct from an
@@ -44,6 +49,12 @@ Distributions are versioned independently; a release lists the ones that moved.
   time. A delegation whose target exists nowhere in the graph still yields
   no edge — endpoints are never invented — but now leaves one warning per
   graph naming the missing target.
+- **Spans arriving after finalization are no longer silently absorbed.** The
+  ingest upsert detects (inside its own transaction) that a batch touches a
+  finalized graph, logs one warning per graph per POST, and stamps the graph
+  with `late_spans_count` / `late_spans_last_at` (migration 0013, additive
+  and nullable), readable via `GET /graphs` and `GET /graphs/{id}`. Only
+  genuinely new runs count, so redelivery changes nothing.
 
 ## [0.3.0] — 2026-07-29
 

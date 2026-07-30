@@ -60,12 +60,19 @@ class Finalizer:
         self._remapper = remapper
         # graph_id -> last time a POST delivered spans for it (arrival time).
         self._last_seen: dict[UUID, datetime] = {}
+        # Finalized graphs that gained NEW runs after finalization, queued for
+        # a controlled re-map + re-announce (config-gated at the call site).
+        self._pending_reanalysis: set[UUID] = set()
 
     def touch(self, graph_ids: Iterable[UUID], at: datetime | None = None) -> None:
         """Record ingest activity for graphs (called on every POST /v1/traces)."""
         now = at or self._clock()
         for graph_id in graph_ids:
             self._last_seen[graph_id] = now
+
+    def notify_late_spans(self, graph_ids: Iterable[UUID]) -> None:
+        """Queue finalized graphs that gained new runs for re-analysis."""
+        self._pending_reanalysis.update(graph_ids)
 
     async def scan_once(self, now: datetime | None = None) -> list[FinalizeResult]:
         """Finalize every active graph that quiesced or whose root run ended."""
@@ -116,7 +123,43 @@ class Finalizer:
                 },
             )
             finalized.append(result)
+        await self._reanalyze_pending(now, finalized)
         return finalized
+
+    async def _reanalyze_pending(
+        self, now: datetime, finalized: list[FinalizeResult]
+    ) -> None:
+        """Re-run the full finalization path for graphs that grew post-finalize.
+
+        Same road as the first pass — re-map, refinalize, one announcement —
+        just with the status guard flipped to ``finalized``.
+        """
+        pending = sorted(self._pending_reanalysis, key=str)
+        self._pending_reanalysis.clear()
+        for graph_id in pending:
+            if self._remapper is not None:
+                try:
+                    await self._remapper.remap(graph_id)
+                except Exception:
+                    logger.exception(
+                        "re-map failed for late-grown graph %s; refinalizing as-is",
+                        graph_id,
+                    )
+            result = await self._repo.refinalize_graph(graph_id, now)
+            if result is None or result.run_count == 0:
+                # Not finalized (state changed under us) or empty: stay silent,
+                # same rule as a first finalize of an empty shell.
+                continue
+            await self._publisher.xadd_json(
+                self._stream,
+                {
+                    "schema_version": 1,
+                    "graph_id": str(result.graph_id),
+                    "finalized_at": result.finalized_at.isoformat(),
+                    "run_count": result.run_count,
+                },
+            )
+            finalized.append(result)
 
     async def run_forever(self, check_seconds: float) -> None:
         """Background loop: scan every ``check_seconds``; log and continue on errors."""
