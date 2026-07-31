@@ -9,15 +9,21 @@ concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: true
 
+# All three actions run on node24; GitHub deprecated node20 and was already
+# force-running the old pins on 24. setup-uv is pinned to an exact patch on
+# purpose — it stopped publishing floating major tags at v8 (supply-chain
+# hardening), so @v9 does not resolve. Bump it deliberately, do not "fix" it
+# back to a major.
+
 jobs:
   unit:
     name: Unit tests
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
@@ -70,10 +76,10 @@ jobs:
     name: pip distribution (build + clean install)
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
@@ -127,7 +133,7 @@ jobs:
           fi
 
       - name: Upload distributions
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: dist
           path: dist/
@@ -136,10 +142,10 @@ jobs:
     name: End-to-end acceptance
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Install uv
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v9.0.0
         with:
           enable-cache: true
 
