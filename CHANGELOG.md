@@ -8,7 +8,7 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
-## [0.4.3] — 2026-07-31
+## [0.4.2] — 2026-07-31
 
 **The repository is now Apache-2.0.** It was Business Source License 1.1;
 `otel_mapper` and `detective_sdk` already carried Apache-2.0 and are unchanged.
