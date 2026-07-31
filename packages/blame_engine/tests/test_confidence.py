@@ -171,6 +171,44 @@ def test_fail_signal_that_observed_origination_carries_the_headline(mk):
     assert report.evidence.attribution_confidence == pytest.approx(0.95)
 
 
+def test_judged_content_flag_is_not_deterministic_evidence(mk):
+    """The other half of the same drift. `missing_required_content` is a string an
+    LLM judge emits — it is recorded as a judged Finding worth certainty 0.7 — yet
+    the observation predicate counted it as deterministic and published 0.95, the
+    constant that means "origination observed on BOTH sides of the fault", for a
+    node whose contract_violations and deterministic_signals are both empty. One
+    flag cannot be worth 0.7 as evidence and 0.95 as proof."""
+    inp = mk(
+        nodes=["src", "sink"],
+        edges=[("src", "sink")],
+        scores={
+            "src": 0.90,
+            "sink": NodeScore(
+                run_id="sink", score=0.55, components={}, input_flawed=None,
+                unscored_reason=None, judge_note="lacks the rental detail",
+                flags=("missing_required_content",),
+            ),
+        },
+    )
+    report = find_blame(inp)
+
+    assert "sink" in report.culprit_run_ids
+    obs = report.evidence.observation_confidence
+    assert obs != pytest.approx(DETERMINISTIC_ATTRIBUTION)
+    # It falls to what the judged channel actually measured: a drop of 0.35
+    # against the 0.5 saturation point, worth JUDGED_DEGRADATION_OBSERVATION.
+    assert obs == pytest.approx((0.35 / 0.5) * JUDGED_DEGRADATION_OBSERVATION)
+
+
+def test_observation_and_localisation_share_one_deterministic_predicate(mk):
+    """Two functions answering the same question drifted apart twice. They are one
+    function now, so a third drift cannot be written."""
+    from blame_engine import blame as _blame
+    from blame_engine import cutpoint as _cutpoint
+
+    assert _blame._has_deterministic_defect is _cutpoint._deterministic_defect
+
+
 def test_fail_signal_without_the_marker_keeps_inferred_attribution(mk):
     """An injection signature says the output is bad and nothing about where it
     came from — it may well have arrived from upstream. No marker, no headline."""

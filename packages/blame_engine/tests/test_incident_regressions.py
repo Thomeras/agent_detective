@@ -498,9 +498,14 @@ def test_wrong_fail_with_ok_terminal_surfaces_as_gap_with_honest_note(mk):
     ]
 
 
-def test_wrong_fail_with_bad_terminal_is_not_manufactured(mk):
-    """A FAIL scored low over a BAD terminal has no ground truth that the FAIL
-    was wrong (the work really was bad) — do not manufacture a wrong-FAIL gap."""
+def test_wrong_fail_with_bad_terminal_is_reported_as_a_conflict_not_a_verdict(mk):
+    """A FAIL scored low over a BAD terminal is self-contradictory: a FAIL on bad
+    work is the RIGHT call, so the flag and the sub-threshold score cannot both
+    hold. The engine has no ground truth that the FAIL was wrong, so it still may
+    not manufacture a wrong-FAIL gap — but dropping the node reported nothing at
+    all, which is how a verifier that let bad work through disappeared from the
+    report on the strength of one unchecked judge string. It is surfaced as an
+    UNRESOLVED conflict instead."""
     nodes = ["gen", "review"]
     edges = [("gen", "review")]
     scores = {
@@ -509,4 +514,33 @@ def test_wrong_fail_with_bad_terminal_is_not_manufactured(mk):
     }
     report = find_blame(mk(nodes=nodes, edges=edges, scores=scores,
                            terminal_verdict=BAD))
-    assert report.evidence.verification_gaps == []
+
+    gaps = {g["run_id"]: g["basis"] for g in report.evidence.verification_gaps}
+    assert gaps == {"review": "verifier_flag_conflict"}
+    # The original guarantee, unchanged: never assert the FAIL was wrong.
+    assert "verdict_scored_incorrect" not in gaps.values()
+
+
+def test_flag_conflict_never_promotes_the_verifier_to_culprit(mk):
+    """The conflict says the engine cannot tell which of the two judge outputs
+    failed. Blaming the verifier on it would replace a silent drop with a louder
+    unfounded claim, so the report type and culprits stay as the evidence left
+    them."""
+    nodes = ["gen", "review"]
+    edges = [("gen", "review")]
+    scores = {
+        "gen": _sc("gen", 0.9),
+        "review": _flawed("review", 0.27, ["issued_fail"]),
+    }
+    report = find_blame(mk(nodes=nodes, edges=edges, scores=scores,
+                           terminal_verdict=BAD))
+
+    assert report.report_type != "verification_gap"
+    assert "review" not in report.culprit_run_ids
+    # Reported, not swallowed: the gap and its finding both exist.
+    assert report.evidence.verification_gaps
+    assert any(
+        f["kind"] == "verifier_verdict"
+        and f["data"].get("basis") == "verifier_flag_conflict"
+        for f in report.evidence.findings
+    )

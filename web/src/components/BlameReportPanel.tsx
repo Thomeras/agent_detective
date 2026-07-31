@@ -88,6 +88,9 @@ const FALLBACK_NOTE: Record<string, string> = {
 const GAP_BASIS_LABEL: Record<string, string> = {
   verdict_scored_incorrect: "verdict itself judged wrong",
   passed_bad_terminal: "passed work behind a bad terminal verdict",
+  // Not an accusation: the judge's own flag and its own score contradict each
+  // other, and the engine does not know which one failed.
+  verifier_flag_conflict: "unresolved — FAIL flag contradicts the score",
 };
 
 // Reasoning notes are long evidence prose, each opening with a stable

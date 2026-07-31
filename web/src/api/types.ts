@@ -195,7 +195,10 @@ export interface VerificationGap {
   run_id: string;
   agent_name: string;
   // "verdict_scored_incorrect" — the role-aware judge scored the verdict wrong;
-  // "passed_bad_terminal" — deduced: terminal is bad, this verifier passed it.
+  // "passed_bad_terminal" — deduced: terminal is bad, this verifier passed it;
+  // "verifier_flag_conflict" — the judge flagged an issued FAIL and scored that
+  // same verdict wrong over a bad terminal, which cannot both hold. Evidence
+  // only: it never names a culprit, so do not render it as an accusation.
   basis?: string;
 }
 
