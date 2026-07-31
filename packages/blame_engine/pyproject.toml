@@ -1,6 +1,6 @@
 [project]
 name = "blame-engine"
-version = "0.4.0"
+version = "0.4.1"
 description = "Pure, I/O-free blame analysis engine for multi-agent execution graphs"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"

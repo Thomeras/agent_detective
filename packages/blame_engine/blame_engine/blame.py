@@ -36,7 +36,7 @@ from .confidence import (
     report_type_cap,
 )
 from .cost import downstream_cost
-from .cutpoint import Candidate, _analyze, channel_fields
+from .cutpoint import Candidate, _analyze, _deterministic_defect, channel_fields
 from .finding import Finding
 from .loops import _detect_anomalies
 from .narrative import (
@@ -125,28 +125,28 @@ def _violations(inp: BlameInput, run_id: str) -> list[dict]:
     return [{"key": k, "from": a, "to": b} for k, a, b in ns.contract_violations]
 
 
-def _has_deterministic_defect(inp: BlameInput, run_id: str) -> bool:
-    """A hard, reproducible signal that this node's output is defective — as
-    opposed to a graded judge opinion. Drives observation_confidence to
-    near-certain.
-
-    Must agree with ``cutpoint._deterministic_defect``, which decides whether the
-    node gets localised at all. It did not: that one counts any fail-severity
-    deterministic signal, this one read only contract violations and a CLOSED SET
-    of three flag names. So a node localised by a fail signal outside that set
-    arrived here with no deterministic evidence and reported observation 0% —
-    while the report above it cited the very same finding at certainty 100%.
-    Found by the foreign corpus on ``empty_output``; the closed set would have
-    swallowed every signal added after it in the same way.
-    """
-    ns = inp.scores.get(run_id)
-    if ns is None:
-        return False
-    return (
-        bool(ns.contract_violations)
-        or bool(_CONTENT_FLAGS.intersection(ns.flags))
-        or any(s.get("severity") == "fail" for s in ns.deterministic_signals)
-    )
+# "This node's own output carries a hard, reproducible fault" — the predicate
+# that drives observation_confidence to near-certain. It is the SAME question
+# `cutpoint._deterministic_defect` answers to decide whether the node gets
+# localised at all, so it is now the same function rather than a second one kept
+# in step by discipline.
+#
+# Discipline had already failed twice. The first drift (this side read a closed
+# set of three flag names, the other counted any fail-severity signal) meant a
+# node localised by a signal outside that set reported observation 0% while the
+# report above it cited the very same finding at certainty 100%. Adding the
+# fail-severity branch here fixed that half and left the other: a judge-emitted
+# `missing_required_content` still returned True, so a node with
+# `contract_violations: []` and `deterministic_signals: []` published observation
+# 0.95 — DETERMINISTIC_ATTRIBUTION, whose whole meaning is "origination observed
+# on BOTH sides of the fault" — on the strength of one LLM string, recorded a few
+# lines away as a judged Finding worth certainty 0.7. The same flag cannot be
+# worth 0.7 as evidence and 0.95 as proof.
+#
+# A judged flag is judged evidence: it belongs to the severity/degradation
+# formula in `compute_observation_confidence`, which already reads the score it
+# capped. Aliasing instead of re-implementing makes a third drift impossible.
+_has_deterministic_defect = _deterministic_defect
 
 
 # The attribution ceiling for a CONTENT defect at the OBSERVABILITY BOUNDARY
@@ -1323,18 +1323,36 @@ def find_blame(
         #    "wrong PASS" resting on the unreliable role-aware score alone — the
         #    exact false positive (PASS + terminal ok => NOT a gap).
         #  - wrong FAIL (false alarm): a gap ONLY if the terminal is ok/good, i.e.
-        #    ground truth confirms the failed work was actually fine. With a bad
-        #    or not_checkable terminal there is no ground truth that the FAIL was
-        #    wrong, so we do not manufacture a wrong-FAIL gap either.
+        #    ground truth confirms the failed work was actually fine. A
+        #    not_checkable or absent terminal is no ground truth at all, so no
+        #    wrong-FAIL gap is manufactured there — and none is manufactured
+        #    against a BAD terminal either; that case is the conflict below,
+        #    which asserts nothing about which verdict the verifier issued.
+        # The flag is a CLAIM about what the verifier did, never an observation
+        # of it: judge_verifier.md forces exactly one of issued_pass/issued_fail
+        # out of every call and nothing confronts the answer with the payload.
+        # Read as ground truth it silently chose which corroboration branch ran.
         issued_fail = "issued_fail" in ns.flags
-        corroborated = terminal_ok if issued_fail else terminal_bad
-        if not corroborated:
+        if issued_fail and terminal_bad:
+            # Self-contradictory, and detectable without reading a single word of
+            # prose: the same judge call scored this verifier's verdict WRONG
+            # (below threshold) while flagging that it issued FAIL — but a FAIL
+            # on work the terminal confirms is bad is the RIGHT verdict. Either
+            # the flag is wrong (it passed: a rubber stamp on bad work) or the
+            # score is (a judge error). The engine cannot tell which, and the
+            # branch this replaces resolved it by reporting neither: a verifier
+            # that let bad work through vanished from the report on the strength
+            # of the one string nothing had checked.
+            basis = "verifier_flag_conflict"
+        elif terminal_ok if issued_fail else terminal_bad:
+            basis = "verdict_scored_incorrect"
+        else:
             continue
         verification_gaps.append(
             {
                 "run_id": run_id,
                 "agent_name": inp.agent_names.get(run_id, "unknown"),
-                "basis": "verdict_scored_incorrect",
+                "basis": basis,
             }
         )
         scored_gap_ids.add(run_id)
@@ -1409,8 +1427,18 @@ def find_blame(
     # scoring the verifier's own PASS/FAIL wrong, NOT on the terminal. Asserting a
     # bad terminal here — worse, while quoting an OK verdict's reasoning — is the
     # exact dishonesty this fixes (a false verification_gap on a healthy run).
-    if report_type in ("composition_failure", "unclassified") and verification_gaps:
-        culprits = [g["run_id"] for g in verification_gaps]
+    #
+    # A verifier_flag_conflict gap asserts no wrong verdict — it says the flag and
+    # the score cannot both hold and that the engine cannot tell which failed. It
+    # is therefore evidence, not a localisation: it is reported (in
+    # evidence.verification_gaps, with its verifier_verdict finding) but it never
+    # promotes a node to culprit. Blaming a verifier on an explicitly unresolved
+    # conflict would trade one silent claim for a louder one.
+    _asserted_gaps = [
+        g for g in verification_gaps if g["basis"] != "verifier_flag_conflict"
+    ]
+    if report_type in ("composition_failure", "unclassified") and _asserted_gaps:
+        culprits = [g["run_id"] for g in _asserted_gaps]
         confidence = _CONFIDENCE_CAP["verification_gap"]
         # The rubber-stamping (or false-alarming) verifiers ARE the failure now:
         # replace the (composition/none) primary defects with the localized

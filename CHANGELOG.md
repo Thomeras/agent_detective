@@ -8,6 +8,99 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
+## [0.4.1] — 2026-07-31
+
+`blame-engine` (0.4.0 → 0.4.1). `agent-detective` and
+`agent-detective-worker` already require `blame-engine>=0.4.0`, so the fix
+reaches them without a bump of their own.
+
+**No verdict is renamed.** Both entries make a report say *less* than it did,
+in the two places where it was saying more than it had measured: one number
+falls, one silently dropped node reappears as evidence. `report_type`, the
+exit-code contract and the schema are all unchanged, and the foreign-corpus
+goldens are byte-identical to 0.4.0.
+
+**Upgrade note.** `verification_gaps` gains entries on unchanged traces —
+verifiers that were being dropped silently now appear. If you alert on gap
+counts, expect a step up; it is the second fix below surfacing what was
+already there, not new faults.
+
+### Fixed
+
+- **An LLM's flag no longer counts as deterministic proof.**
+  `observation_confidence` — "how sure are we this output is defective" —
+  reached `DETERMINISTIC_ATTRIBUTION` (0.95) for a node whose
+  `contract_violations` and `deterministic_signals` were both empty. The
+  constant means *origination observed on both sides of the fault*; what
+  actually triggered it was `missing_required_content`, a string the per-node
+  judge emits, recorded a few lines away in the same report as a judged
+  Finding worth `certainty: 0.7`. One flag was worth 0.7 as evidence and 0.95
+  as proof.
+
+  This was the surviving half of a drift 0.3.0 reported as closed. Two
+  functions answered the same question — `blame._has_deterministic_defect` and
+  `cutpoint._deterministic_defect` — and had to agree by discipline. The first
+  divergence (a closed set of three flag names here, any fail-severity signal
+  there) made a node localised by a signal outside that set publish observation
+  0% while citing a 100%-certainty finding; that fix added the fail-severity
+  branch and left the judge-flag branch untouched. They are now **one
+  function**, so a third drift cannot be written.
+
+  A judged flag is judged evidence: it lands in the severity/degradation
+  formula, which already reads the score it capped. Affected reports lose the
+  0.95 and report what the judged channel measured — for a node scoring 0.55
+  after a 0.35 drop, `0.49`.
+
+- **A verifier that let bad work through no longer vanishes on an unchecked
+  string.** `judge_verifier.md` forces exactly one of
+  `issued_pass` / `issued_fail` out of every call, and nothing confronts the
+  answer with the payload — so the flag is a *claim* about what the verifier
+  did, not an observation of it. The engine read it as ground truth to pick
+  which corroboration branch ran, and with a bad terminal an `issued_fail`
+  therefore dropped the node silently: no gap, no note, nothing in evidence.
+
+  Found on a live run where a verifier stamped `"overeno": true` over
+  `sidli_tam: null` and `najem: null`, drew the harshest per-node judge score
+  in the graph (0.0), and still produced `verification_gaps: []` — because the
+  same judge call also emitted `issued_fail` while its own reasoning read
+  *"incorrectly **passed** the work"*.
+
+  That triple is self-contradictory and detectable without reading a word of
+  prose: a FAIL on work the terminal confirms is bad is the *right* verdict, so
+  a sub-threshold score ("this verdict was wrong") and the `issued_fail` flag
+  cannot both hold. The engine cannot tell which of the two judge outputs
+  failed, so it now reports the conflict instead of resolving it by reporting
+  neither.
+
+### Changed
+
+- `verification_gaps` entries carry a new `basis`, `verifier_flag_conflict`,
+  alongside `verdict_scored_incorrect` and `passed_bad_terminal`. Consumers
+  that switch on `basis` should treat it as **evidence, not a localisation**:
+  it asserts no wrong verdict, and it never promotes a node to culprit or
+  upgrades a report to `verification_gap`. Blaming a verifier on an explicitly
+  unresolved conflict would trade one silent claim for a louder unfounded one.
+  It carries no `score_overrides` entry for the same reason — the rubber-stamp
+  override to 0.1 stays exclusive to `passed_bad_terminal`, where terminal
+  ground truth actually refutes the PASS. The field is typed `string` in the
+  web client and falls back to the raw slug, so an older UI renders it without
+  breaking.
+
+### Known, not fixed here
+
+- **The heuristics channel still lifts the nodes the judge condemned hardest.**
+  0.3.0 stopped `evaluate_heuristics` returning a flat 1.0 when no check fired
+  (silence is not a verdict of health). The channel only ever subtracts from
+  1.0, so when a check *does* fire it still lands high — and at 0.273 of the
+  blend it pulls up every node scored below it. Measured on one live graph: a
+  verifier the judge scored 0.0 came out at 0.216, and a collector scored 0.40
+  came out at 0.554, i.e. over the 0.50 acceptance bar, on the strength of a
+  0.034 repetition deduction. The worse the judged verdict, the larger the
+  lift. The 0.3.0 note describes this failure mode exactly ("turned the absence
+  of evidence into evidence of health"); it was closed for the silent case and
+  is open for the fired-but-mild case. Fixing it will move numbers broadly and
+  belongs in a MINOR, not here.
+
 ## [0.4.0] — 2026-07-30
 
 `blame-engine` (0.3.0 → 0.4.0), `agent-detective` (0.3.0 → 0.4.0),

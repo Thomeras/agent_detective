@@ -449,6 +449,17 @@ def _verification_gap(d: Mapping[str, Any]) -> str:
                 f"'{name}' scored healthy ({s:.2f}) yet let the work through "
                 "while the terminal output is bad"
             )
+        elif g["basis"] == "verifier_flag_conflict":
+            parts.append(
+                f"'{name}' is flagged as having issued a FAIL, yet the same judge "
+                f"call scored its verdict wrong (score {s:.2f} < threshold "
+                f"{t:.2f}) while the terminal output is bad — a FAIL on bad work "
+                "is the correct verdict, so the flag and the score cannot both "
+                "hold. UNRESOLVED: either it passed the work (a rubber stamp the "
+                "flag misreports) or the low score is a judge error. Nothing "
+                "checks the flag against the payload, so the engine states the "
+                "conflict rather than picking a side"
+            )
         elif g["issued_fail"]:
             parts.append(
                 f"'{name}' issued a FAIL the role-aware judge scored wrong "
