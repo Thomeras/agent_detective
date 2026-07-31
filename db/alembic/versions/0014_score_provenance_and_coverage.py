@@ -13,7 +13,7 @@ across incommensurable measurements with no way to tell.
 ``judge_model`` records it beside the existing ``judge_prompt_hash`` (0009) on
 both verdict tables and on the run whose judge component it produced.
 
-``runs.score_weights`` records the weights ACTUALLY used after renormalization.
+``agent_runs.score_weights`` records the weights ACTUALLY used after renormalization.
 A missing channel redistributed its weight silently (schema absent -> judge
 0.40 becomes 0.727), so a single-channel score was indistinguishable from a
 three-channel one.
@@ -37,8 +37,10 @@ depends_on: Union[str, Sequence[str], None] = None
 
 
 def upgrade() -> None:
-    op.add_column("runs", sa.Column("judge_model", sa.Text(), nullable=True))
-    op.add_column("runs", sa.Column("score_weights", postgresql.JSONB(), nullable=True))
+    op.add_column("agent_runs", sa.Column("judge_model", sa.Text(), nullable=True))
+    op.add_column(
+        "agent_runs", sa.Column("score_weights", postgresql.JSONB(), nullable=True)
+    )
     op.add_column("blame_reports", sa.Column("judge_model", sa.Text(), nullable=True))
     op.add_column(
         "blame_reports", sa.Column("cost_coverage", postgresql.JSONB(), nullable=True)
@@ -58,5 +60,5 @@ def downgrade() -> None:
     op.drop_column("tier1_verdicts", "judge_model")
     op.drop_column("blame_reports", "cost_coverage")
     op.drop_column("blame_reports", "judge_model")
-    op.drop_column("runs", "score_weights")
-    op.drop_column("runs", "judge_model")
+    op.drop_column("agent_runs", "score_weights")
+    op.drop_column("agent_runs", "judge_model")
