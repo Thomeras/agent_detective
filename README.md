@@ -212,3 +212,16 @@ done
 
 Business Source License 1.1 (see [LICENSE](LICENSE));
 `packages/otel_mapper` is Apache-2.0.
+
+Source-available, not OSI open source. Internal use is explicitly permitted —
+including running it in your company's CI against your own agents. What the
+licence withholds is operating it as a service or product for third parties.
+On 2030-07-22 it converts to Apache-2.0.
+
+## Contact
+
+Questions, collaboration, or a licence for production use that the grant above
+does not cover: **tomje11@seznam.cz**.
+
+A trace that produces a wrong verdict is the most useful thing you can send —
+see [CONTRIBUTING.md](CONTRIBUTING.md).

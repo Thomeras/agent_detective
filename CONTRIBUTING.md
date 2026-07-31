@@ -133,3 +133,8 @@ are versioned independently; publish **leaves first**
 (`otel-mapper`, `detective-sdk`, `blame-engine` → `agent-detective-worker` →
 `agent-detective`), or the CLI briefly requires a dependency version that does
 not exist yet.
+
+## Contact
+
+Anything that does not fit an issue — collaboration, commercial licensing, or a
+question about whether your use is covered by the grant: **tomje11@seznam.cz**.
