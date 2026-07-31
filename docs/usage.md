@@ -672,7 +672,7 @@ heuristics weight and sold as a score.
 | Distribution | Import | What | License |
 |---|---|---|---|
 | `agent-detective` | `detective_cli` | the `detective` CLI + local mode — `pip install agent-detective` | BSL 1.1 |
-| `detective-sdk` | `detective_sdk` | zero-dependency instrumentation; ships as a dependency of `agent-detective`, or install from the repo (`[otel]` extra for the collector) | BSL 1.1 |
+| `detective-sdk` | `detective_sdk` | zero-dependency instrumentation; ships as a dependency of `agent-detective`, or install from the repo (`[otel]` extra for the collector) | Apache-2.0 |
 | `detective-ci` | `detective_ci` | golden replay + pytest plugin; install from the repo | BSL 1.1 |
 | `blame-engine` | `blame_engine` | pure blame analysis over networkx | BSL 1.1 |
 | `otel-mapper` | `otel_mapper` | OTLP span → run/edge mapping | Apache-2.0 |

@@ -281,7 +281,7 @@ compare against, and no incident history to supersede.
 | `packages/blame_engine/` | pure, I/O-free blame analysis (networkx only) — **BSL 1.1** |
 | `packages/otel_mapper/` | OTLP/HTTP JSON span → run/edge mapping, plus the shared uuid5 run/graph id derivation (`ids.py`) — **Apache-2.0** |
 | `packages/detective_cli/` | the `agent-detective` pip distribution: `detective analyze`, the in-process tier1→tier2 run, terminal/Markdown/JSON renderers |
-| `packages/detective_sdk/` | zero-dependency instrumentation helpers (artifact meta, version/prompt hashes, opt-in halt hook) |
+| `packages/detective_sdk/` | zero-dependency instrumentation helpers (artifact meta, version/prompt hashes, opt-in halt hook) — **Apache-2.0** |
 | `packages/detective_ci/` | deterministic golden replay of a blame fixture + pytest plugin (CI gate on the stable surface) |
 | `services/ingest/` | OTLP/HTTP trace ingest, ClickHouse/Postgres/MinIO writes, finalizer |
 | `services/worker/` | tier1/tier2 pipeline over Redis Streams, judge client, alerter, DLQ reaper |

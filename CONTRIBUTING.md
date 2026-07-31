@@ -7,11 +7,19 @@ than on formatting.
 ## Licensing, before anything else
 
 The repository is **Business Source License 1.1** (converting to Apache-2.0 on
-2030-07-22), with one deliberate exception: `packages/otel_mapper/` is
-**Apache-2.0**. That split is intentional — the mapper is the adoption surface
-and is meant to be usable anywhere, including in things that compete with the
-rest. By opening a pull request you agree your contribution ships under the
-licence of the files it touches.
+2030-07-22), with two deliberate exceptions: `packages/otel_mapper/` and
+`packages/detective_sdk/` are **Apache-2.0**.
+
+That split is not a compromise, it is the boundary of the product. Both
+exempted packages run inside somebody else's system — the mapper is the
+adoption surface, and the SDK is imported into the user's agent and ships in
+their product, which the BSL grant would class as a Production Use. Nothing
+that merely *emits* a trace may require a licence, including in things that
+compete with the rest. What stays under BSL is what *reads* the trace and
+returns a verdict.
+
+By opening a pull request you agree your contribution ships under the licence
+of the files it touches.
 
 If you are contributing something substantial, say so in the issue first. It is
 easier to agree on where a thing belongs before it is written.
@@ -55,7 +63,7 @@ cd packages/blame_engine && uv run --package blame-engine pytest tests
 |---|---|---|
 | `packages/otel_mapper/` | OTLP spans → run/edge candidates | `otel-mapper` (Apache-2.0) |
 | `packages/blame_engine/` | pure, I/O-free blame analysis | `blame-engine` |
-| `packages/detective_sdk/` | instrumentation helpers, zero deps | `detective-sdk` |
+| `packages/detective_sdk/` | instrumentation helpers, zero deps | `detective-sdk` (Apache-2.0) |
 | `packages/detective_cli/` | the local-mode CLI | `agent-detective` |
 | `packages/detective_ci/` | golden replay + CI gate | `detective-ci` |
 | `services/worker/` | tier1/tier2 processors, scoring, signals | `agent-detective-worker` |

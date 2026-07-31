@@ -2,10 +2,20 @@ Note on scope
 =============
 
 This Business Source License 1.1 governs the Agent Detective project EXCEPT for
-the directory `packages/otel_mapper/`, which is licensed separately under the
-Apache License, Version 2.0. See `packages/otel_mapper/LICENSE` for that
-directory's terms. Everything else in this repository is licensed under the
-Business Source License 1.1 set out below.
+two directories, which are licensed separately under the Apache License,
+Version 2.0:
+
+  * `packages/otel_mapper/`   — see `packages/otel_mapper/LICENSE`
+  * `packages/detective_sdk/` — see `packages/detective_sdk/LICENSE`
+
+Both are exempt for the same reason: they are the parts that run inside someone
+else's system. The mapper is the adoption surface, and the SDK is imported into
+the user's own agent process and ships inside their product — which the grant
+below would otherwise class as a Production Use. Instrumenting an agent must
+never require a licence from the Licensor.
+
+Everything else in this repository is licensed under the Business Source
+License 1.1 set out below.
 
 
 Business Source License 1.1

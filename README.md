@@ -2,6 +2,7 @@
 
 [![CI](https://github.com/Thomeras/agent_detective/actions/workflows/ci.yml/badge.svg)](https://github.com/Thomeras/agent_detective/actions/workflows/ci.yml)
 [![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue.svg)](LICENSE)
+[![Instrumentation: Apache-2.0](https://img.shields.io/badge/instrumentation-Apache--2.0-green.svg)](packages/detective_sdk/LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
 
 > ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
@@ -188,7 +189,7 @@ packages/
   blame_engine/    pure, I/O-free blame analysis (networkx only)
   otel_mapper/     OTLP span -> AgentRun/Edge mapping (Apache-2.0)
   detective_cli/   the `agent-detective` pip distribution: local mode + CLI
-  detective_sdk/   zero-dependency instrumentation helpers
+  detective_sdk/   zero-dependency instrumentation helpers (Apache-2.0)
   detective_ci/    deterministic golden replay + pytest plugin
 services/          ingest · worker (tier1/tier2 + judge) · read API
 db/                Alembic migrations        docker/clickhouse/  ClickHouse init
@@ -210,10 +211,12 @@ done
 
 ## License
 
-Business Source License 1.1 (see [LICENSE](LICENSE));
-`packages/otel_mapper` is Apache-2.0.
+**The instrumentation is Apache-2.0** — `detective-sdk` and `otel-mapper`, the
+two pieces that run inside your process and ship inside your product. Emitting
+traces never requires a licence from anyone.
 
-Source-available, not OSI open source. Internal use is explicitly permitted —
+The analysis side (see [LICENSE](LICENSE)) is Business Source License 1.1:
+source-available, not OSI open source. Internal use is explicitly permitted,
 including running it in your company's CI against your own agents. What the
 licence withholds is operating it as a service or product for third parties.
 On 2030-07-22 it converts to Apache-2.0.
