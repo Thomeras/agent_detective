@@ -1,14 +1,11 @@
 [project]
 name = "detective-sdk"
-version = "0.3.0"
-description = "Universal, dependency-free instrumentation helpers for Agent Detective conventions (Apache-2.0)"
+version = "0.3.1"
+description = "Universal, dependency-free instrumentation helpers for Agent Detective conventions"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
-# Apache-2.0, deliberately, while the rest of the repository is BUSL-1.1: this
-# package is imported INTO the user's own agent process and ships inside their
-# product. Under the BUSL grant that is a Production Use, so a source-available
-# SDK would make commercial instrumentation impossible. Same reasoning as
-# otel_mapper, and Apache rather than MIT for the express patent grant.
+# Apache rather than MIT for the express patent grant: this package is imported
+# INTO the user's own agent process and ships inside their product.
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 # Zero dependencies is a feature, not an oversight: instrumentation runs inside

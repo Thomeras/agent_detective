@@ -1,12 +1,11 @@
 [project]
 name = "detective-ci"
-version = "0.1.0"
+version = "0.1.1"
 description = "Deterministic blame-level golden replay + CI gate for Agent Detective (roadmap 2.5)"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
-# BUSL-1.1 is the SPDX identifier for the Business Source License 1.1 (BSL-1.0
-# is Boost's, an entirely different licence — do not "fix" this to BSL).
-license = "BUSL-1.1"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "blame-engine",
 ]

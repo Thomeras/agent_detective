@@ -8,6 +8,33 @@ stable and is the thing to gate CI on.
 
 Distributions are versioned independently; a release lists the ones that moved.
 
+## [0.4.3] — 2026-07-31
+
+**The repository is now Apache-2.0.** It was Business Source License 1.1;
+`otel_mapper` and `detective_sdk` already carried Apache-2.0 and are unchanged.
+Relicensed for better accessibility.
+
+Every distribution moves, because every distribution's artifact moved: the
+bundled `LICENSE` and the `License-Expression` metadata. No source file was
+touched — the bumps exist so that one version number never means two different
+licences. `blame-engine` (0.4.1 → 0.4.2), `agent-detective` (0.4.0 → 0.4.1),
+`agent-detective-worker` (0.4.0 → 0.4.1), `detective-sdk` (0.3.0 → 0.3.1),
+`otel-mapper` (0.3.0 → 0.3.1), `detective-ci` (0.1.0 → 0.1.1).
+
+**Nothing behaves differently.** No verdict is renamed, no score moves, the
+exit-code contract and the schema are untouched.
+
+### Changed
+- Licence: `BUSL-1.1` → `Apache-2.0` across the workspace. `blame_engine`,
+  `detective_ci` and `services/worker` shipped without a `LICENSE` file at all;
+  all six distributions now bundle the text in `dist-info`.
+- Documentation drops the licence-split explanation it no longer needs — README,
+  CONTRIBUTING, `docs/usage.md`, `docs/architecture.md`.
+
+### Removed
+- References to a hosted "Agent Detective Cloud" edition. There is no paid tier
+  and no hosted edition; the repository is the whole project.
+
 ## [0.4.1] — 2026-07-31
 
 `blame-engine` (0.4.0 → 0.4.1). `agent-detective` and

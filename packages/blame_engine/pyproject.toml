@@ -1,12 +1,11 @@
 [project]
 name = "blame-engine"
-version = "0.4.1"
+version = "0.4.2"
 description = "Pure, I/O-free blame analysis engine for multi-agent execution graphs"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
-# BUSL-1.1 is the SPDX identifier for the Business Source License 1.1 (BSL-1.0
-# is Boost's, an entirely different licence — do not "fix" this to BSL).
-license = "BUSL-1.1"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 dependencies = [
     "networkx>=3.3",
 ]

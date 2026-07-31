@@ -1,12 +1,8 @@
 # Agent Detective
 
 [![CI](https://github.com/Thomeras/agent_detective/actions/workflows/ci.yml/badge.svg)](https://github.com/Thomeras/agent_detective/actions/workflows/ci.yml)
-[![License: BSL 1.1](https://img.shields.io/badge/license-BSL%201.1-blue.svg)](LICENSE)
-[![Instrumentation: Apache-2.0](https://img.shields.io/badge/instrumentation-Apache--2.0-green.svg)](packages/detective_sdk/LICENSE)
+[![License: Apache-2.0](https://img.shields.io/badge/license-Apache--2.0-green.svg)](LICENSE)
 [![Python 3.12+](https://img.shields.io/badge/python-3.12%2B-blue.svg)](pyproject.toml)
-
-> ### ☁️ Agent Detective Cloud — hosted incident inbox for teams — **coming soon**
-> Self-hosting stays free. [**Watch releases →**](https://github.com/Thomeras/agent_detective/releases) to be first to know.
 
 > ### 🧪 Beta — the analysis is real, its wording is not frozen
 > Classifications still move between minor versions ([0.2.0 reclassified what 0.1.0 called `loop_detected`](CHANGELOG.md)), so gate CI on the **exit code** — `0` clean, `1` incident, `2` could not run — never on an exact `report_type`.
@@ -149,7 +145,8 @@ LLM judges, so no external API keys are needed.
 > BIND=0.0.0.0 docker compose up --build
 > ```
 >
-> Auth and multi-tenancy are what Cloud is being built for.
+> Authentication is not on the roadmap as something this project will grow on
+> its own — put it behind a reverse proxy that already does it.
 
 ```mermaid
 flowchart LR
@@ -187,9 +184,9 @@ install because it registers a pytest plugin. Details per distribution:
 ```
 packages/
   blame_engine/    pure, I/O-free blame analysis (networkx only)
-  otel_mapper/     OTLP span -> AgentRun/Edge mapping (Apache-2.0)
+  otel_mapper/     OTLP span -> AgentRun/Edge mapping
   detective_cli/   the `agent-detective` pip distribution: local mode + CLI
-  detective_sdk/   zero-dependency instrumentation helpers (Apache-2.0)
+  detective_sdk/   zero-dependency instrumentation helpers
   detective_ci/    deterministic golden replay + pytest plugin
 services/          ingest · worker (tier1/tier2 + judge) · read API
 db/                Alembic migrations        docker/clickhouse/  ClickHouse init
@@ -211,20 +208,15 @@ done
 
 ## License
 
-**The instrumentation is Apache-2.0** — `detective-sdk` and `otel-mapper`, the
-two pieces that run inside your process and ship inside your product. Emitting
-traces never requires a licence from anyone.
+**Apache-2.0 — the whole repository** (see [LICENSE](LICENSE)). Run it, fork it,
+ship it inside your product, or operate it for other people.
 
-The analysis side (see [LICENSE](LICENSE)) is Business Source License 1.1:
-source-available, not OSI open source. Internal use is explicitly permitted,
-including running it in your company's CI against your own agents. What the
-licence withholds is operating it as a service or product for third parties.
-On 2030-07-22 it converts to Apache-2.0.
+It was Business Source License 1.1 until 2026-07-31, relicensed for better
+accessibility. There is no paid tier and no hosted edition.
 
 ## Contact
 
-Questions, collaboration, or a licence for production use that the grant above
-does not cover: **tomje11@seznam.cz**.
+Questions or collaboration: **tomje11@seznam.cz**.
 
 A trace that produces a wrong verdict is the most useful thing you can send —
 see [CONTRIBUTING.md](CONTRIBUTING.md).

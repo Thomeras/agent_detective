@@ -5,13 +5,12 @@
 # `worker` to that stranger's 2018 release instead of this one. Namespacing the
 # distribution is what makes the dependency unambiguous.
 name = "agent-detective-worker"
-version = "0.4.0"
+version = "0.4.1"
 description = "Two-tier detection/scoring/blame pipeline over Redis Streams (build spec section 4)"
 authors = [{ name = "Tomáš Jeřábek" }]
 requires-python = ">=3.12"
-# BUSL-1.1 is the SPDX identifier for the Business Source License 1.1 (BSL-1.0
-# is Boost's, an entirely different licence — do not "fix" this to BSL).
-license = "BUSL-1.1"
+license = "Apache-2.0"
+license-files = ["LICENSE"]
 # Core = what the tier1/tier2 pipeline itself needs. The database, stream and
 # object-store clients are an extra because the pipeline is protocol-seamed:
 # `worker.repository` holds only the Repo protocol, and redis/minio are

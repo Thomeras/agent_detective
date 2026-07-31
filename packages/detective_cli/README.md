@@ -186,5 +186,4 @@ for graph in run.incidents:
 
 ## License
 
-Business Source License 1.1 — see `LICENSE`. The `otel-mapper` dependency is
-Apache-2.0.
+Apache-2.0 — see `LICENSE`. So is every dependency this project ships.

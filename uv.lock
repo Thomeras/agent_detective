@@ -22,7 +22,7 @@ members = [
 
 [[package]]
 name = "agent-detective"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "packages/detective_cli" }
 dependencies = [
     { name = "agent-detective-worker" },
@@ -73,7 +73,7 @@ provides-extras = ["record"]
 
 [[package]]
 name = "agent-detective-worker"
-version = "0.4.0"
+version = "0.4.1"
 source = { editable = "services/worker" }
 dependencies = [
     { name = "blame-engine" },
@@ -325,7 +325,7 @@ wheels = [
 
 [[package]]
 name = "blame-engine"
-version = "0.4.1"
+version = "0.4.2"
 source = { editable = "packages/blame_engine" }
 dependencies = [
     { name = "networkx" },
@@ -646,7 +646,7 @@ wheels = [
 
 [[package]]
 name = "detective-ci"
-version = "0.1.0"
+version = "0.1.1"
 source = { editable = "packages/detective_ci" }
 dependencies = [
     { name = "blame-engine" },
@@ -665,7 +665,7 @@ dev = [{ name = "pytest", specifier = ">=8.0" }]
 
 [[package]]
 name = "detective-sdk"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/detective_sdk" }
 
 [package.optional-dependencies]
@@ -1448,7 +1448,7 @@ wheels = [
 
 [[package]]
 name = "otel-mapper"
-version = "0.3.0"
+version = "0.3.1"
 source = { editable = "packages/otel_mapper" }
 
 [package.dev-dependencies]

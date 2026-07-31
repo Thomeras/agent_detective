@@ -6,20 +6,12 @@ than on formatting.
 
 ## Licensing, before anything else
 
-The repository is **Business Source License 1.1** (converting to Apache-2.0 on
-2030-07-22), with two deliberate exceptions: `packages/otel_mapper/` and
-`packages/detective_sdk/` are **Apache-2.0**.
+The repository is **Apache-2.0**, every package of it.
 
-That split is not a compromise, it is the boundary of the product. Both
-exempted packages run inside somebody else's system — the mapper is the
-adoption surface, and the SDK is imported into the user's agent and ships in
-their product, which the BSL grant would class as a Production Use. Nothing
-that merely *emits* a trace may require a licence, including in things that
-compete with the rest. What stays under BSL is what *reads* the trace and
-returns a verdict.
+It was Business Source License 1.1 until 2026-07-31, relicensed for better
+accessibility.
 
-By opening a pull request you agree your contribution ships under the licence
-of the files it touches.
+By opening a pull request you agree your contribution ships under Apache-2.0.
 
 If you are contributing something substantial, say so in the issue first. It is
 easier to agree on where a thing belongs before it is written.
@@ -61,9 +53,9 @@ cd packages/blame_engine && uv run --package blame-engine pytest tests
 
 | path | what it is | ships as |
 |---|---|---|
-| `packages/otel_mapper/` | OTLP spans → run/edge candidates | `otel-mapper` (Apache-2.0) |
+| `packages/otel_mapper/` | OTLP spans → run/edge candidates | `otel-mapper` |
 | `packages/blame_engine/` | pure, I/O-free blame analysis | `blame-engine` |
-| `packages/detective_sdk/` | instrumentation helpers, zero deps | `detective-sdk` (Apache-2.0) |
+| `packages/detective_sdk/` | instrumentation helpers, zero deps | `detective-sdk` |
 | `packages/detective_cli/` | the local-mode CLI | `agent-detective` |
 | `packages/detective_ci/` | golden replay + CI gate | `detective-ci` |
 | `services/worker/` | tier1/tier2 processors, scoring, signals | `agent-detective-worker` |
@@ -144,5 +136,6 @@ not exist yet.
 
 ## Contact
 
-Anything that does not fit an issue — collaboration, commercial licensing, or a
-question about whether your use is covered by the grant: **tomje11@seznam.cz**.
+Anything that does not fit an issue — collaboration, or a trace you would rather
+not attach in public: **tomje11@seznam.cz**. Your use is covered by the grant;
+there is no case where you need to ask.
